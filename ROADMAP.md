@@ -27,6 +27,34 @@ Each stage can be executed **independently** during development or as part of th
 
 ---
 
+# 🖥️ Frontend / UI Build Status
+
+Every milestone tracks **two** deliverables: **API** (backend endpoint + persistence + logging) and **UI** (React screen the researcher actually uses). This table is the at-a-glance view; per-phase checklists below carry the detail.
+
+UI strategy: most pipeline stages render into **one shared User-Story run view** (analysis → test cases → review → consensus → coverage/quality as expandable sections) rather than a bespoke page each. Only Manual Review and the Experiment Dashboard are true standalone screens.
+
+| Area | API | UI | UI notes |
+|---|---|---|---|
+| Auth (login / register) | ✅ | ✅ | Branded split-screen |
+| Dashboard | ✅ | ✅ | Real project/story counts |
+| Project detail + User Story CRUD | ✅ | ✅ | |
+| Pipeline stepper | ✅ | ✅ | Stage status on story page |
+| Requirement Analysis | ✅ | ✅ | Actors/flows/acceptance criteria rendered |
+| Test Generation (multi-agent) | ✅ | ✅ | "Generate test cases" + case cards |
+| **Single-LLM baseline + mode switch** | ❌ | ❌ | **Next** — mode toggle, reuses case cards |
+| Review | ❌ | ❌ | Findings section in shared run view |
+| Consensus / debate | ❌ | ❌ | Debate transcript section |
+| Coverage | ❌ | ❌ | Coverage matrix / % |
+| Quality | ❌ | ❌ | Quality scores per test case |
+| Manual Review | ❌ | ❌ | Standalone approve/edit/reject screen |
+| Export | ❌ | ❌ | Format picker + download |
+| Experiment Dashboard | ❌ | ❌ | Standalone comparison charts (thesis eval) |
+
+**Built:** Auth, Dashboard, Project/Story CRUD, Pipeline stepper, Requirement Analysis, Multi-agent Test Generation.
+**Pending:** everything from the Single-LLM baseline downward.
+
+---
+
 # ✅ Phase 0 — Foundation (DONE)
 
 - [x] Repository structure (`backend/`, `frontend/`)
@@ -106,9 +134,10 @@ Each stage can be executed **independently** during development or as part of th
 
 ## Baseline
 
-- [ ] Single-LLM baseline
-- [ ] Pipeline mode switching
-- [x] UI for generated test cases
+- [ ] Single-LLM baseline (API)
+- [ ] Pipeline mode switching (API)
+- [ ] UI: mode toggle (single-LLM vs multi-agent)
+- [x] UI: generated test cases display
 
 ---
 
@@ -120,7 +149,7 @@ Each stage can be executed **independently** during development or as part of th
 - [ ] Duplicate detection
 - [ ] Severity classification
 - [ ] Persist review results
-- [ ] Review UI
+- [ ] UI: review findings section (in shared run view)
 
 ---
 
@@ -132,7 +161,7 @@ Each stage can be executed **independently** during development or as part of th
 - [ ] Test Case revision
 - [ ] Consensus rationale
 - [ ] Consensus metrics
-- [ ] UI visualization
+- [ ] UI: debate transcript + consensus visualization (in shared run view)
 
 ---
 
@@ -160,29 +189,30 @@ Each stage can be executed **independently** during development or as part of th
 
 ## UI
 
-- [ ] Coverage Dashboard
-- [ ] Quality Dashboard
+- [ ] UI: Coverage section / matrix (in shared run view)
+- [ ] UI: Quality scores section (in shared run view)
 
 ---
 
 # ⬜ Phase 6 — Manual Review
 
-- [ ] Manual Review UI
-- [ ] Approve
-- [ ] Reject
-- [ ] Edit
-- [ ] Version history
-- [ ] Persist ManualReview
+- [ ] Persist ManualReview (API)
+- [ ] UI: Manual Review screen (standalone)
+- [ ] UI: Approve
+- [ ] UI: Reject
+- [ ] UI: Edit
+- [ ] UI: Version history
 
 ---
 
 # ⬜ Phase 7 — Export
 
-- [ ] CSV Export
-- [ ] JSON Export
-- [ ] XLSX Export
-- [ ] Export history
-- [ ] Export version locking
+- [ ] CSV Export (API)
+- [ ] JSON Export (API)
+- [ ] XLSX Export (API)
+- [ ] Export history (API)
+- [ ] Export version locking (API)
+- [ ] UI: export format picker + download
 
 ---
 
@@ -214,12 +244,12 @@ Each stage can be executed **independently** during development or as part of th
 - [ ] Debate Rounds
 - [ ] Consensus Rate
 
-## Dashboard
+## Dashboard (standalone Experiment Dashboard — thesis evaluation UI)
 
-- [ ] Experiment Comparison
-- [ ] Charts
-- [ ] Tables
-- [ ] Export Results
+- [ ] UI: Experiment Comparison
+- [ ] UI: Charts
+- [ ] UI: Tables
+- [ ] UI: Export Results
 
 ---
 
