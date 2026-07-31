@@ -73,4 +73,10 @@ export const api = {
     }),
   getLatestAnalysis: (projectId, storyId) =>
     request(`/projects/${projectId}/user-stories/${storyId}/latest-analysis`),
+  generateTestCases: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/generate-test-cases`, {
+      method: "POST",
+    }),
+  getLatestTestCases: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/latest-test-cases`),
 };

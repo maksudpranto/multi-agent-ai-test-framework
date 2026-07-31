@@ -114,6 +114,26 @@ def _dev_mock_responder(messages, system) -> str:
                 ],
             }
         )
+    if "acceptance criteria (database ids are authoritative)" in text:
+        criteria = re.findall(r'"id"\s*:\s*(\d+).*?"text"\s*:\s*"([^"]+)"', text)
+        return json.dumps(
+            {
+                "test_cases": [
+                    {
+                        "acceptance_criterion_id": int(criterion_id),
+                        "title": f"Verify {criterion_text}",
+                        "steps": [
+                            "Open the relevant feature",
+                            "Perform the action described by the acceptance criterion",
+                        ],
+                        "expected_result": criterion_text,
+                        "type": "functional",
+                        "priority": "medium",
+                    }
+                    for criterion_id, criterion_text in criteria
+                ]
+            }
+        )
     return "{}"
 
 

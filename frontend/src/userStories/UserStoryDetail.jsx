@@ -7,19 +7,23 @@ export default function UserStoryDetail() {
   const { projectId, storyId } = useParams();
   const [story, setStory] = useState(null);
   const [result, setResult] = useState(null);
+  const [generation, setGeneration] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
       api.getUserStory(projectId, storyId),
       api.getLatestAnalysis(projectId, storyId).catch(() => null),
+      api.getLatestTestCases(projectId, storyId).catch(() => null),
     ])
-      .then(([s, r]) => {
+      .then(([s, r, g]) => {
         setStory(s);
         setResult(r);
+        setGeneration(g);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -34,6 +38,18 @@ export default function UserStoryDetail() {
       setError(err.message);
     } finally {
       setRunning(false);
+    }
+  }
+
+  async function onGenerate() {
+    setGenerating(true);
+    setError("");
+    try {
+      setGeneration(await api.generateTestCases(projectId, storyId));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -70,9 +86,14 @@ export default function UserStoryDetail() {
         <section className="section">
           <div className="section-head">
             <h2>Requirement Analysis</h2>
-            <button onClick={onAnalyze} disabled={running}>
-              {running ? "Analyzing…" : analysis ? "Re-run analysis" : "Run analysis"}
-            </button>
+            <div className="section-actions">
+              <button className="ghost" onClick={onGenerate} disabled={!analysis || generating}>
+                {generating ? "Generating…" : "Generate test cases"}
+              </button>
+              <button onClick={onAnalyze} disabled={running}>
+                {running ? "Analyzing…" : analysis ? "Re-run analysis" : "Run analysis"}
+              </button>
+            </div>
           </div>
 
           {error && <p className="error">{error}</p>}
@@ -106,6 +127,33 @@ export default function UserStoryDetail() {
                 )}
               </div>
               <AnalysisList title="Ambiguities" items={analysis.ambiguities} />
+            </div>
+          )}
+        </section>
+
+        <section className="section">
+          <div className="section-head">
+            <h2>Generated test cases</h2>
+            {generation?.test_cases?.length > 0 && (
+              <span className="muted">{generation.test_cases.length} generated</span>
+            )}
+          </div>
+          {!generation?.test_cases?.length ? (
+            <p className="muted">Run requirement analysis, then generate test cases from its acceptance criteria.</p>
+          ) : (
+            <div className="generated-cases">
+              {generation.test_cases.map((testCase) => (
+                <article className="generated-case" key={testCase.id}>
+                  <div className="generated-case-head">
+                    <h3>{testCase.title}</h3>
+                    <span className="badge badge-blue">{testCase.priority} priority</span>
+                  </div>
+                  <ol>
+                    {testCase.steps?.map((step, index) => <li key={index}>{step}</li>)}
+                  </ol>
+                  <p><strong>Expected:</strong> {testCase.expected_result}</p>
+                </article>
+              ))}
             </div>
           )}
         </section>

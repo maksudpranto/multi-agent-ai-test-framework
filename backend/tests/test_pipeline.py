@@ -23,6 +23,7 @@ from app.models import (
     Project,
     RequirementAnalysis,
     RunStatus,
+    TestCase as GeneratedTestCase,
     User,
     UserStory,
 )
@@ -40,6 +41,23 @@ ANALYSIS_JSON = {
         {"id": "AC2", "text": "Invalid credentials show an error and deny access"},
     ],
     "ambiguities": ["Lockout after N failed attempts not specified"],
+}
+
+TEST_CASES_JSON = {
+    "test_cases": [
+        {
+            "acceptance_criterion_id": 1,
+            "title": "Grant dashboard access with valid credentials",
+            "steps": [
+                "Open the login screen",
+                "Enter a registered email and valid password",
+                "Submit the login form",
+            ],
+            "expected_result": "The dashboard is displayed to the authenticated user.",
+            "type": "functional",
+            "priority": "high",
+        }
+    ]
 }
 
 
@@ -170,3 +188,48 @@ def test_requirement_analysis_stage_handles_bad_json(db):
             RequirementAnalysis.pipeline_run_id == run.id
         )
     ) is None
+
+
+def test_test_generation_stage_persists_traceable_test_cases(db):
+    seed_prompts(db)
+    story = _seed_story(db)
+    run = PipelineRun(
+        user_story_id=story.id,
+        mode=ExperimentMode.multi_agent,
+        current_stage=PipelineStage.test_generation,
+        status=RunStatus.running,
+    )
+    db.add(run)
+    db.flush()
+    criterion = AcceptanceCriterion(
+        pipeline_run_id=run.id,
+        text="Valid credentials grant access to the dashboard",
+        order=0,
+    )
+    db.add(criterion)
+    db.commit()
+
+    response = TEST_CASES_JSON.copy()
+    response["test_cases"] = [dict(TEST_CASES_JSON["test_cases"][0])]
+    response["test_cases"][0]["acceptance_criterion_id"] = criterion.id
+    llm = LLMService(MockProvider(response=json.dumps(response)))
+    engine = DefaultWorkflowEngine(llm_service=llm)
+    result = engine.run_stage(
+        db,
+        run,
+        PipelineStage.test_generation,
+        inputs={
+            "user_story": story.raw_text,
+            "acceptance_criteria": [{"id": criterion.id, "text": criterion.text}],
+        },
+        config=RunConfig(model="mock-model"),
+    )
+
+    assert result.success
+    test_case = db.scalar(
+        select(GeneratedTestCase).where(GeneratedTestCase.pipeline_run_id == run.id)
+    )
+    assert test_case is not None
+    assert test_case.traces_to == criterion.id
+    assert test_case.version == 1
+    assert test_case.steps[0] == "Open the login screen"

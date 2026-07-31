@@ -51,6 +51,10 @@ class DefaultWorkflowEngine(WorkflowEngine):
             from app.agents.requirement_analysis import RequirementAnalysisAgent
 
             return RequirementAnalysisAgent(self.llm)
+        if stage == PipelineStage.test_generation:
+            from app.agents.test_generation import TestGenerationAgent
+
+            return TestGenerationAgent(self.llm)
         raise NotImplementedError(f"No agent registered for stage {stage.value}")
 
     def run_stage(

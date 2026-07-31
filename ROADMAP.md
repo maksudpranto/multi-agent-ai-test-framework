@@ -99,16 +99,16 @@ Each stage can be executed **independently** during development or as part of th
 
 ## Multi-Agent
 
-- [ ] Test Generation Agent
-- [ ] Structured Test Case schema
-- [ ] Versioned Test Cases
-- [ ] Traceability mapping
+- [x] Test Generation Agent
+- [x] Structured Test Case schema
+- [x] Versioned Test Cases
+- [x] Traceability mapping
 
 ## Baseline
 
 - [ ] Single-LLM baseline
 - [ ] Pipeline mode switching
-- [ ] UI for generated test cases
+- [x] UI for generated test cases
 
 ---
 

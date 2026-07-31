@@ -39,3 +39,22 @@ class RequirementAnalysisResult(BaseModel):
     analysis: RequirementAnalysisOut | None
     acceptance_criteria: list[AcceptanceCriterionOut]
     error: str | None = None
+
+
+class TestCaseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    version: int
+    title: str
+    steps: list[str] | None
+    expected_result: str | None
+    type: str | None
+    priority: str | None
+    traces_to: int | None
+
+
+class TestGenerationResult(BaseModel):
+    run: PipelineRunOut
+    test_cases: list[TestCaseOut]
+    error: str | None = None

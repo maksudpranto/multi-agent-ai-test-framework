@@ -35,12 +35,39 @@ in the story that a tester would need clarified)
 Do not include any prose outside the JSON.
 """
 
+TEST_GENERATION_V1 = """\
+You are a software test designer. Generate precise, independently executable
+test cases for this user story and its acceptance criteria.
+
+USER STORY:
+{user_story}
+
+ACCEPTANCE CRITERIA (database ids are authoritative):
+{acceptance_criteria}
+
+Return ONLY a JSON object with a "test_cases" array. Each item must contain:
+- "acceptance_criterion_id": integer id from the supplied criteria
+- "title": concise test title
+- "steps": non-empty ordered array of imperative steps
+- "expected_result": a verifiable outcome
+- "type": functional, negative, boundary, or security
+- "priority": high, medium, or low
+
+Cover every supplied criterion. Do not include prose outside the JSON.
+"""
+
 SEED_PROMPTS: list[dict] = [
     {
         "stage": PipelineStage.requirement_analysis,
         "version": "v1",
         "template": REQUIREMENT_ANALYSIS_V1,
         "description": "Requirement analysis: user story -> structured spec.",
+    },
+    {
+        "stage": PipelineStage.test_generation,
+        "version": "v1",
+        "template": TEST_GENERATION_V1,
+        "description": "Test generation: acceptance criteria -> traceable test cases.",
     },
 ]
 

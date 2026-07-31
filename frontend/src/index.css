@@ -986,6 +986,43 @@ select:focus {
 .section-head h2 {
   margin: 0;
 }
+.section-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.generated-cases {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+.generated-case {
+  padding: 16px 18px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+.generated-case-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.generated-case h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.generated-case ol {
+  margin: 12px 0;
+  padding-left: 20px;
+}
+.generated-case li,
+.generated-case p {
+  font-size: 13px;
+}
+.generated-case p {
+  margin: 0;
+}
 .story-text {
   white-space: pre-wrap;
   font-family: var(--font-body);

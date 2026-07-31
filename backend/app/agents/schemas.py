@@ -18,3 +18,16 @@ class RequirementAnalysisOut(BaseModel):
     alt_flows: list[str] = Field(default_factory=list)
     acceptance_criteria: list[AcceptanceCriterionOut] = Field(default_factory=list)
     ambiguities: list[str] = Field(default_factory=list)
+
+
+class GeneratedTestCaseOut(BaseModel):
+    acceptance_criterion_id: int
+    title: str = Field(min_length=1)
+    steps: list[str] = Field(min_length=1)
+    expected_result: str = Field(min_length=1)
+    type: str = Field(default="functional")
+    priority: str = Field(default="medium")
+
+
+class TestGenerationOut(BaseModel):
+    test_cases: list[GeneratedTestCaseOut] = Field(default_factory=list)
