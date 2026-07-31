@@ -118,17 +118,41 @@ def _dev_mock_responder(messages, system) -> str:
 
 
 def build_provider() -> LLMProvider:
-    """Pick a provider from settings: Anthropic when a key is configured,
-    otherwise a Mock provider (with a dev responder) so the app runs offline."""
+    """Build the explicitly configured LLM provider.
+
+    Mock is the default so development and tests work without an external API.
+    """
     settings = get_settings()
-    if settings.anthropic_api_key:
+    provider = settings.llm_provider.lower().strip()
+
+    if provider == "mock":
+        from app.llm.mock_provider import MockProvider
+
+        return MockProvider(responder=_dev_mock_responder)
+
+    if provider == "anthropic":
+        if not settings.anthropic_api_key:
+            raise ValueError("ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic")
         from app.llm.anthropic_provider import AnthropicProvider
 
         return AnthropicProvider(api_key=settings.anthropic_api_key)
 
-    from app.llm.mock_provider import MockProvider
+    if provider == "gemini":
+        if not settings.gemini_api_key:
+            raise ValueError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini")
+        from app.llm.gemini_provider import GeminiProvider
 
-    return MockProvider(responder=_dev_mock_responder)
+        return GeminiProvider(api_key=settings.gemini_api_key)
+
+    if provider == "ollama":
+        from app.llm.ollama_provider import OllamaProvider
+
+        return OllamaProvider(base_url=settings.ollama_base_url)
+
+    raise ValueError(
+        f"Unsupported LLM_PROVIDER={settings.llm_provider!r}. "
+        "Choose mock, anthropic, gemini, or ollama."
+    )
 
 
 @lru_cache

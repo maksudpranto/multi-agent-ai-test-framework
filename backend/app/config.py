@@ -10,8 +10,11 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
+    llm_provider: str = "mock"
     anthropic_api_key: str = ""
-    default_llm_model: str = "claude-sonnet-5"
+    gemini_api_key: str = ""
+    ollama_base_url: str = "http://localhost:11434"
+    default_llm_model: str = "mock-requirement-analysis"
     cors_origins: str = "http://localhost:5173"
 
     @property

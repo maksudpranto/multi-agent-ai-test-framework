@@ -64,10 +64,10 @@ Each stage can be executed **independently** during development or as part of th
 
 ## Infrastructure
 
-- [ ] Configure Anthropic API Key
-- [ ] LLMProvider interface
-- [ ] Anthropic Provider
-- [ ] Mock Provider
+- [x] Configurable LLM provider selection (Mock, Anthropic, Gemini, Ollama)
+- [x] LLMProvider interface
+- [x] Anthropic Provider
+- [x] Mock Provider
 - [ ] Agent base interface
 - [ ] Workflow Engine
 - [ ] Pipeline execution manager

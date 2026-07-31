@@ -36,7 +36,7 @@ consensus, coverage, quality) are implemented in later phases.
 - **Backend:** FastAPI, SQLAlchemy, Alembic, SQLite (swappable to Postgres)
 - **Frontend:** React + Vite, React Router
 - **Auth:** email/password with JWT (bcrypt hashing)
-- **AI (later phases):** Anthropic Claude API
+- **AI:** provider-independent adapters for Mock, Anthropic Claude, Google Gemini, and local Ollama
 
 ## Project Structure
 
@@ -72,10 +72,24 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # then edit JWT_SECRET, ANTHROPIC_API_KEY
+cp .env.example .env          # mock works offline by default
 alembic upgrade head          # create the SQLite schema
 uvicorn app.main:app --reload # serves at http://localhost:8000 (docs at /docs)
 ```
+
+### AI providers
+
+The backend uses `LLM_PROVIDER` to select an adapter. The default is `mock`,
+which runs the requirement-analysis workflow without an external API.
+
+- `mock`: offline development and tests (`DEFAULT_LLM_MODEL=mock-requirement-analysis`)
+- `anthropic`: set `ANTHROPIC_API_KEY` and a Claude model name
+- `gemini`: set `GEMINI_API_KEY` and a Gemini model name
+- `ollama`: run Ollama locally and set `OLLAMA_BASE_URL` plus a pulled local model
+
+For example, `LLM_PROVIDER=ollama` and `DEFAULT_LLM_MODEL=llama3.2` use a
+local Ollama model. Provider selection does not require changes to agents or
+the workflow engine.
 
 ### Frontend
 
