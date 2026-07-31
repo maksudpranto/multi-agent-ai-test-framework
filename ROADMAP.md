@@ -1,134 +1,268 @@
 # Project Roadmap & Checklist
 
-Build tracker for the M.Sc thesis project — *A Multi-Agent AI Framework for
-Automated Software Test Case Generation and Validation from Software
-Requirements.*
+Build tracker for the M.Sc. thesis project:
 
-This is a **research prototype**: experiments (single-LLM baseline vs
-multi-agent) are a first-class concept. See [ARCHITECTURE.md](ARCHITECTURE.md)
-for the layered design.
+> **A Multi-Agent AI Framework for Automated Software Test Case Generation and Validation from Software Requirements**
 
-Multi-agent pipeline order:
-`Requirement Analysis → Test Generation → Review → Consensus → Coverage →
-Quality → Manual Review → Export` (Coverage/Quality run after Consensus).
+This repository contains a **research prototype**, not a commercial SaaS product.
+
+The primary research objective is to compare a **Single-LLM baseline** against a **Collaborative Multi-Agent Framework** for automated software test case generation and evaluation.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete system architecture.
 
 ---
 
-## ✅ Phase 0 — Foundation (DONE)
+# Multi-Agent Pipeline
 
-- [x] Isolated Python venv + personal GitHub repo (SSH)
-- [x] Repo restructure into `backend/` and `frontend/`
-- [x] Backend: FastAPI, config from `.env`, SQLAlchemy engine/session
-- [x] Auth: register / login / me with JWT + bcrypt
-- [x] Project CRUD + User Story CRUD (scoped)
-- [x] React app: routing, protected routes, auth context, dashboard,
-      project detail, user story detail, pipeline stepper
-- [x] Verified end-to-end in browser, committed & pushed
+Requirement Analysis
+→ Test Generation
+→ Review
+→ Consensus
+→ Coverage Analysis
+→ Quality Evaluation
+→ Manual Review
+→ Export
 
-## ✅ Phase 0.5 — Research-platform schema + architecture (DONE)
-
-- [x] `Dataset` table (groups user stories by domain) + `dataset_id` on story
-- [x] `PromptTemplate` table (versioned prompts as data)
-- [x] `ExperimentConfig` (model, temperature, max_tokens, stage toggles,
-      debate rounds)
-- [x] `Experiment` (dataset + config + mode: single_llm / multi_agent)
-- [x] `ExperimentMetric` (precomputed metrics per run + aggregate)
-- [x] `PipelineRun.mode` + `experiment_id`; `AgentExecution.prompt_template_id`
-      + `reasoning`
-- [x] Clean single migration (18 tables) applied
-- [x] `ARCHITECTURE.md` documenting the layered design
+Each stage can be executed **independently** during development or as part of the complete pipeline.
 
 ---
 
-## ⬜ Phase 1 — Foundations for agents (LLM Service, Engine, first stage)
+# ✅ Phase 0 — Foundation (DONE)
 
-- [ ] Add `ANTHROPIC_API_KEY` to `backend/.env`
-- [ ] **LLM Service:** `LLMProvider` ABC + `LLMResponse` (tokens/latency/model)
-- [ ] `AnthropicProvider` + `MockProvider` (offline / no-cost testing)
-- [ ] **Agent base:** uniform `AgentResult` contract + `Agent` ABC
-- [ ] **Workflow Engine:** `WorkflowEngine` interface + `DefaultWorkflowEngine`
-      (reads config + mode); pluggable for LangGraph/CrewAI later
-- [ ] `AgentExecution` logging plumbing (raw I/O, reasoning, tokens, latency,
-      prompt template + version)
-- [ ] `PromptTemplate` seeding for the requirement-analysis stage
-- [ ] **Requirement Analysis Agent:** story → actors, preconditions,
-      main/alt flows, acceptance criteria, ambiguities (Pydantic-validated)
-- [ ] Persist `RequirementAnalysis` + `AcceptanceCriterion` rows
-- [ ] API endpoint + "Run Requirement Analysis" trigger in the UI
-- [ ] Verify with MockProvider (and real key if set)
-
-## ⬜ Phase 2 — Test Generation + Single-LLM baseline
-
-- [ ] Test-case structured-output schema
-- [ ] Test Generation Agent: requirement → test cases, each with real FK
-      `traces_to` an acceptance criterion; versioned `TestCase` rows
-- [ ] **Single-LLM baseline mode:** one call, story → test cases (no analysis,
-      no review/consensus) — the comparison target
-- [ ] Engine branches on `mode` (single_llm vs multi_agent)
-- [ ] UI: list generated test cases
-
-## ⬜ Phase 3 — Review
-
-- [ ] Critique schema (issues, suggested fix, severity, duplicate flag)
-- [ ] Reviewer Agent: test cases + requirement → per-test critique
-- [ ] Persist as `DebateTurn` (speaker = reviewer); flag contested tests
-- [ ] UI: show review feedback
-
-## ⬜ Phase 4 — Consensus (core novelty)
-
-- [ ] Bounded debate loop (config `max_debate_rounds`): reviewer → generator
-      defends/concedes → reviewer re-assesses
-- [ ] Log every turn as `DebateTurn`
-- [ ] Consensus Agent: reads full transcript, independent decision
-      (keep/revise/merge/drop) **with rationale**
-- [ ] Revised `TestCase` versions (`generated_by = consensus`)
-- [ ] Metrics: rounds-to-convergence, reviewer-override rate
-- [ ] UI: debate transcript + consensus decision
-
-## ⬜ Phase 5 — Coverage & Quality
-
-- [ ] Coverage (deterministic): traceability-matrix join over `traces_to`
-- [ ] Quality (LLM, temperature=0, fixed rubric): clarity, atomicity,
-      traceability scores
-- [ ] Duplicate detection (embedding similarity; LLM for ambiguous cases)
-- [ ] Persist `CoverageReport` + `QualityReport`
-- [ ] UI: coverage matrix + quality scores
-
-## ⬜ Phase 6 — Manual Review
-
-- [ ] Review UI: approve / edit / reject per test case
-- [ ] Edits create new `TestCase` versions (`generated_by = manual`)
-- [ ] Persist `ManualReview`; status transitions
-
-## ⬜ Phase 7 — Export
-
-- [ ] Export approved test cases to CSV / JSON / XLSX
-- [ ] Pin exact `TestCase` versions in `ExportLog`
-- [ ] UI: download + export history
-
-## ⬜ Phase 8 — Experiment Manager + Evaluation Dashboard
-
-- [ ] Dataset CRUD UI (import stories, tag domain)
-- [ ] Experiment Config UI (model, temperature, stage toggles, mode)
-- [ ] Create/run Experiment over a dataset; batch runs
-- [ ] Compute + store `ExperimentMetric` (coverage %, duplicate rate,
-      quality, traceability, rounds-to-consensus, execution time)
-- [ ] Results dashboard: single-LLM vs multi-agent comparison, charts/tables
-- [ ] Home dashboard stat tiles (projects, stories, tests, coverage, quality)
-      + recent activity
-- [ ] Export metrics for the dissertation
+- [x] Repository structure (`backend/`, `frontend/`)
+- [x] Python virtual environment
+- [x] FastAPI backend
+- [x] SQLAlchemy setup
+- [x] JWT Authentication
+- [x] Project CRUD
+- [x] User Story CRUD
+- [x] React application
+- [x] Protected routes
+- [x] Dashboard
+- [x] Project details
+- [x] User Story details
+- [x] Pipeline stepper
+- [x] End-to-end verification
 
 ---
 
-## Cross-cutting / later
+# ✅ Phase 0.5 — Research Platform (DONE)
 
-- [ ] Regenerate = new `PipelineRun` (`parent_run_id`), never mutate old runs
-- [ ] Idempotency / run token so retries don't double-call the API
-- [ ] Additional LLM providers (OpenAI, Gemini, Ollama) behind LLM Service
-- [ ] Backend unit tests (auth, coverage computation, schema validation)
-- [ ] Error handling + retry UI for failed stages
-- [ ] Deployment (optional): Postgres, hosting, env config
+- [x] Dataset table
+- [x] PromptTemplate table
+- [x] ExperimentConfig
+- [x] Experiment
+- [x] ExperimentMetric
+- [x] PipelineRun improvements
+- [x] AgentExecution improvements
+- [x] 18-table schema
+- [x] ARCHITECTURE.md
 
-## Explicitly out of scope (not research-relevant)
+---
 
-- Forgot-password, email verification, refresh tokens
+# ⬜ Phase 1 — AI Foundation
+
+## Infrastructure
+
+- [ ] Configure Anthropic API Key
+- [ ] LLMProvider interface
+- [ ] Anthropic Provider
+- [ ] Mock Provider
+- [ ] Agent base interface
+- [ ] Workflow Engine
+- [ ] Pipeline execution manager
+
+## Logging & Reproducibility
+
+- [ ] Agent execution logging
+- [ ] Prompt version tracking
+- [ ] Raw LLM response storage
+- [ ] Parsed response storage
+- [ ] Validated output storage
+- [ ] Token usage tracking
+- [ ] Latency tracking
+- [ ] Estimated execution cost
+
+## Requirement Analysis Agent
+
+- [ ] Prompt template
+- [ ] Requirement Analysis Agent
+- [ ] Acceptance Criteria extraction
+- [ ] Persist RequirementAnalysis
+- [ ] Persist Acceptance Criteria
+- [ ] API endpoint
+- [ ] UI integration
+
+---
+
+# ⬜ Phase 2 — Test Generation
+
+## Multi-Agent
+
+- [ ] Test Generation Agent
+- [ ] Structured Test Case schema
+- [ ] Versioned Test Cases
+- [ ] Traceability mapping
+
+## Baseline
+
+- [ ] Single-LLM baseline
+- [ ] Pipeline mode switching
+- [ ] UI for generated test cases
+
+---
+
+# ⬜ Phase 3 — AI Review
+
+- [ ] Review schema
+- [ ] Reviewer Agent
+- [ ] Missing scenario detection
+- [ ] Duplicate detection
+- [ ] Severity classification
+- [ ] Persist review results
+- [ ] Review UI
+
+---
+
+# ⬜ Phase 4 — Consensus
+
+- [ ] Debate workflow
+- [ ] Debate transcript
+- [ ] Consensus Agent
+- [ ] Test Case revision
+- [ ] Consensus rationale
+- [ ] Consensus metrics
+- [ ] UI visualization
+
+---
+
+# ⬜ Phase 5 — Evaluation
+
+## Coverage
+
+- [ ] Requirement Traceability
+- [ ] Coverage Matrix
+- [ ] Coverage Report
+
+## Quality
+
+- [ ] Quality Evaluation Agent
+- [ ] Clarity Score
+- [ ] Atomicity Score
+- [ ] Traceability Score
+- [ ] Duplicate Score
+- [ ] Overall Quality Score
+
+## Persistence
+
+- [ ] CoverageReport
+- [ ] QualityReport
+
+## UI
+
+- [ ] Coverage Dashboard
+- [ ] Quality Dashboard
+
+---
+
+# ⬜ Phase 6 — Manual Review
+
+- [ ] Manual Review UI
+- [ ] Approve
+- [ ] Reject
+- [ ] Edit
+- [ ] Version history
+- [ ] Persist ManualReview
+
+---
+
+# ⬜ Phase 7 — Export
+
+- [ ] CSV Export
+- [ ] JSON Export
+- [ ] XLSX Export
+- [ ] Export history
+- [ ] Export version locking
+
+---
+
+# ⬜ Phase 8 — Research & Experiments
+
+## Dataset
+
+- [ ] Dataset Management
+- [ ] Dataset Versioning
+- [ ] Dataset Import
+
+## Experiment
+
+- [ ] Experiment Manager
+- [ ] Experiment Notes
+- [ ] Single-LLM execution
+- [ ] Multi-Agent execution
+- [ ] Batch execution
+
+## Metrics
+
+- [ ] Coverage %
+- [ ] Duplicate Rate
+- [ ] Traceability %
+- [ ] Quality Score
+- [ ] Execution Time
+- [ ] Token Usage
+- [ ] Estimated Cost
+- [ ] Debate Rounds
+- [ ] Consensus Rate
+
+## Dashboard
+
+- [ ] Experiment Comparison
+- [ ] Charts
+- [ ] Tables
+- [ ] Export Results
+
+---
+
+# Cross-Cutting Improvements
+
+- [ ] Independent execution of every pipeline stage
+- [ ] Pipeline status tracking
+- [ ] Pipeline regeneration
+- [ ] Retry mechanism
+- [ ] Idempotent execution
+- [ ] Additional LLM providers
+- [ ] Backend unit tests
+- [ ] Error handling
+- [ ] Deployment
+
+---
+
+# Out of Scope
+
+- Forgot Password
+
+---
+
+# Research Goals
+
+- Compare **Single-LLM** vs **Multi-Agent** approaches
+- Improve requirement coverage
+- Reduce duplicate test cases
+- Improve traceability
+- Improve test case quality
+- Measure execution cost and latency
+- Produce reproducible experimental results
+
+---
+
+# Definition of Done
+
+A milestone is considered complete only if:
+
+- [ ] Backend implemented
+- [ ] Frontend integrated
+- [ ] Database persistence completed
+- [ ] Execution logged
+- [ ] Unit tested
+- [ ] Manual verification completed
+- [ ] Documentation updated
