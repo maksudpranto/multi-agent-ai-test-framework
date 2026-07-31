@@ -50,59 +50,72 @@ export default function ProjectDetail() {
     await load();
   }
 
-  if (loading) return <div className="page"><p className="muted">Loading…</p></div>;
+  if (loading)
+    return (
+      <div className="content">
+        <p className="muted">Loading…</p>
+      </div>
+    );
 
   return (
-    <div className="page">
-      <p className="breadcrumb">
-        <Link to="/">Projects</Link> / {project?.name}
-      </p>
-      <h1>{project?.name}</h1>
-      {project?.description && <p className="muted">{project.description}</p>}
+    <div className="content">
+      <div className="page">
+        <p className="breadcrumb">
+          <Link to="/">Home</Link> / {project?.name}
+        </p>
+        <h1>{project?.name}</h1>
+        {project?.description && <p className="muted">{project.description}</p>}
 
-      <h2>Add User Story</h2>
-      <form className="stacked-form" onSubmit={onCreate}>
-        <input
-          placeholder="Story title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-        <textarea
-          placeholder="As a user, I want to… so that…"
-          value={rawText}
-          onChange={(e) => setRawText(e.target.value)}
-          rows={4}
-          required
-        />
-        <button type="submit">Add User Story</button>
-      </form>
+        <section className="section">
+          <h2>Add user story</h2>
+          <form className="stacked-form" onSubmit={onCreate}>
+            <input
+              placeholder="Story title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+            <textarea
+              placeholder="As a user, I want to… so that…"
+              value={rawText}
+              onChange={(e) => setRawText(e.target.value)}
+              rows={4}
+              required
+            />
+            <button type="submit">Add user story</button>
+          </form>
+          {error && <p className="error">{error}</p>}
+        </section>
 
-      {error && <p className="error">{error}</p>}
-
-      <h2>User Stories</h2>
-      {stories.length === 0 ? (
-        <p className="muted">No user stories yet.</p>
-      ) : (
-        <ul className="card-list">
-          {stories.map((s) => (
-            <li key={s.id} className="card">
-              <div>
-                <Link
-                  to={`/projects/${projectId}/user-stories/${s.id}`}
-                  className="card-title"
-                >
-                  {s.title}
-                </Link>
-                <p className="muted clamp">{s.raw_text}</p>
-              </div>
-              <button className="danger" onClick={() => onDelete(s.id)}>
-                Delete
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+        <section className="section">
+          <div className="section-head">
+            <h2>User stories</h2>
+            <span className="muted">{stories.length} total</span>
+          </div>
+          {stories.length === 0 ? (
+            <p className="muted">No user stories yet. Add one above.</p>
+          ) : (
+            <ul className="card-list" style={{ marginTop: 16 }}>
+              {stories.map((s) => (
+                <li key={s.id} className="list-card">
+                  <div style={{ minWidth: 0 }}>
+                    <Link
+                      to={`/projects/${projectId}/user-stories/${s.id}`}
+                      className="list-title"
+                    >
+                      {s.title}
+                    </Link>
+                    <p className="muted clamp">{s.raw_text}</p>
+                  </div>
+                  <button className="danger" onClick={() => onDelete(s.id)}>
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

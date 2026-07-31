@@ -37,86 +37,97 @@ export default function UserStoryDetail() {
     }
   }
 
-  if (loading) return <div className="page"><p className="muted">Loading…</p></div>;
+  if (loading)
+    return (
+      <div className="content">
+        <p className="muted">Loading…</p>
+      </div>
+    );
   if (error && !story)
-    return <div className="page"><p className="error">{error}</p></div>;
+    return (
+      <div className="content">
+        <p className="error">{error}</p>
+      </div>
+    );
 
   const analysis = result?.analysis;
   const criteria = result?.acceptance_criteria || [];
 
   return (
-    <div className="page">
-      <p className="breadcrumb">
-        <Link to="/">Projects</Link> /{" "}
-        <Link to={`/projects/${projectId}`}>Project</Link> / {story?.title}
-      </p>
-      <h1>{story?.title}</h1>
+    <div className="content">
+      <div className="page">
+        <p className="breadcrumb">
+          <Link to="/">Home</Link> /{" "}
+          <Link to={`/projects/${projectId}`}>Project</Link> / {story?.title}
+        </p>
+        <h1>{story?.title}</h1>
 
-      <section className="panel">
-        <h2>User Story</h2>
-        <p className="story-text">{story?.raw_text}</p>
-      </section>
+        <section className="section">
+          <h2>User story</h2>
+          <p className="story-text">{story?.raw_text}</p>
+        </section>
 
-      <section className="panel">
-        <div className="panel-head">
-          <h2>Requirement Analysis</h2>
-          <button onClick={onAnalyze} disabled={running}>
-            {running ? "Analyzing…" : analysis ? "Re-run Analysis" : "Run Analysis"}
-          </button>
-        </div>
-
-        {error && <p className="error">{error}</p>}
-        {result?.error && <p className="error">{result.error}</p>}
-
-        {!analysis && !result?.error && (
-          <p className="muted">
-            Run the analysis to break this story into a structured, testable
-            specification.
-          </p>
-        )}
-
-        {analysis && (
-          <div className="analysis">
-            <AnalysisList title="Actors" items={analysis.actors} />
-            <AnalysisList title="Preconditions" items={analysis.preconditions} />
-            <AnalysisList title="Main Flow" items={analysis.main_flow} ordered />
-            <AnalysisList title="Alternative Flows" items={analysis.alt_flows} />
-            <div className="analysis-block">
-              <h3>Acceptance Criteria</h3>
-              {criteria.length === 0 ? (
-                <p className="muted">None extracted.</p>
-              ) : (
-                <ul>
-                  {criteria.map((c) => (
-                    <li key={c.id}>
-                      <code>AC{c.order + 1}</code> {c.text}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <AnalysisList title="Ambiguities" items={analysis.ambiguities} />
+        <section className="section">
+          <div className="section-head">
+            <h2>Requirement Analysis</h2>
+            <button onClick={onAnalyze} disabled={running}>
+              {running ? "Analyzing…" : analysis ? "Re-run analysis" : "Run analysis"}
+            </button>
           </div>
-        )}
-      </section>
 
-      <section className="panel">
-        <h2>Generation Pipeline</h2>
-        <ol className="stepper">
-          {PIPELINE_STAGES.map((stage, i) => (
-            <li
-              key={stage.key}
-              className={`step ${stage.implemented ? "done" : "pending"}`}
-            >
-              <span className="step-index">{i + 1}</span>
-              <span className="step-label">{stage.label}</span>
-              <span className="step-status">
-                {stage.implemented ? "Ready" : "Not yet implemented"}
-              </span>
-            </li>
-          ))}
-        </ol>
-      </section>
+          {error && <p className="error">{error}</p>}
+          {result?.error && <p className="error">{result.error}</p>}
+
+          {!analysis && !result?.error && (
+            <p className="muted">
+              Run the analysis to break this story into a structured, testable
+              specification.
+            </p>
+          )}
+
+          {analysis && (
+            <div className="analysis">
+              <AnalysisList title="Actors" items={analysis.actors} />
+              <AnalysisList title="Preconditions" items={analysis.preconditions} />
+              <AnalysisList title="Main flow" items={analysis.main_flow} ordered />
+              <AnalysisList title="Alternative flows" items={analysis.alt_flows} />
+              <div className="analysis-block">
+                <h3>Acceptance criteria</h3>
+                {criteria.length === 0 ? (
+                  <p className="muted">None extracted.</p>
+                ) : (
+                  <ul>
+                    {criteria.map((c) => (
+                      <li key={c.id}>
+                        <code>AC{c.order + 1}</code> {c.text}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <AnalysisList title="Ambiguities" items={analysis.ambiguities} />
+            </div>
+          )}
+        </section>
+
+        <section className="section">
+          <h2>Generation pipeline</h2>
+          <ol className="stepper">
+            {PIPELINE_STAGES.map((stage, i) => (
+              <li
+                key={stage.key}
+                className={`step ${stage.implemented ? "done" : "pending"}`}
+              >
+                <span className="step-index">{i + 1}</span>
+                <span className="step-label">{stage.label}</span>
+                <span className="step-status">
+                  {stage.implemented ? "Ready" : "Not yet implemented"}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
     </div>
   );
 }
