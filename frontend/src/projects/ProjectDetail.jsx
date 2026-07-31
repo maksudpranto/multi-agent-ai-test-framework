@@ -58,63 +58,103 @@ export default function ProjectDetail() {
     );
 
   return (
-    <div className="content">
-      <div className="page">
+    <div className="content project-content">
+      <div className="page project-page">
         <p className="breadcrumb">
           <Link to="/">Home</Link> / {project?.name}
         </p>
-        <h1>{project?.name}</h1>
-        {project?.description && <p className="muted">{project.description}</p>}
-
-        <section className="section">
-          <h2>Add user story</h2>
-          <form className="stacked-form" onSubmit={onCreate}>
-            <input
-              placeholder="Story title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-            <textarea
-              placeholder="As a user, I want to… so that…"
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              rows={4}
-              required
-            />
-            <button type="submit">Add user story</button>
-          </form>
-          {error && <p className="error">{error}</p>}
-        </section>
-
-        <section className="section">
-          <div className="section-head">
-            <h2>User stories</h2>
-            <span className="muted">{stories.length} total</span>
+        <header className="project-page-head">
+          <div>
+            <div className="eyebrow">Project workspace</div>
+            <h1>{project?.name}</h1>
+            <p>{project?.description || "Create and prepare requirements for analysis."}</p>
           </div>
+          <div className="story-count">
+            <strong>{stories.length}</strong>
+            <span>{stories.length === 1 ? "user story" : "user stories"}</span>
+          </div>
+        </header>
+
+        <div className="stories-workspace">
+          <aside className="story-composer">
+            <div className="panel-kicker">New requirement</div>
+            <h2>Add a user story</h2>
+            <p className="muted">Describe the user need and the expected outcome.</p>
+            <form className="story-form" onSubmit={onCreate}>
+              <label>
+                Story title
+                <input
+                  placeholder="e.g. Secure sign in"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Requirement
+                <textarea
+                  placeholder="As a user, I want to… so that…"
+                  value={rawText}
+                  onChange={(e) => setRawText(e.target.value)}
+                  rows={7}
+                  required
+                />
+              </label>
+              <button type="submit" className="story-submit">
+                <span>+</span> Add user story
+              </button>
+            </form>
+            {error && <p className="error">{error}</p>}
+          </aside>
+
+          <section className="stories-panel">
+            <div className="stories-panel-head">
+              <div>
+                <div className="panel-kicker">Requirements</div>
+                <h2>User stories</h2>
+              </div>
+              <span className="filter-chip on">All {stories.length}</span>
+            </div>
           {stories.length === 0 ? (
-            <p className="muted">No user stories yet. Add one above.</p>
+              <div className="story-empty">
+                <div className="story-empty-icon">+</div>
+                <h3>No user stories yet</h3>
+                <p>Add your first requirement using the form on the left.</p>
+              </div>
           ) : (
-            <ul className="card-list" style={{ marginTop: 16 }}>
+              <ul className="story-list">
               {stories.map((s) => (
-                <li key={s.id} className="list-card">
-                  <div style={{ minWidth: 0 }}>
-                    <Link
-                      to={`/projects/${projectId}/user-stories/${s.id}`}
-                      className="list-title"
-                    >
-                      {s.title}
-                    </Link>
-                    <p className="muted clamp">{s.raw_text}</p>
-                  </div>
-                  <button className="danger" onClick={() => onDelete(s.id)}>
-                    Delete
-                  </button>
-                </li>
+                  <li key={s.id} className="story-row">
+                    <div className="story-row-index">US</div>
+                    <div className="story-row-content">
+                      <Link
+                        to={`/projects/${projectId}/user-stories/${s.id}`}
+                        className="story-row-title"
+                      >
+                        {s.title}
+                      </Link>
+                      <p className="clamp">{s.raw_text}</p>
+                      <div className="story-row-meta">
+                        <span className="badge badge-blue">Ready for analysis</span>
+                        <div className="story-row-actions">
+                          <Link
+                            to={`/projects/${projectId}/user-stories/${s.id}`}
+                            className="story-open"
+                          >
+                            Open <span>→</span>
+                          </Link>
+                          <button className="danger story-delete" onClick={() => onDelete(s.id)}>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
               ))}
             </ul>
           )}
-        </section>
+          </section>
+        </div>
       </div>
     </div>
   );

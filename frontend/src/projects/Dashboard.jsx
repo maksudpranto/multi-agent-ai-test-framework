@@ -3,17 +3,6 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
-// The reasoning agents in the pipeline. Status is driven by the real build
-// state so the dashboard never overstates what exists.
-const CREW = [
-  { code: "RA", name: "Requirement Analysis", role: "Extracts actors, flows & acceptance criteria", live: true, color: "rgba(0,102,178,0.10)", fg: "var(--blue-700)" },
-  { code: "TG", name: "Test Generation", role: "Drafts test cases from each criterion", live: false, color: "rgba(78,85,201,0.10)", fg: "var(--indigo-accent)" },
-  { code: "RV", name: "Reviewer", role: "Hunts gaps, overlaps & weak assertions", live: false, color: "rgba(216,0,50,0.09)", fg: "var(--crimson)" },
-  { code: "CS", name: "Consensus", role: "Debates the reviewer to resolve findings", live: false, color: "rgba(121,30,148,0.10)", fg: "var(--mauveine)" },
-  { code: "CV", name: "Coverage", role: "Maps cases back to acceptance criteria", live: false, color: "rgba(0,103,163,0.10)", fg: "var(--blue-600)" },
-  { code: "QA", name: "Quality Evaluation", role: "Scores clarity, atomicity & traceability", live: false, color: "rgba(123,201,80,0.14)", fg: "var(--poly-green)" },
-];
-
 // Right-hand hero card: honest readiness of the pipeline, not a fake score.
 const READINESS = [
   { label: "Requirement analysis", pct: 100, color: "var(--blue-600)", note: "Live" },
@@ -208,11 +197,6 @@ export default function Dashboard() {
           <div className="stat-value">0</div>
           <div className="stat-sub">Generation lands in Phase 2</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">Reasoning agents</div>
-          <div className="stat-value accent">{CREW.length}</div>
-          <div className="stat-sub">{CREW.filter((c) => c.live).length} live · {CREW.filter((c) => !c.live).length} planned</div>
-        </div>
       </section>
 
       {/* ---------- Projects + rail ---------- */}
@@ -282,32 +266,6 @@ export default function Dashboard() {
         </div>
 
         <div className="rail">
-          <div className="panel panel-pad">
-            <div className="rail-head">
-              <h2>Agent crew</h2>
-              <span className="filter-chip on">{CREW.filter((c) => c.live).length}/{CREW.length} live</span>
-            </div>
-            <p className="rail-desc">
-              Specialised agents collaborate on each story — the thesis's core claim over a single-prompt baseline.
-            </p>
-            <div className="crew-list">
-              {CREW.map((c) => (
-                <div className="crew-item" key={c.code}>
-                  <div className="crew-badge" style={{ background: c.color, color: c.fg }}>{c.code}</div>
-                  <div className="crew-body">
-                    <div className="crew-name">{c.name}</div>
-                    <div className="crew-role">{c.role}</div>
-                  </div>
-                  {c.live ? (
-                    <span className="dot-lg" style={{ background: "var(--lime-green)" }} title="Live" />
-                  ) : (
-                    <span className="crew-status" style={{ color: "var(--text-secondary)" }}>planned</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="panel panel-pad">
             <h2 style={{ marginBottom: 16 }}>Recent activity</h2>
             {recent.length === 0 ? (

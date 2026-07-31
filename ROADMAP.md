@@ -68,30 +68,30 @@ Each stage can be executed **independently** during development or as part of th
 - [x] LLMProvider interface
 - [x] Anthropic Provider
 - [x] Mock Provider
-- [ ] Agent base interface
-- [ ] Workflow Engine
-- [ ] Pipeline execution manager
+- [x] Agent base interface
+- [x] Workflow Engine
+- [x] Pipeline execution manager
 
 ## Logging & Reproducibility
 
-- [ ] Agent execution logging
-- [ ] Prompt version tracking
-- [ ] Raw LLM response storage
-- [ ] Parsed response storage
-- [ ] Validated output storage
-- [ ] Token usage tracking
-- [ ] Latency tracking
+- [x] Agent execution logging
+- [x] Prompt version tracking
+- [x] Raw LLM response storage
+- [x] Parsed response storage
+- [x] Validated output storage
+- [x] Token usage tracking
+- [x] Latency tracking
 - [ ] Estimated execution cost
 
 ## Requirement Analysis Agent
 
-- [ ] Prompt template
-- [ ] Requirement Analysis Agent
-- [ ] Acceptance Criteria extraction
-- [ ] Persist RequirementAnalysis
-- [ ] Persist Acceptance Criteria
-- [ ] API endpoint
-- [ ] UI integration
+- [x] Prompt template
+- [x] Requirement Analysis Agent
+- [x] Acceptance Criteria extraction
+- [x] Persist RequirementAnalysis
+- [x] Persist Acceptance Criteria
+- [x] API endpoint
+- [x] UI integration
 
 ---
 
