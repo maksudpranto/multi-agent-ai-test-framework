@@ -66,4 +66,11 @@ export const api = {
     request(`/projects/${projectId}/user-stories/${storyId}`),
   deleteUserStory: (projectId, storyId) =>
     request(`/projects/${projectId}/user-stories/${storyId}`, { method: "DELETE" }),
+
+  runRequirementAnalysis: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/analyze`, {
+      method: "POST",
+    }),
+  getLatestAnalysis: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/latest-analysis`),
 };

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
     anthropic_api_key: str = ""
+    default_llm_model: str = "claude-sonnet-5"
     cors_origins: str = "http://localhost:5173"
 
     @property

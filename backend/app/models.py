@@ -37,6 +37,11 @@ class RunStatus(str, enum.Enum):
     failed = "failed"
 
 
+class ExperimentMode(str, enum.Enum):
+    single_llm = "single_llm"
+    multi_agent = "multi_agent"
+
+
 class ExecutionStatus(str, enum.Enum):
     success = "success"
     failed = "failed"
@@ -96,16 +101,41 @@ class Project(Base):
     )
 
 
+class Dataset(Base):
+    """A named collection of user stories for a domain (e.g. Banking,
+    Ecommerce, Healthcare). Experiments run over a dataset so results can be
+    reported per domain rather than mixing everything together."""
+
+    __tablename__ = "datasets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    domain: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    user_stories: Mapped[list["UserStory"]] = relationship(
+        back_populates="dataset"
+    )
+
+
 class UserStory(Base):
     __tablename__ = "user_stories"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    dataset_id: Mapped[int | None] = mapped_column(
+        ForeignKey("datasets.id"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(255))
     raw_text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     project: Mapped["Project"] = relationship(back_populates="user_stories")
+    dataset: Mapped["Dataset | None"] = relationship(
+        back_populates="user_stories"
+    )
     pipeline_runs: Mapped[list["PipelineRun"]] = relationship(
         back_populates="user_story", cascade="all, delete-orphan"
     )
@@ -118,8 +148,14 @@ class PipelineRun(Base):
     user_story_id: Mapped[int] = mapped_column(
         ForeignKey("user_stories.id"), index=True
     )
+    experiment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("experiments.id"), nullable=True, index=True
+    )
     parent_run_id: Mapped[int | None] = mapped_column(
         ForeignKey("pipeline_runs.id"), nullable=True
+    )
+    mode: Mapped[ExperimentMode] = mapped_column(
+        Enum(ExperimentMode), default=ExperimentMode.multi_agent
     )
     current_stage: Mapped[PipelineStage | None] = mapped_column(
         Enum(PipelineStage), nullable=True
@@ -144,7 +180,11 @@ class AgentExecution(Base):
     attempt_no: Mapped[int] = mapped_column(Integer, default=1)
     raw_input: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     raw_output: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    prompt_template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("prompt_templates.id"), nullable=True
+    )
     prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
     tokens_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tokens_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -279,4 +319,91 @@ class ExportLog(Base):
     format: Mapped[str] = mapped_column(String(20))
     test_case_version_ids: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Research-platform tables: prompts, experiments, configs, metrics.
+# These make experiments a first-class, reproducible concept (single-LLM
+# baseline vs multi-agent) rather than something bolted on for evaluation.
+# ---------------------------------------------------------------------------
+
+
+class PromptTemplate(Base):
+    """Versioned prompt text for a pipeline stage, stored as data (not code)
+    so prompts can be iterated and every AgentExecution can be traced back to
+    the exact prompt that produced it."""
+
+    __tablename__ = "prompt_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    stage: Mapped[PipelineStage] = mapped_column(Enum(PipelineStage), index=True)
+    version: Mapped[str] = mapped_column(String(50))
+    template: Mapped[str] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ExperimentConfig(Base):
+    """A named, reusable configuration for a run: model, sampling params, and
+    which stages are enabled. Keeps values out of the code so experiments are
+    declarative and reproducible."""
+
+    __tablename__ = "experiment_configs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    llm_model: Mapped[str] = mapped_column(String(100))
+    temperature: Mapped[float] = mapped_column(Float, default=0.0)
+    max_tokens: Mapped[int] = mapped_column(Integer, default=4096)
+    reviewer_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    consensus_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    coverage_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    quality_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    max_debate_rounds: Mapped[int] = mapped_column(Integer, default=3)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Experiment(Base):
+    """A first-class experiment: run a dataset through the pipeline in a given
+    mode (single-LLM baseline or multi-agent) with a fixed config. This is the
+    unit the thesis compares."""
+
+    __tablename__ = "experiments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    dataset_id: Mapped[int | None] = mapped_column(
+        ForeignKey("datasets.id"), nullable=True
+    )
+    config_id: Mapped[int | None] = mapped_column(
+        ForeignKey("experiment_configs.id"), nullable=True
+    )
+    mode: Mapped[ExperimentMode] = mapped_column(Enum(ExperimentMode))
+    status: Mapped[RunStatus] = mapped_column(
+        Enum(RunStatus), default=RunStatus.pending
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ExperimentMetric(Base):
+    """A precomputed metric value, either per pipeline run or aggregated for an
+    experiment (pipeline_run_id NULL). Stored so the evaluation dashboard is a
+    query, not a recomputation."""
+
+    __tablename__ = "experiment_metrics"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    experiment_id: Mapped[int] = mapped_column(
+        ForeignKey("experiments.id"), index=True
+    )
+    pipeline_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pipeline_runs.id"), nullable=True
+    )
+    metric_name: Mapped[str] = mapped_column(String(100), index=True)
+    metric_value: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

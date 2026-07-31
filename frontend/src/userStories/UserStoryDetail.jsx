@@ -6,20 +6,43 @@ import { PIPELINE_STAGES } from "../pipeline/stages";
 export default function UserStoryDetail() {
   const { projectId, storyId } = useParams();
   const [story, setStory] = useState(null);
+  const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    api
-      .getUserStory(projectId, storyId)
-      .then(setStory)
+    Promise.all([
+      api.getUserStory(projectId, storyId),
+      api.getLatestAnalysis(projectId, storyId).catch(() => null),
+    ])
+      .then(([s, r]) => {
+        setStory(s);
+        setResult(r);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [projectId, storyId]);
 
+  async function onAnalyze() {
+    setRunning(true);
+    setError("");
+    try {
+      setResult(await api.runRequirementAnalysis(projectId, storyId));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRunning(false);
+    }
+  }
+
   if (loading) return <div className="page"><p className="muted">Loading…</p></div>;
-  if (error) return <div className="page"><p className="error">{error}</p></div>;
+  if (error && !story)
+    return <div className="page"><p className="error">{error}</p></div>;
+
+  const analysis = result?.analysis;
+  const criteria = result?.acceptance_criteria || [];
 
   return (
     <div className="page">
@@ -32,6 +55,49 @@ export default function UserStoryDetail() {
       <section className="panel">
         <h2>User Story</h2>
         <p className="story-text">{story?.raw_text}</p>
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Requirement Analysis</h2>
+          <button onClick={onAnalyze} disabled={running}>
+            {running ? "Analyzing…" : analysis ? "Re-run Analysis" : "Run Analysis"}
+          </button>
+        </div>
+
+        {error && <p className="error">{error}</p>}
+        {result?.error && <p className="error">{result.error}</p>}
+
+        {!analysis && !result?.error && (
+          <p className="muted">
+            Run the analysis to break this story into a structured, testable
+            specification.
+          </p>
+        )}
+
+        {analysis && (
+          <div className="analysis">
+            <AnalysisList title="Actors" items={analysis.actors} />
+            <AnalysisList title="Preconditions" items={analysis.preconditions} />
+            <AnalysisList title="Main Flow" items={analysis.main_flow} ordered />
+            <AnalysisList title="Alternative Flows" items={analysis.alt_flows} />
+            <div className="analysis-block">
+              <h3>Acceptance Criteria</h3>
+              {criteria.length === 0 ? (
+                <p className="muted">None extracted.</p>
+              ) : (
+                <ul>
+                  {criteria.map((c) => (
+                    <li key={c.id}>
+                      <code>AC{c.order + 1}</code> {c.text}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <AnalysisList title="Ambiguities" items={analysis.ambiguities} />
+          </div>
+        )}
       </section>
 
       <section className="panel">
@@ -50,10 +116,22 @@ export default function UserStoryDetail() {
             </li>
           ))}
         </ol>
-        <p className="muted">
-          The multi-agent stages will run here in upcoming build phases.
-        </p>
       </section>
+    </div>
+  );
+}
+
+function AnalysisList({ title, items, ordered }) {
+  if (!items || items.length === 0) return null;
+  const List = ordered ? "ol" : "ul";
+  return (
+    <div className="analysis-block">
+      <h3>{title}</h3>
+      <List>
+        {items.map((it, idx) => (
+          <li key={idx}>{it}</li>
+        ))}
+      </List>
     </div>
   );
 }

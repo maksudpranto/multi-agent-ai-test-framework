@@ -209,6 +209,36 @@ main {
   white-space: pre-wrap;
 }
 
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.panel-head h2 {
+  margin: 0;
+}
+.analysis-block {
+  margin-top: 1rem;
+}
+.analysis-block h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+}
+.analysis-block ul,
+.analysis-block ol {
+  margin: 0;
+  padding-left: 1.3rem;
+}
+.analysis-block code {
+  background: #eef2ff;
+  color: var(--primary-hover);
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  margin-right: 0.3rem;
+}
+
 .stepper {
   list-style: none;
   padding: 0;

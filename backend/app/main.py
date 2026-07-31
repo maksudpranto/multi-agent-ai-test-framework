@@ -1,14 +1,31 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.routes import router as auth_router
 from app.config import get_settings
+from app.database import SessionLocal
+from app.pipeline.routes import router as pipeline_router
 from app.projects.routes import router as projects_router
+from app.prompts.seed import seed_prompts
 from app.user_stories.routes import router as user_stories_router
 
 settings = get_settings()
 
-app = FastAPI(title="Multi-Agent AI Test Framework")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ensure prompt templates exist so agents always have an active prompt.
+    db = SessionLocal()
+    try:
+        seed_prompts(db)
+    finally:
+        db.close()
+    yield
+
+
+app = FastAPI(title="Multi-Agent AI Test Framework", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,6 +38,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(user_stories_router)
+app.include_router(pipeline_router)
 
 
 @app.get("/health", tags=["health"])
