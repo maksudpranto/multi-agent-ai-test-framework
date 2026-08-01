@@ -23,7 +23,9 @@ from sqlalchemy.orm import Session
 from app.agents.base import Agent, AgentContext, AgentResult
 from app.llm import LLMService, get_llm_service
 from app.models import (
+    AcceptanceCriterion,
     AgentExecution,
+    CoverageReport,
     DebateSpeaker,
     DebateTurn,
     ExecutionStatus,
@@ -73,6 +75,14 @@ class DefaultWorkflowEngine(WorkflowEngine):
             from app.agents.consensus import ConsensusAgent
 
             return ConsensusAgent(self.llm)
+        if stage == PipelineStage.prioritization:
+            from app.agents.prioritizer import PrioritizerAgent
+
+            return PrioritizerAgent(self.llm)
+        if stage == PipelineStage.coverage:
+            from app.agents.coverage import CoverageAgent
+
+            return CoverageAgent(self.llm)
         raise NotImplementedError(f"No agent registered for stage {stage.value}")
 
     # -- low-level: run one agent and log an AgentExecution row ---------------
@@ -179,6 +189,119 @@ class DefaultWorkflowEngine(WorkflowEngine):
         db.commit()
         return result
 
+    # -- prioritization: rank the current suite ------------------------------
+    def run_prioritization(
+        self, db: Session, run: PipelineRun, *, user_story: str, config: RunConfig
+    ) -> AgentResult:
+        """Rank the run's current test cases by importance. Annotates cases in
+        place (priority/severity/rank); creates no new versions."""
+        current = self._current_test_cases(db, run)
+        if not current:
+            return AgentResult(
+                stage=PipelineStage.prioritization,
+                success=False,
+                error="No test cases available to prioritize",
+            )
+        result = self.run_stage(
+            db,
+            run,
+            PipelineStage.prioritization,
+            inputs={"user_story": user_story, "test_cases": self._tc_payload(current)},
+            config=config,
+        )
+        run.current_stage = PipelineStage.prioritization
+        db.commit()
+        return result
+
+    # -- coverage / validation: traceability matrix + adequacy judgement -----
+    def run_coverage(
+        self, db: Session, run: PipelineRun, *, user_story: str, config: RunConfig
+    ) -> dict[str, Any]:
+        """Validate requirement coverage. Traceability (which criterion is hit by
+        which case) is computed deterministically here — authoritative. The agent
+        judges adequacy (superficial vs genuine). CoverageReport rows are then
+        written merging the two."""
+        criteria = list(
+            db.scalars(
+                select(AcceptanceCriterion)
+                .where(AcceptanceCriterion.pipeline_run_id == run.id)
+                .order_by(AcceptanceCriterion.order)
+            )
+        )
+        current = self._current_test_cases(db, run)
+
+        # Deterministic traceability matrix: criterion id -> covering case ids.
+        covering: dict[int, list[int]] = {c.id: [] for c in criteria}
+        for case in current:
+            if case.traces_to in covering:
+                covering[case.traces_to].append(case.id)
+
+        by_id = {c.id: c for c in current}
+        coverage_map = [
+            {
+                "acceptance_criterion_id": crit.id,
+                "criterion_text": crit.text,
+                "covering_test_case_ids": covering[crit.id],
+                "mapped_cases": [
+                    {"id": tc_id, "title": by_id[tc_id].title, "type": by_id[tc_id].type}
+                    for tc_id in covering[crit.id]
+                ],
+            }
+            for crit in criteria
+        ]
+
+        # Agent judges adequacy (logged as an AgentExecution). If it fails we
+        # still record deterministic coverage, just without adequacy notes.
+        assessments: dict[int, dict] = {}
+        if criteria:
+            _, result = self._run_agent_logged(
+                db,
+                run,
+                PipelineStage.coverage,
+                inputs={"user_story": user_story, "coverage_map": coverage_map},
+                config=config,
+            )
+            if result.success:
+                for a in result.output.get("assessments", []):
+                    assessments[a.get("acceptance_criterion_id")] = a
+
+        # Rewrite CoverageReport rows for this run.
+        db.query(CoverageReport).filter(
+            CoverageReport.pipeline_run_id == run.id
+        ).delete()
+        covered_count = 0
+        adequate_count = 0
+        for crit in criteria:
+            ids = covering[crit.id]
+            covered = bool(ids)
+            covered_count += 1 if covered else 0
+            assessment = assessments.get(crit.id, {})
+            adequate = covered and assessment.get("adequate", True)
+            adequate_count += 1 if adequate else 0
+            if not covered:
+                gap_notes = "No test case traces to this criterion."
+            else:
+                gap_notes = assessment.get("gap_notes") or "Adequately covered"
+            db.add(
+                CoverageReport(
+                    pipeline_run_id=run.id,
+                    acceptance_criterion_id=crit.id,
+                    covered=covered,
+                    covering_test_case_ids=ids,
+                    gap_notes=gap_notes,
+                )
+            )
+
+        run.current_stage = PipelineStage.coverage
+        db.commit()
+        total = len(criteria)
+        return {
+            "total": total,
+            "covered_count": covered_count,
+            "adequate_count": adequate_count,
+            "coverage_pct": round(100.0 * covered_count / total, 1) if total else 0.0,
+        }
+
     # -- multi-agent debate: Reviewer <-> Consensus, bounded -----------------
     def _current_test_cases(self, db: Session, run: PipelineRun) -> list[TestCase]:
         """The live test cases for a run: the leaf of each version chain (a case
@@ -206,6 +329,7 @@ class DefaultWorkflowEngine(WorkflowEngine):
                 "title": c.title,
                 "steps": c.steps,
                 "expected_result": c.expected_result,
+                "test_data": c.test_data,
                 "type": c.type,
                 "priority": c.priority,
             }
@@ -234,6 +358,7 @@ class DefaultWorkflowEngine(WorkflowEngine):
                         title=revised["title"],
                         steps=revised["steps"],
                         expected_result=revised["expected_result"],
+                        test_data=revised.get("test_data"),
                         type=revised.get("type", "functional"),
                         priority=revised.get("priority", "medium"),
                         traces_to=existing.traces_to
@@ -251,6 +376,7 @@ class DefaultWorkflowEngine(WorkflowEngine):
                         title=revised["title"],
                         steps=revised["steps"],
                         expected_result=revised["expected_result"],
+                        test_data=revised.get("test_data"),
                         type=revised.get("type", "functional"),
                         priority=revised.get("priority", "medium"),
                         traces_to=res.get("acceptance_criterion_id")

@@ -3,6 +3,8 @@ these so a malformed LLM reply is caught (and can be retried/logged) rather
 than silently persisted."""
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -25,8 +27,16 @@ class GeneratedTestCaseOut(BaseModel):
     title: str = Field(min_length=1)
     steps: list[str] = Field(min_length=1)
     expected_result: str = Field(min_length=1)
-    type: str = Field(default="functional")
-    priority: str = Field(default="medium")
+    type: str = Field(
+        default="functional",
+        description="functional | negative | boundary | security | api",
+    )
+    priority: str = Field(default="medium", description="high | medium | low")
+    test_data: dict[str, Any] | list[Any] | None = Field(
+        default=None,
+        description="Concrete mock data to execute the case, e.g. "
+        '{"valid": {...}, "invalid": {...}, "boundary": [...]}',
+    )
 
 
 class TestGenerationOut(BaseModel):
@@ -81,6 +91,40 @@ class ConsensusOut(BaseModel):
     resolutions: list[ConsensusResolutionOut] = Field(default_factory=list)
 
 
+# --- Prioritizer ----------------------------------------------------------
+# The Prioritizer ranks the whole suite by importance and assigns a severity,
+# addressing the "priority / severity confusion" that single-pass generation
+# leaves unresolved. It annotates existing cases (no new content).
+
+
+class PriorityRankingOut(BaseModel):
+    test_case_id: int
+    priority: str = Field(default="medium", description="high | medium | low")
+    severity: str = Field(default="major", description="critical | major | minor")
+    rank: int = Field(description="1-based importance rank; 1 = most important")
+    rationale: str | None = None
+
+
+class PrioritizationOut(BaseModel):
+    rankings: list[PriorityRankingOut] = Field(default_factory=list)
+
+
+# --- Coverage / Validator -------------------------------------------------
+# Coverage of a criterion by test cases is decided deterministically from the
+# traceability links (authoritative). The agent adds the semantic judgement:
+# is that mapping genuinely adequate, or only superficial?
+
+
+class CoverageAssessmentOut(BaseModel):
+    acceptance_criterion_id: int
+    adequate: bool = True
+    gap_notes: str | None = None
+
+
+class CoverageOut(BaseModel):
+    assessments: list[CoverageAssessmentOut] = Field(default_factory=list)
+
+
 # --- Single-LLM baseline --------------------------------------------------
 # One prompt, story -> test cases, no acceptance-criterion traceability (the
 # baseline's honest limitation). Same shape otherwise, for a fair comparison.
@@ -92,6 +136,7 @@ class BaselineTestCaseOut(BaseModel):
     expected_result: str = Field(min_length=1)
     type: str = Field(default="functional")
     priority: str = Field(default="medium")
+    test_data: dict[str, Any] | list[Any] | None = None
 
 
 class BaselineOut(BaseModel):

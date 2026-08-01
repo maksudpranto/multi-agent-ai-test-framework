@@ -23,16 +23,20 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete system architecture.
 
 # Multi-Agent Pipeline
 
-Requirement Analysis
-→ Test Generation
+Input (Requirement **or** Acceptance Criteria — user's choice)
+→ Requirement Analysis *(skipped when AC supplied directly)*
+→ Test Generation (full suite per criterion: functional / negative / boundary / security / API, each with concrete mock **test data**)
 → Review
 → Consensus
-→ Coverage Analysis
+→ Prioritization (priority + severity + rank)
+→ Coverage Analysis (traceability matrix + adequacy validation)
 → Quality Evaluation
 → Manual Review
 → Export
 
 Each stage can be executed **independently** during development or as part of the complete pipeline.
+
+**Dual input:** a user can start from a full user story (the Analyzer derives acceptance criteria) **or** paste acceptance criteria directly and skip analysis. Either way, generation, debate, prioritization, and coverage run identically.
 
 ---
 
@@ -48,19 +52,21 @@ UI strategy: most pipeline stages render into **one shared User-Story run view**
 | Dashboard | ✅ | ✅ | Real project/story counts |
 | Project detail + User Story CRUD | ✅ | ✅ | |
 | Pipeline stepper | ✅ | ✅ | Stage status on story page |
+| Dual input (Requirement **or** AC-direct) | ✅ | ✅ | Input-mode toggle + AC textarea |
 | Requirement Analysis | ✅ | ✅ | Actors/flows/acceptance criteria rendered |
-| Test Generation (multi-agent) | ✅ | ✅ | "Generate test cases" + case cards |
+| Test Generation (rich: all types + mock data) | ✅ | ✅ | Full suite per criterion, type badges + test-data blocks |
 | Single-LLM baseline + mode switch | ✅ | ✅ | Mode toggle, reuses case cards |
 | Review | ✅ | ✅ | Reviewer findings in debate transcript |
 | Consensus / debate | ✅ | ✅ | Bounded Reviewer⇄Consensus debate + transcript |
-| Coverage | ❌ | ❌ | Coverage matrix / % |
+| Prioritization | ✅ | ✅ | Priority + severity + rank; suite ordered by rank |
+| Coverage / Validator | ✅ | ✅ | Traceability matrix + % covered + gap notes |
 | Quality | ❌ | ❌ | Quality scores per test case |
 | Manual Review | ❌ | ❌ | Standalone approve/edit/reject screen |
 | Export | ❌ | ❌ | Format picker + download |
 | Experiment Dashboard | ❌ | ❌ | Standalone comparison charts (thesis eval) |
 
-**Built:** Auth, Dashboard, Project/Story CRUD, Pipeline stepper, Requirement Analysis, Multi-agent Test Generation.
-**Pending:** everything from the Single-LLM baseline downward.
+**Built:** Auth, Dashboard, Project/Story CRUD, Pipeline stepper, **dual input**, Requirement Analysis, **rich multi-agent Test Generation (all test types + mock data)**, Single-LLM baseline + mode switch, Review, Consensus debate, **Prioritization**, **Coverage/Validator**.
+**Pending:** Quality Evaluation, Manual Review, Export, Experiment Dashboard.
 
 ---
 
@@ -181,13 +187,27 @@ so each is spelled out explicitly rather than left to interpretation:
 
 ---
 
-# ⬜ Phase 5 — Evaluation
+# ✅ Phase 4.5 — Rich generation, dual input, Prioritizer (DONE)
 
-## Coverage
+- [x] Dual input: generate from a Requirement **or** from Acceptance Criteria supplied directly (skips analysis)
+- [x] Rich generator: full suite per criterion (functional / negative / boundary / security / API)
+- [x] Concrete **mock test data** on every case (`test_data`: valid / invalid / boundary values)
+- [x] Story-aware offline mock (echoes the actual story, no longer always "login")
+- [x] **Prioritizer agent** — assigns priority + severity + unique rank; suite ordered by importance
+- [x] Persistence: `TestCase.test_data / severity / rank`, `PipelineRun.input_mode` (Alembic migration)
+- [x] UI: input-mode toggle, AC textarea, type/severity/rank badges, test-data blocks, Prioritization section
 
-- [ ] Requirement Traceability
-- [ ] Coverage Matrix
-- [ ] Coverage Report
+---
+
+# ◐ Phase 5 — Evaluation (Coverage DONE; Quality pending)
+
+## Coverage ✅ DONE
+
+- [x] Requirement Traceability (deterministic matrix over `traces_to` — authoritative)
+- [x] Coverage Matrix (per-criterion covered / gap + covering test-case ids)
+- [x] Coverage Report (persisted `CoverageReport` rows)
+- [x] **Validator adequacy judgement** — agent flags superficial vs genuine coverage (`gap_notes`)
+- [x] UI: Coverage section / matrix + % covered (in shared run view)
 
 ## Quality
 
@@ -200,12 +220,12 @@ so each is spelled out explicitly rather than left to interpretation:
 
 ## Persistence
 
-- [ ] CoverageReport
+- [x] CoverageReport
 - [ ] QualityReport
 
 ## UI
 
-- [ ] UI: Coverage section / matrix (in shared run view)
+- [x] UI: Coverage section / matrix (in shared run view)
 - [ ] UI: Quality scores section (in shared run view)
 
 ---

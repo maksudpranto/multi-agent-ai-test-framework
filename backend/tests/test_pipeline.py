@@ -289,7 +289,13 @@ def test_debate_reaches_consensus_and_versions_test_cases(db):
             select(GeneratedTestCase).where(GeneratedTestCase.pipeline_run_id == run.id)
         )
     )
-    assert len(before) == 3  # one per acceptance criterion (AC1..AC3)
+    # The generator now produces a full suite (multiple typed cases per
+    # criterion), not one case each. Every criterion must be covered, and the
+    # suite must span more than just the happy path.
+    assert len(before) >= 3
+    assert {c.traces_to for c in before} == {c.id for c in criteria}
+    assert {c.type for c in before} >= {"functional", "negative"}
+    assert any(c.test_data for c in before)
 
     summary = engine.run_debate(
         db, run,
@@ -351,6 +357,79 @@ def test_debate_records_reviewer_findings_in_transcript(db):
     assert first.content["needs_revision"] is True
     assert first.content["findings"]
     assert first.content["findings"][0]["severity"] in {"high", "medium", "low"}
+
+
+def test_prioritizer_assigns_rank_and_severity(db):
+    engine, run, story, criteria, cfg = _run_multi_agent_through_generation(db)
+
+    result = engine.run_prioritization(
+        db, run, user_story=story.raw_text, config=cfg
+    )
+    assert result.success
+
+    cases = list(
+        db.scalars(
+            select(GeneratedTestCase).where(
+                GeneratedTestCase.pipeline_run_id == run.id
+            )
+        )
+    )
+    ranked = [c for c in cases if c.rank is not None]
+    # Every current case is ranked, with a severity and a unique rank.
+    assert ranked
+    assert all(c.severity in {"critical", "major", "minor"} for c in ranked)
+    ranks = [c.rank for c in ranked]
+    assert len(ranks) == len(set(ranks))  # unique
+    assert min(ranks) == 1
+
+    execution = db.scalar(
+        select(AgentExecution).where(
+            AgentExecution.pipeline_run_id == run.id,
+            AgentExecution.stage == PipelineStage.prioritization,
+        )
+    )
+    assert execution is not None and execution.status == ExecutionStatus.success
+
+
+def test_coverage_reports_traceability_and_gaps(db):
+    engine, run, story, criteria, cfg = _run_multi_agent_through_generation(db)
+
+    summary = engine.run_coverage(
+        db, run, user_story=story.raw_text, config=cfg
+    )
+    # Every criterion is covered (the generator makes cases for each), so 100%.
+    assert summary["total"] == len(criteria)
+    assert summary["covered_count"] == len(criteria)
+    assert summary["coverage_pct"] == 100.0
+
+    from app.models import CoverageReport
+
+    reports = list(
+        db.scalars(
+            select(CoverageReport).where(CoverageReport.pipeline_run_id == run.id)
+        )
+    )
+    assert len(reports) == len(criteria)
+    assert all(r.covered and r.covering_test_case_ids for r in reports)
+
+    # An uncovered criterion is reported as a gap.
+    orphan = AcceptanceCriterion(
+        pipeline_run_id=run.id, text="An untested extra criterion", order=99
+    )
+    db.add(orphan)
+    db.commit()
+    summary2 = engine.run_coverage(
+        db, run, user_story=story.raw_text, config=cfg
+    )
+    assert summary2["covered_count"] == len(criteria)  # orphan not covered
+    assert summary2["coverage_pct"] < 100.0
+    gap = db.scalar(
+        select(CoverageReport).where(
+            CoverageReport.pipeline_run_id == run.id,
+            CoverageReport.acceptance_criterion_id == orphan.id,
+        )
+    )
+    assert gap is not None and gap.covered is False
 
 
 def test_single_llm_baseline_runs_untraceable(db):

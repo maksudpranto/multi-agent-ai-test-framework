@@ -850,6 +850,136 @@ select:focus {
   border-color: rgba(216, 0, 50, 0.22);
 }
 
+/* Priority rank badge (from the Prioritizer) */
+.badge-rank {
+  color: var(--blue-900);
+  background: var(--grad-mid-blue);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Test-type badges — colour-code the suite (functional/negative/boundary/…) */
+.type-functional {
+  color: var(--poly-green);
+  background: rgba(123, 201, 80, 0.14);
+  border-color: rgba(123, 201, 80, 0.32);
+}
+.type-negative {
+  color: var(--crimson);
+  background: rgba(216, 0, 50, 0.09);
+  border-color: rgba(216, 0, 50, 0.22);
+}
+.type-boundary {
+  color: #8a6100;
+  background: rgba(224, 180, 0, 0.16);
+  border-color: rgba(224, 180, 0, 0.34);
+}
+.type-security {
+  color: var(--mauveine);
+  background: rgba(121, 30, 148, 0.1);
+  border-color: rgba(121, 30, 148, 0.24);
+}
+.type-api {
+  color: var(--indigo-accent);
+  background: rgba(78, 85, 201, 0.1);
+  border-color: rgba(78, 85, 201, 0.24);
+}
+.type-edge {
+  color: #8a6100;
+  background: rgba(224, 180, 0, 0.16);
+  border-color: rgba(224, 180, 0, 0.34);
+}
+
+/* Severity (from the Prioritizer) */
+.sev-badge {
+  text-transform: capitalize;
+}
+.sev-critical {
+  color: var(--crimson);
+  background: rgba(216, 0, 50, 0.12);
+  border-color: rgba(216, 0, 50, 0.3);
+}
+.sev-major {
+  color: #8a6100;
+  background: rgba(224, 180, 0, 0.16);
+  border-color: rgba(224, 180, 0, 0.34);
+}
+.sev-minor {
+  color: var(--text-secondary);
+  background: var(--surface-mist);
+  border-color: var(--divider);
+}
+
+/* Concrete mock/test data block on a test case */
+.test-data {
+  margin-top: 10px;
+  border-top: 1px dashed var(--divider);
+  padding-top: 8px;
+}
+.test-data-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.test-data pre {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Coverage / traceability matrix */
+.coverage-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 13.5px;
+}
+.coverage-table th,
+.coverage-table td {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--divider);
+  vertical-align: top;
+}
+.coverage-table th {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.coverage-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Acceptance-criteria direct-input textarea */
+.ac-input {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 12px 14px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface-white);
+  resize: vertical;
+  margin-bottom: 12px;
+}
+.ac-input:focus {
+  outline: none;
+  border-color: var(--blue-600);
+  box-shadow: 0 0 0 3px rgba(0, 102, 178, 0.12);
+}
+
 /* rail */
 .rail {
   display: flex;

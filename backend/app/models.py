@@ -26,6 +26,7 @@ class PipelineStage(str, enum.Enum):
     test_generation = "test_generation"
     reviewer = "reviewer"
     consensus = "consensus"
+    prioritization = "prioritization"
     coverage = "coverage"
     quality = "quality"
 
@@ -157,6 +158,10 @@ class PipelineRun(Base):
     mode: Mapped[ExperimentMode] = mapped_column(
         Enum(ExperimentMode), default=ExperimentMode.multi_agent
     )
+    # How the run's acceptance criteria were obtained: "requirement" (derived by
+    # the Analyzer from a user story) or "acceptance_criteria" (supplied directly
+    # by the user, skipping analysis). Lets a user generate from either input.
+    input_mode: Mapped[str | None] = mapped_column(String(50), nullable=True)
     current_stage: Mapped[PipelineStage | None] = mapped_column(
         Enum(PipelineStage), nullable=True
     )
@@ -235,8 +240,16 @@ class TestCase(Base):
     title: Mapped[str] = mapped_column(String(500))
     steps: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     expected_result: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Concrete mock/test data for the case: e.g.
+    # {"valid": {...}, "invalid": {...}, "boundary": [...]} so a case is
+    # executable, not just described. Shape is free-form per test type.
+    test_data: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
     type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     priority: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Assigned by the Prioritizer agent: severity (critical|major|minor) and a
+    # numeric rank for ordering the suite by importance. Null until prioritised.
+    severity: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     traces_to: Mapped[int | None] = mapped_column(
         ForeignKey("acceptance_criteria.id"), nullable=True
     )

@@ -1,6 +1,13 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class AcceptanceCriteriaIn(BaseModel):
+    """User-supplied acceptance criteria — the alternative input to a full user
+    story. Lets a user generate test cases directly from AC, skipping analysis."""
+
+    criteria: list[str] = Field(min_length=1)
 
 
 class AcceptanceCriterionOut(BaseModel):
@@ -50,8 +57,11 @@ class TestCaseOut(BaseModel):
     title: str
     steps: list[str] | None
     expected_result: str | None
+    test_data: dict | list | None = None
     type: str | None
     priority: str | None
+    severity: str | None = None
+    rank: int | None = None
     traces_to: int | None
     generated_by: str
     status: str
@@ -60,6 +70,23 @@ class TestCaseOut(BaseModel):
 class TestGenerationResult(BaseModel):
     run: PipelineRunOut
     test_cases: list[TestCaseOut]
+    error: str | None = None
+
+
+class CoverageItemOut(BaseModel):
+    acceptance_criterion_id: int
+    criterion_text: str
+    covered: bool
+    covering_test_case_ids: list[int]
+    gap_notes: str | None = None
+
+
+class CoverageResult(BaseModel):
+    run: PipelineRunOut
+    items: list[CoverageItemOut]
+    total: int
+    covered_count: int
+    coverage_pct: float
     error: str | None = None
 
 

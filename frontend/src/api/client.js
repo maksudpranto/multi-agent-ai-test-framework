@@ -73,6 +73,11 @@ export const api = {
     }),
   getLatestAnalysis: (projectId, storyId) =>
     request(`/projects/${projectId}/user-stories/${storyId}/latest-analysis`),
+  submitAcceptanceCriteria: (projectId, storyId, criteria) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/acceptance-criteria`, {
+      method: "POST",
+      body: { criteria },
+    }),
   generateTestCases: (projectId, storyId) =>
     request(`/projects/${projectId}/user-stories/${storyId}/generate-test-cases`, {
       method: "POST",
@@ -86,6 +91,18 @@ export const api = {
     }),
   getLatestReviewConsensus: (projectId, storyId) =>
     request(`/projects/${projectId}/user-stories/${storyId}/latest-review-consensus`),
+
+  prioritize: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/prioritize`, {
+      method: "POST",
+    }),
+
+  runCoverage: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/coverage`, {
+      method: "POST",
+    }),
+  getLatestCoverage: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/latest-coverage`),
 
   runBaseline: (projectId, storyId) =>
     request(`/projects/${projectId}/user-stories/${storyId}/baseline`, {

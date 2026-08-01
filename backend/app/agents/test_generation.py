@@ -12,7 +12,13 @@ from app.agents.base import Agent, AgentContext, AgentResult
 from app.agents.schemas import TestGenerationOut
 from app.llm import LLMMessage, LLMService
 from app.llm.service import extract_json
-from app.models import GeneratedBy, PipelineRun, PipelineStage, TestCase
+from app.models import (
+    GeneratedBy,
+    PipelineRun,
+    PipelineStage,
+    TestCase,
+    TestCaseStatus,
+)
 
 
 class TestGenerationAgent(Agent):
@@ -66,23 +72,33 @@ class TestGenerationAgent(Agent):
         )
 
     def persist(self, db: Session, run: PipelineRun, result: AgentResult) -> None:
-        for test_case in result.output.get("test_cases", []):
-            previous = db.scalar(
-                select(TestCase)
-                .where(
-                    TestCase.pipeline_run_id == run.id,
-                    TestCase.traces_to == test_case["acceptance_criterion_id"],
-                )
-                .order_by(TestCase.version.desc(), TestCase.id.desc())
+        # The generator produces a full suite (many cases per criterion), so
+        # cross-generation versioning by criterion no longer makes sense. Treat
+        # each generation as a fresh suite: retire prior *generator* cases that
+        # are still live (mark rejected — kept for audit, not deleted) so a
+        # re-generation replaces rather than accumulates. Consensus/manual cases
+        # are left untouched. New cases are version 1 with no parent; later
+        # versions come only from the consensus debate.
+        prior = db.scalars(
+            select(TestCase).where(
+                TestCase.pipeline_run_id == run.id,
+                TestCase.generated_by == GeneratedBy.generator,
+                TestCase.status != TestCaseStatus.rejected,
             )
+        ).all()
+        for case in prior:
+            case.status = TestCaseStatus.rejected
+
+        for test_case in result.output.get("test_cases", []):
             db.add(
                 TestCase(
                     pipeline_run_id=run.id,
-                    version=(previous.version + 1) if previous else 1,
-                    parent_test_case_id=previous.id if previous else None,
+                    version=1,
+                    parent_test_case_id=None,
                     title=test_case["title"],
                     steps=test_case["steps"],
                     expected_result=test_case["expected_result"],
+                    test_data=test_case.get("test_data"),
                     type=test_case["type"],
                     priority=test_case["priority"],
                     traces_to=test_case["acceptance_criterion_id"],

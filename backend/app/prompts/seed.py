@@ -56,6 +56,46 @@ Return ONLY a JSON object with a "test_cases" array. Each item must contain:
 Cover every supplied criterion. Do not include prose outside the JSON.
 """
 
+TEST_GENERATION_V2 = """\
+You are a senior test designer. For the user story and its acceptance criteria,
+generate a COMPLETE, executable test suite — not one case per criterion, but the
+full set a thorough QA engineer would write.
+
+USER STORY:
+{user_story}
+
+ACCEPTANCE CRITERIA (database ids are authoritative):
+{acceptance_criteria}
+
+For EACH acceptance criterion, produce MULTIPLE test cases spanning the relevant
+categories below (skip a category only when it genuinely does not apply):
+- functional — the happy path / positive behaviour
+- negative   — invalid input, wrong state, denied actions, error handling
+- boundary   — edge values: min, max, just-inside, just-outside, empty, zero,
+               max length, first/last, off-by-one
+- security   — authz/authn, injection, tampering, sensitive-data exposure
+- api        — request/response contract, status codes, schema, when the story
+               involves an API or service call
+
+Every test case MUST include "test_data": concrete, realistic values needed to
+run it — for example {{"valid": {{"email": "a@b.com", "amount": 100}},
+"invalid": {{"amount": -1}}, "boundary": [0, 1, 9999999]}}. Use fields that fit
+the story's domain. For a pure UI-navigation case with no data, use an empty
+object {{}}.
+
+Return ONLY a JSON object with a "test_cases" array. Each item must contain:
+- "acceptance_criterion_id": integer id from the supplied criteria
+- "title": concise, specific test title
+- "steps": non-empty ordered array of imperative, unambiguous steps
+- "expected_result": a single verifiable outcome
+- "type": functional | negative | boundary | security | api
+- "priority": high | medium | low
+- "test_data": object or array of concrete data (see above)
+
+Cover every supplied criterion with at least a functional and a negative case.
+Do not include prose outside the JSON.
+"""
+
 REVIEWER_V1 = """\
 You are a meticulous QA reviewer taking part in a multi-agent test-design debate.
 
@@ -129,6 +169,59 @@ Return ONLY a JSON object:
 Do not include prose outside the JSON.
 """
 
+PRIORITIZATION_V1 = """\
+You are a test prioritization specialist. Given the user story and the current
+test cases, decide which matter most so a team running under time pressure knows
+what to execute first.
+
+USER STORY:
+{user_story}
+
+CURRENT TEST CASES (database ids are authoritative):
+{test_cases}
+
+For EACH test case, assign:
+- "priority": high | medium | low — business importance of the behaviour it checks
+- "severity": critical | major | minor — the impact if this behaviour broke in
+  production (data loss / security / money = critical)
+- "rank": a unique 1-based integer ordering ALL cases from most (1) to least
+  important; no ties, no gaps
+- "rationale": one short sentence on why
+
+Weigh: security and data-integrity cases high; core happy paths high; obscure
+boundary cases lower. Return ONLY a JSON object:
+- "rankings": array of objects, each with "test_case_id" (integer, from the
+  supplied cases), "priority", "severity", "rank", "rationale"
+
+Do not include prose outside the JSON.
+"""
+
+COVERAGE_V1 = """\
+You are a test coverage analyst. Each acceptance criterion below is already
+mapped (by database id) to the test cases that trace to it. Traceability is
+authoritative — do NOT re-decide which case maps where. Your job is to judge, per
+criterion, whether that mapping is ADEQUATE or only superficial.
+
+USER STORY:
+{user_story}
+
+ACCEPTANCE CRITERIA WITH THEIR MAPPED TEST CASES:
+{coverage_map}
+
+For EACH criterion decide:
+- "adequate": true if the mapped cases genuinely and sufficiently verify the
+  criterion (positive AND relevant negative/boundary behaviour where it matters);
+  false if there are no cases, or they only skim the surface (e.g. happy path
+  only, missing error handling, missing edge values)
+- "gap_notes": a short sentence naming what is missing, or "Adequately covered"
+
+Return ONLY a JSON object:
+- "assessments": array of objects, each with "acceptance_criterion_id" (integer),
+  "adequate" (boolean), "gap_notes" (string)
+
+Do not include prose outside the JSON.
+"""
+
 SINGLE_LLM_BASELINE_V1 = """\
 You are a software tester. This is a SINGLE-LLM BASELINE: in one step, read the
 user story and write test cases for it. There is no separate analysis phase.
@@ -160,6 +253,15 @@ SEED_PROMPTS: list[dict] = [
         "description": "Test generation: acceptance criteria -> traceable test cases.",
     },
     {
+        # v2 is the active generator: a full suite per criterion (functional,
+        # negative, boundary, security, api) with concrete test_data. Seeded
+        # after v1 so get_active_prompt (newest active per stage) selects it.
+        "stage": PipelineStage.test_generation,
+        "version": "v2",
+        "template": TEST_GENERATION_V2,
+        "description": "Rich generation: full test suite per criterion + mock data + edge cases.",
+    },
+    {
         "stage": PipelineStage.reviewer,
         "version": "v1",
         "template": REVIEWER_V1,
@@ -170,6 +272,18 @@ SEED_PROMPTS: list[dict] = [
         "version": "v1",
         "template": CONSENSUS_V1,
         "description": "Consensus: rebut/revise/add per reviewer finding.",
+    },
+    {
+        "stage": PipelineStage.prioritization,
+        "version": "v1",
+        "template": PRIORITIZATION_V1,
+        "description": "Prioritizer: assign priority/severity/rank to each test case.",
+    },
+    {
+        "stage": PipelineStage.coverage,
+        "version": "v1",
+        "template": COVERAGE_V1,
+        "description": "Coverage: judge adequacy of each criterion's traced cases.",
     },
     {
         # Single-LLM baseline. Kept inactive so it never shadows the multi-agent

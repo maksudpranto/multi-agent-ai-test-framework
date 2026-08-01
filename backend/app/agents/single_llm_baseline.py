@@ -75,6 +75,7 @@ class SingleLLMBaselineAgent(Agent):
                     title=test_case["title"],
                     steps=test_case["steps"],
                     expected_result=test_case["expected_result"],
+                    test_data=test_case.get("test_data"),
                     type=test_case.get("type", "functional"),
                     priority=test_case.get("priority", "medium"),
                     traces_to=None,

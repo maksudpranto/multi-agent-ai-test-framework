@@ -9,13 +9,19 @@ export default function UserStoryDetail() {
   const [result, setResult] = useState(null);
   const [generation, setGeneration] = useState(null);
   const [debate, setDebate] = useState(null);
+  const [coverage, setCoverage] = useState(null);
   const [baseline, setBaseline] = useState(null);
   const [mode, setMode] = useState("multi"); // "multi" | "baseline"
+  const [inputMode, setInputMode] = useState("requirement"); // "requirement" | "criteria"
+  const [acText, setAcText] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [submittingAc, setSubmittingAc] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [prioritizing, setPrioritizing] = useState(false);
+  const [analysingCoverage, setAnalysingCoverage] = useState(false);
   const [baselining, setBaselining] = useState(false);
 
   useEffect(() => {
@@ -25,14 +31,21 @@ export default function UserStoryDetail() {
       api.getLatestAnalysis(projectId, storyId).catch(() => null),
       api.getLatestTestCases(projectId, storyId).catch(() => null),
       api.getLatestReviewConsensus(projectId, storyId).catch(() => null),
+      api.getLatestCoverage(projectId, storyId).catch(() => null),
       api.getLatestBaseline(projectId, storyId).catch(() => null),
     ])
-      .then(([s, r, g, d, b]) => {
+      .then(([s, r, g, d, cov, b]) => {
         setStory(s);
         setResult(r);
         setGeneration(g);
         setDebate(d);
+        setCoverage(cov);
         setBaseline(b);
+        // Reflect how the latest run was seeded: criteria supplied directly
+        // (no analysis) vs derived from the requirement.
+        if (r && !r.analysis && r.acceptance_criteria?.length) {
+          setInputMode("criteria");
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -50,12 +63,34 @@ export default function UserStoryDetail() {
     }
   }
 
+  async function onSubmitCriteria() {
+    const criteria = acText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (criteria.length === 0) return;
+    setSubmittingAc(true);
+    setError("");
+    try {
+      // A fresh criteria set means any previously generated cases / debate are
+      // stale — clear them so the UI reflects the new run.
+      setResult(await api.submitAcceptanceCriteria(projectId, storyId, criteria));
+      setGeneration(null);
+      setDebate(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmittingAc(false);
+    }
+  }
+
   async function onGenerate() {
     setGenerating(true);
     setError("");
     try {
       setGeneration(await api.generateTestCases(projectId, storyId));
       setDebate(null); // stale once test cases change
+      setCoverage(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -71,10 +106,35 @@ export default function UserStoryDetail() {
       setDebate(d);
       // consensus can add/revise cases — refresh the multi-agent set
       setGeneration(await api.getLatestTestCases(projectId, storyId));
+      setCoverage(null); // coverage recomputed against the revised suite
     } catch (err) {
       setError(err.message);
     } finally {
       setReviewing(false);
+    }
+  }
+
+  async function onPrioritize() {
+    setPrioritizing(true);
+    setError("");
+    try {
+      setGeneration(await api.prioritize(projectId, storyId));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPrioritizing(false);
+    }
+  }
+
+  async function onCoverage() {
+    setAnalysingCoverage(true);
+    setError("");
+    try {
+      setCoverage(await api.runCoverage(projectId, storyId));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAnalysingCoverage(false);
     }
   }
 
@@ -124,21 +184,58 @@ export default function UserStoryDetail() {
 
         <section className="section">
           <div className="section-head">
-            <h2>Requirement Analysis</h2>
-            <button onClick={onAnalyze} disabled={running}>
-              {running ? "Analyzing…" : analysis ? "Re-run analysis" : "Run analysis"}
-            </button>
+            <h2>Input</h2>
+            <div className="mode-toggle" role="tablist">
+              <button
+                className={`mode-btn ${inputMode === "requirement" ? "active" : ""}`}
+                onClick={() => setInputMode("requirement")}
+              >
+                From Requirement
+              </button>
+              <button
+                className={`mode-btn ${inputMode === "criteria" ? "active" : ""}`}
+                onClick={() => setInputMode("criteria")}
+              >
+                From Acceptance Criteria
+              </button>
+            </div>
           </div>
+
+          {inputMode === "requirement" ? (
+            <>
+              <p className="muted mode-note">
+                The Analyzer breaks the user story above into a structured,
+                testable specification and derives acceptance criteria.
+              </p>
+              <div className="inline-actions">
+                <button onClick={onAnalyze} disabled={running}>
+                  {running ? "Analyzing…" : analysis ? "Re-run analysis" : "Run analysis"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="muted mode-note">
+                Paste acceptance criteria directly — one per line. Test generation
+                and the debate run straight from these, skipping analysis.
+              </p>
+              <textarea
+                className="ac-input"
+                rows={6}
+                placeholder={"User can log in with valid credentials\nInvalid credentials are rejected with an error\nAccount locks after 5 failed attempts"}
+                value={acText}
+                onChange={(e) => setAcText(e.target.value)}
+              />
+              <div className="inline-actions">
+                <button onClick={onSubmitCriteria} disabled={submittingAc || !acText.trim()}>
+                  {submittingAc ? "Saving…" : "Use these criteria"}
+                </button>
+              </div>
+            </>
+          )}
 
           {error && <p className="error">{error}</p>}
           {result?.error && <p className="error">{result.error}</p>}
-
-          {!analysis && !result?.error && (
-            <p className="muted">
-              Run the analysis to break this story into a structured, testable
-              specification.
-            </p>
-          )}
 
           {analysis && (
             <div className="analysis">
@@ -161,6 +258,22 @@ export default function UserStoryDetail() {
                 )}
               </div>
               <AnalysisList title="Ambiguities" items={analysis.ambiguities} />
+            </div>
+          )}
+
+          {/* AC-direct: no analysis object, but criteria exist — show them. */}
+          {!analysis && criteria.length > 0 && (
+            <div className="analysis">
+              <div className="analysis-block">
+                <h3>Acceptance criteria (supplied)</h3>
+                <ul>
+                  {criteria.map((c) => (
+                    <li key={c.id}>
+                      <code>AC{c.order + 1}</code> {c.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
         </section>
@@ -193,13 +306,14 @@ export default function UserStoryDetail() {
                 collaboratively.
               </p>
               <div className="inline-actions">
-                <button onClick={onGenerate} disabled={!analysis || generating}>
+                <button onClick={onGenerate} disabled={criteria.length === 0 || generating}>
                   {generating ? "Generating…" : "Generate test cases"}
                 </button>
               </div>
               {multiCases.length === 0 ? (
                 <p className="muted">
-                  Run requirement analysis, then generate traceable test cases.
+                  Provide acceptance criteria (analyse a requirement or paste them
+                  directly), then generate a full, traceable test suite.
                 </p>
               ) : (
                 <div className="generated-cases">
@@ -265,6 +379,59 @@ export default function UserStoryDetail() {
           </section>
         )}
 
+        {mode === "multi" && (
+          <section className="section">
+            <div className="section-head">
+              <h2>Prioritization</h2>
+              <button onClick={onPrioritize} disabled={multiCases.length === 0 || prioritizing}>
+                {prioritizing ? "Prioritizing…" : "Prioritize suite"}
+              </button>
+            </div>
+            <p className="muted mode-note">
+              The Prioritizer agent ranks the whole suite by business importance
+              and assigns a production-impact severity — so a team under time
+              pressure knows what to run first. Cases below are ordered by rank.
+            </p>
+            {multiCases.some((tc) => tc.rank != null) ? (
+              <p className="muted">
+                Ranked {multiCases.filter((tc) => tc.rank != null).length} case(s).
+                Highest-priority cases appear first in the suite above.
+              </p>
+            ) : (
+              <p className="muted">
+                Generate (and optionally debate) test cases, then prioritize to
+                rank and assign severity.
+              </p>
+            )}
+          </section>
+        )}
+
+        {mode === "multi" && (
+          <section className="section">
+            <div className="section-head">
+              <h2>Coverage &amp; Validation</h2>
+              <button onClick={onCoverage} disabled={multiCases.length === 0 || analysingCoverage}>
+                {analysingCoverage ? "Analysing…" : coverage ? "Re-run coverage" : "Analyse coverage"}
+              </button>
+            </div>
+            <p className="muted mode-note">
+              The Validator builds a traceability matrix — which acceptance
+              criterion is verified by which test case — and judges whether each
+              is adequately covered or only superficially. Gaps are the untested
+              requirements.
+            </p>
+            {coverage?.error && <p className="error">{coverage.error}</p>}
+            {!coverage ? (
+              <p className="muted">
+                Generate test cases, then analyse coverage to see the
+                requirement-to-test traceability matrix and any gaps.
+              </p>
+            ) : (
+              <CoverageMatrix coverage={coverage} />
+            )}
+          </section>
+        )}
+
         <section className="section">
           <h2>Pipeline stages</h2>
           <ol className="stepper">
@@ -288,11 +455,20 @@ export default function UserStoryDetail() {
 }
 
 function TestCaseCard({ tc, showTrace }) {
+  const hasData =
+    tc.test_data &&
+    (Array.isArray(tc.test_data)
+      ? tc.test_data.length > 0
+      : Object.keys(tc.test_data).length > 0);
   return (
     <article className="generated-case">
       <div className="generated-case-head">
         <h3>{tc.title}</h3>
         <div className="case-badges">
+          {tc.rank != null && (
+            <span className="badge badge-rank">#{tc.rank}</span>
+          )}
+          {tc.type && <span className={`badge type-${tc.type}`}>{tc.type}</span>}
           {tc.generated_by === "consensus" && (
             <span className="badge badge-green">consensus v{tc.version}</span>
           )}
@@ -305,6 +481,9 @@ function TestCaseCard({ tc, showTrace }) {
             ) : (
               <span className="badge badge-grey">no trace</span>
             ))}
+          {tc.severity && (
+            <span className={`badge sev-badge sev-${tc.severity}`}>{tc.severity}</span>
+          )}
           <span className="badge badge-grey">{tc.priority}</span>
         </div>
       </div>
@@ -316,6 +495,12 @@ function TestCaseCard({ tc, showTrace }) {
       <p>
         <strong>Expected:</strong> {tc.expected_result}
       </p>
+      {hasData && (
+        <div className="test-data">
+          <span className="test-data-label">Test data</span>
+          <pre>{JSON.stringify(tc.test_data, null, 2)}</pre>
+        </div>
+      )}
     </article>
   );
 }
@@ -409,6 +594,54 @@ function DebateTurn({ turn }) {
         ) : (
           <p className="muted">No resolutions.</p>
         ))}
+    </div>
+  );
+}
+
+function CoverageMatrix({ coverage }) {
+  const items = coverage.items || [];
+  return (
+    <div className="coverage">
+      <div className="debate-summary">
+        <span
+          className={`badge ${
+            coverage.coverage_pct === 100 ? "badge-green" : "badge-red"
+          }`}
+        >
+          {coverage.coverage_pct}% covered
+        </span>
+        <span className="badge badge-grey">
+          {coverage.covered_count}/{coverage.total} criteria
+        </span>
+      </div>
+      <table className="coverage-table">
+        <thead>
+          <tr>
+            <th>Acceptance criterion</th>
+            <th>Status</th>
+            <th>Covering tests</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it) => (
+            <tr key={it.acceptance_criterion_id}>
+              <td>{it.criterion_text}</td>
+              <td>
+                <span className={`badge ${it.covered ? "badge-green" : "badge-red"}`}>
+                  {it.covered ? "covered" : "gap"}
+                </span>
+              </td>
+              <td>
+                {it.covering_test_case_ids.length
+                  ? it.covering_test_case_ids.map((id) => `#${id}`).join(", ")
+                  : "—"}
+              </td>
+              <td className="muted">{it.gap_notes}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -83,15 +83,46 @@ def extract_json(text: str) -> dict | list:
     raise ValueError("No JSON object/array found in model output")
 
 
+def _extract_user_story(raw: str) -> str:
+    """Pull the user-story text out of a formatted prompt so the mock can echo it
+    back and produce story-specific (not hardcoded) output offline."""
+    low = raw.lower()
+    idx = low.find("user story:")
+    seg = raw[idx + len("user story:") :] if idx != -1 else raw
+    seg = seg.replace('"""', " ")
+    for marker in ("return only", "acceptance criteria", "current test cases"):
+        cut = seg.lower().find(marker)
+        if cut != -1:
+            seg = seg[:cut]
+    return " ".join(seg.split()).strip()
+
+
+def _story_labels(raw: str) -> tuple[str, str]:
+    """(feature, subject): a short feature phrase and a longer subject line,
+    both derived from the actual story so different stories differ."""
+    story = _extract_user_story(raw)
+    if not story:
+        return "the feature", "the described behaviour"
+    words = story.split()
+    feature = " ".join(words[:8])
+    subject = story if len(story) <= 90 else " ".join(words[:14]) + "…"
+    return feature, subject
+
+
 def _dev_mock_responder(messages, system) -> str:
     """Dev-only fallback used when no API key is configured, so the FULL pipeline
     — requirement analysis, test generation, the reviewer<->consensus debate, and
     the single-LLM baseline — runs offline and free. Each branch keys off a unique
     marker in the seeded prompt and returns a schema-valid JSON reply.
 
+    It is a STUB: it echoes the story so output varies per story, but it does not
+    reason. For genuine, domain-aware edge cases and mock data, set LLM_PROVIDER
+    to a real free provider (ollama / gemini).
+
     Reviewer/consensus/baseline are matched before test-generation because their
     prompts also embed the "acceptance criteria (database ids...)" phrase."""
-    text = " ".join(m.content for m in messages).lower()
+    raw = " ".join(m.content for m in messages)
+    text = raw.lower()
 
     # --- Reviewer: flag once on round 1, be satisfied from round 2 (so the
     # debate terminates by consensus rather than by hitting max rounds). ---
@@ -151,8 +182,51 @@ def _dev_mock_responder(messages, system) -> str:
                             "expected_result": "The system produces the specified verifiable outcome",
                             "type": "functional",
                             "priority": "high",
+                            "test_data": {
+                                "valid": {"input": "explicit sample value"},
+                                "invalid": {"input": "malformed value"},
+                            },
                         },
                     }
+                ]
+            }
+        )
+
+    # --- Prioritizer: rank each current test case (annotation only). ---
+    if "you are a test prioritization specialist" in text:
+        tail = text.split("current test cases", 1)[-1]
+        ids = [int(m) for m in re.findall(r'"id":\s*(\d+)', tail)]
+        # Deterministic offline ranking: keep input order, high->low priority as
+        # we go down. A real provider reasons about business impact.
+        rankings = []
+        for i, tc_id in enumerate(ids):
+            priority = "high" if i < max(1, len(ids) // 3) else (
+                "medium" if i < max(2, 2 * len(ids) // 3) else "low"
+            )
+            severity = "critical" if i == 0 else ("major" if priority != "low" else "minor")
+            rankings.append(
+                {
+                    "test_case_id": tc_id,
+                    "priority": priority,
+                    "severity": severity,
+                    "rank": i + 1,
+                    "rationale": "Ranked by position in the reviewed suite (offline stub).",
+                }
+            )
+        return json.dumps({"rankings": rankings})
+
+    # --- Coverage analyst: judge adequacy per criterion. ---
+    if "you are a test coverage analyst" in text:
+        ids = [int(m) for m in re.findall(r'"acceptance_criterion_id":\s*(\d+)', text)]
+        return json.dumps(
+            {
+                "assessments": [
+                    {
+                        "acceptance_criterion_id": cid,
+                        "adequate": True,
+                        "gap_notes": "Adequately covered by the mapped cases (offline stub).",
+                    }
+                    for cid in dict.fromkeys(ids)  # de-dup, keep order
                 ]
             }
         )
@@ -172,6 +246,7 @@ def _dev_mock_responder(messages, system) -> str:
                         "expected_result": "The primary action succeeds",
                         "type": "functional",
                         "priority": "high",
+                        "test_data": {"valid": {"input": "well-formed value"}},
                     },
                     {
                         "title": "Invalid input is rejected",
@@ -179,57 +254,93 @@ def _dev_mock_responder(messages, system) -> str:
                         "expected_result": "An error is shown and the action is denied",
                         "type": "negative",
                         "priority": "medium",
+                        "test_data": {"invalid": {"input": "bad value"}},
                     },
                 ]
             }
         )
 
     if "acceptance_criteria" in text and "main_flow" in text:
+        feature, subject = _story_labels(raw)
         return json.dumps(
             {
-                "actors": ["End User", "Authentication Service"],
-                "preconditions": ["The user has a registered account"],
+                "actors": ["End User", "System"],
+                "preconditions": [f"The user can access {feature}"],
                 "main_flow": [
-                    "User opens the login screen",
-                    "User enters email and password",
-                    "User submits the form",
-                    "System validates credentials and grants access",
+                    f"User opens {feature}",
+                    "User provides the required input",
+                    "User submits the action",
+                    "System processes the request and returns the result",
                 ],
                 "alt_flows": [
-                    "Invalid credentials: system shows an error and denies access",
-                    "Empty fields: system prompts for required input",
+                    "Invalid input: the system shows an error and does not proceed",
+                    "Missing required input: the system prompts for it",
                 ],
                 "acceptance_criteria": [
-                    {"id": "AC1", "text": "Valid credentials grant access to the dashboard"},
-                    {"id": "AC2", "text": "Invalid credentials show an error and deny access"},
-                    {"id": "AC3", "text": "Empty email or password is rejected with a prompt"},
+                    {"id": "AC1", "text": f"With valid input, {subject} succeeds"},
+                    {"id": "AC2", "text": f"With invalid input, {feature} is rejected with a clear error"},
+                    {"id": "AC3", "text": f"Required fields for {feature} cannot be empty"},
                 ],
                 "ambiguities": [
-                    "Account lockout policy after repeated failures is unspecified",
-                    "Password complexity / reset flow is not described",
+                    f"Boundary limits for {feature} are not specified",
+                    "Authorization / permission rules are not described",
                 ],
             }
         )
     if "acceptance criteria (database ids are authoritative)" in text:
         criteria = re.findall(r'"id"\s*:\s*(\d+).*?"text"\s*:\s*"([^"]+)"', text)
-        return json.dumps(
-            {
-                "test_cases": [
-                    {
-                        "acceptance_criterion_id": int(criterion_id),
-                        "title": f"Verify {criterion_text}",
-                        "steps": [
-                            "Open the relevant feature",
-                            "Perform the action described by the acceptance criterion",
-                        ],
-                        "expected_result": criterion_text,
-                        "type": "functional",
-                        "priority": "medium",
-                    }
-                    for criterion_id, criterion_text in criteria
-                ]
-            }
-        )
+        cases = []
+        for criterion_id, criterion_text in criteria:
+            cid = int(criterion_id)
+            # A small suite per criterion (functional + negative + boundary),
+            # each with concrete mock data — so the offline path exercises the
+            # rich schema. A real provider produces genuinely varied suites.
+            cases.append(
+                {
+                    "acceptance_criterion_id": cid,
+                    "title": f"Functional: {criterion_text}",
+                    "steps": [
+                        "Open the relevant feature",
+                        "Enter the specified valid input",
+                        "Submit the action",
+                    ],
+                    "expected_result": criterion_text,
+                    "type": "functional",
+                    "priority": "high",
+                    "test_data": {"valid": {"input": "well-formed sample value"}},
+                }
+            )
+            cases.append(
+                {
+                    "acceptance_criterion_id": cid,
+                    "title": f"Negative: invalid input is rejected for AC{cid}",
+                    "steps": [
+                        "Open the relevant feature",
+                        "Enter malformed / invalid input",
+                        "Submit the action",
+                    ],
+                    "expected_result": "A clear validation error is shown and the action does not proceed",
+                    "type": "negative",
+                    "priority": "medium",
+                    "test_data": {"invalid": {"input": "!!! not valid !!!"}},
+                }
+            )
+            cases.append(
+                {
+                    "acceptance_criterion_id": cid,
+                    "title": f"Boundary: edge values for AC{cid}",
+                    "steps": [
+                        "Open the relevant feature",
+                        "Enter boundary values (empty, minimum, maximum)",
+                        "Submit the action",
+                    ],
+                    "expected_result": "Each boundary value is handled correctly per the specification",
+                    "type": "boundary",
+                    "priority": "medium",
+                    "test_data": {"boundary": ["", "min", "max", "max-length-string"]},
+                }
+            )
+        return json.dumps({"test_cases": cases})
     return "{}"
 
 
