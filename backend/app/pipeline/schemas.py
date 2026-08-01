@@ -33,7 +33,7 @@ class PipelineRunOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    user_story_id: int
+    requirement_id: int
     mode: str
     status: str
     current_stage: str | None

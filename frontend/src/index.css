@@ -850,6 +850,55 @@ select:focus {
   border-color: rgba(216, 0, 50, 0.22);
 }
 
+/* Module status badges */
+.status-active {
+  color: var(--poly-green);
+  background: rgba(123, 201, 80, 0.14);
+  border-color: rgba(123, 201, 80, 0.32);
+}
+.status-on_hold {
+  color: #8a6100;
+  background: rgba(224, 180, 0, 0.16);
+  border-color: rgba(224, 180, 0, 0.34);
+}
+.status-completed {
+  color: var(--blue-800);
+  background: rgba(0, 102, 178, 0.1);
+  border-color: rgba(0, 102, 178, 0.18);
+}
+.status-archived {
+  color: var(--text-secondary);
+  background: var(--surface-mist);
+  border-color: var(--divider);
+}
+
+/* Inline edit form (module row) */
+.inline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.inline-edit input,
+.inline-edit textarea,
+.inline-edit select {
+  width: 100%;
+  font-family: var(--font-primary);
+  font-size: 13.5px;
+  padding: 8px 10px;
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  background: var(--surface-white);
+}
+.inline-edit-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.inline-edit-row select {
+  flex: 1;
+}
+
 /* Priority rank badge (from the Prioritizer) */
 .badge-rank {
   color: var(--blue-900);

@@ -14,11 +14,13 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-async function request(path, { method = "GET", body, form, auth = true } = {}) {
+async function request(path, { method = "GET", body, form, formData, auth = true } = {}) {
   const headers = {};
   const opts = { method, headers };
 
-  if (form) {
+  if (formData) {
+    opts.body = formData; // browser sets multipart Content-Type + boundary
+  } else if (form) {
     opts.body = new URLSearchParams(form);
     headers["Content-Type"] = "application/x-www-form-urlencoded";
   } else if (body !== undefined) {
@@ -43,6 +45,8 @@ async function request(path, { method = "GET", body, form, auth = true } = {}) {
   return data;
 }
 
+const P = (projectId) => `/projects/${projectId}`;
+
 export const api = {
   register: (email, password) =>
     request("/auth/register", { method: "POST", body: { email, password }, auth: false }),
@@ -56,58 +60,67 @@ export const api = {
   getProject: (id) => request(`/projects/${id}`),
   deleteProject: (id) => request(`/projects/${id}`, { method: "DELETE" }),
 
-  listUserStories: (projectId) => request(`/projects/${projectId}/user-stories`),
-  createUserStory: (projectId, title, raw_text) =>
-    request(`/projects/${projectId}/user-stories`, {
-      method: "POST",
-      body: { title, raw_text },
-    }),
-  getUserStory: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}`),
-  deleteUserStory: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}`, { method: "DELETE" }),
+  // --- Modules (§4) ---
+  listModules: (projectId) => request(`${P(projectId)}/modules`),
+  createModule: (projectId, body) =>
+    request(`${P(projectId)}/modules`, { method: "POST", body }),
+  getModule: (projectId, moduleId) => request(`${P(projectId)}/modules/${moduleId}`),
+  updateModule: (projectId, moduleId, body) =>
+    request(`${P(projectId)}/modules/${moduleId}`, { method: "PATCH", body }),
+  deleteModule: (projectId, moduleId) =>
+    request(`${P(projectId)}/modules/${moduleId}`, { method: "DELETE" }),
 
-  runRequirementAnalysis: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/analyze`, {
+  // --- Requirements (§5) ---
+  listRequirements: (projectId, moduleId) =>
+    request(`${P(projectId)}/modules/${moduleId}/requirements`),
+  createRequirement: (projectId, moduleId, body) =>
+    request(`${P(projectId)}/modules/${moduleId}/requirements`, { method: "POST", body }),
+  uploadRequirement: (projectId, moduleId, formData) =>
+    request(`${P(projectId)}/modules/${moduleId}/requirements/upload`, {
       method: "POST",
+      formData,
     }),
-  getLatestAnalysis: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/latest-analysis`),
-  submitAcceptanceCriteria: (projectId, storyId, criteria) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/acceptance-criteria`, {
+  getRequirement: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}`),
+  updateRequirement: (projectId, requirementId, body) =>
+    request(`${P(projectId)}/requirements/${requirementId}`, { method: "PATCH", body }),
+  deleteRequirement: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}`, { method: "DELETE" }),
+
+  // --- Pipeline (operates on a requirement) ---
+  runRequirementAnalysis: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/analyze`, { method: "POST" }),
+  getLatestAnalysis: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/latest-analysis`),
+  submitAcceptanceCriteria: (projectId, requirementId, criteria) =>
+    request(`${P(projectId)}/requirements/${requirementId}/acceptance-criteria`, {
       method: "POST",
       body: { criteria },
     }),
-  generateTestCases: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/generate-test-cases`, {
+  generateTestCases: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/generate-test-cases`, {
       method: "POST",
     }),
-  getLatestTestCases: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/latest-test-cases`),
+  getLatestTestCases: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/latest-test-cases`),
 
-  runReviewConsensus: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/review-consensus`, {
+  runReviewConsensus: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/review-consensus`, {
       method: "POST",
     }),
-  getLatestReviewConsensus: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/latest-review-consensus`),
+  getLatestReviewConsensus: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/latest-review-consensus`),
 
-  prioritize: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/prioritize`, {
-      method: "POST",
-    }),
+  prioritize: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/prioritize`, { method: "POST" }),
 
-  runCoverage: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/coverage`, {
-      method: "POST",
-    }),
-  getLatestCoverage: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/latest-coverage`),
+  runCoverage: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/coverage`, { method: "POST" }),
+  getLatestCoverage: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/latest-coverage`),
 
-  runBaseline: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/baseline`, {
-      method: "POST",
-    }),
-  getLatestBaseline: (projectId, storyId) =>
-    request(`/projects/${projectId}/user-stories/${storyId}/latest-baseline`),
+  runBaseline: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/baseline`, { method: "POST" }),
+  getLatestBaseline: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/latest-baseline`),
 };

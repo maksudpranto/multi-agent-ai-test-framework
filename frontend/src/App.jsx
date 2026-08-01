@@ -5,7 +5,8 @@ import Login from "./auth/Login";
 import Register from "./auth/Register";
 import Dashboard from "./projects/Dashboard";
 import ProjectDetail from "./projects/ProjectDetail";
-import UserStoryDetail from "./userStories/UserStoryDetail";
+import ModuleDetail from "./modules/ModuleDetail";
+import RequirementDetail from "./requirements/RequirementDetail";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -62,10 +63,18 @@ export default function App() {
         }
       />
       <Route
-        path="/projects/:projectId/user-stories/:storyId"
+        path="/projects/:projectId/modules/:moduleId"
         element={
           <ProtectedRoute>
-            <UserStoryDetail />
+            <ModuleDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:projectId/requirements/:requirementId"
+        element={
+          <ProtectedRoute>
+            <RequirementDetail />
           </ProtectedRoute>
         }
       />

@@ -18,7 +18,7 @@ from app.models import (
     TestCase,
     TestCaseStatus,
     User,
-    UserStory,
+    Requirement,
     utcnow,
 )
 from app.pipeline.schemas import (
@@ -33,25 +33,25 @@ from app.workflow.config import RunConfig
 from app.workflow.engine import DefaultWorkflowEngine
 
 router = APIRouter(
-    prefix="/projects/{project_id}/user-stories/{story_id}",
+    prefix="/projects/{project_id}/requirements/{requirement_id}",
     tags=["pipeline"],
 )
 
 
-def _get_owned_story(
-    project_id: int, story_id: int, user: User, db: Session
-) -> UserStory:
+def _get_owned_requirement(
+    project_id: int, requirement_id: int, user: User, db: Session
+) -> Requirement:
     project = db.get(Project, project_id)
     if project is None or project.owner_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
         )
-    story = db.get(UserStory, story_id)
-    if story is None or story.project_id != project_id:
+    requirement = db.get(Requirement, requirement_id)
+    if requirement is None or requirement.project_id != project_id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User story not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Requirement not found"
         )
-    return story
+    return requirement
 
 
 def _build_result(db: Session, run: PipelineRun, error: str | None):
@@ -157,19 +157,19 @@ def _build_debate_result(
     )
 
 
-def _latest_run_with_test_cases(db: Session, story_id: int) -> PipelineRun | None:
+def _latest_run_with_test_cases(db: Session, requirement_id: int) -> PipelineRun | None:
     return db.scalar(
         select(PipelineRun)
         .join(TestCase, TestCase.pipeline_run_id == PipelineRun.id)
         .where(
-            PipelineRun.user_story_id == story_id,
+            PipelineRun.requirement_id == requirement_id,
             PipelineRun.mode == ExperimentMode.multi_agent,
         )
         .order_by(PipelineRun.created_at.desc(), PipelineRun.id.desc())
     )
 
 
-def _latest_run_with_criteria(db: Session, story_id: int) -> PipelineRun | None:
+def _latest_run_with_criteria(db: Session, requirement_id: int) -> PipelineRun | None:
     """Latest multi-agent run that has acceptance criteria, regardless of how
     they were obtained (Analyzer-derived from a requirement, or user-supplied
     directly). This is the run test generation and the debate operate on."""
@@ -177,7 +177,7 @@ def _latest_run_with_criteria(db: Session, story_id: int) -> PipelineRun | None:
         select(PipelineRun)
         .join(AcceptanceCriterion, AcceptanceCriterion.pipeline_run_id == PipelineRun.id)
         .where(
-            PipelineRun.user_story_id == story_id,
+            PipelineRun.requirement_id == requirement_id,
             PipelineRun.mode == ExperimentMode.multi_agent,
         )
         .order_by(PipelineRun.created_at.desc(), PipelineRun.id.desc())
@@ -187,14 +187,14 @@ def _latest_run_with_criteria(db: Session, story_id: int) -> PipelineRun | None:
 @router.post("/analyze", response_model=RequirementAnalysisResult)
 def run_requirement_analysis(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> RequirementAnalysisResult:
-    story = _get_owned_story(project_id, story_id, user, db)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
 
     run = PipelineRun(
-        user_story_id=story.id,
+        requirement_id=requirement.id,
         mode=ExperimentMode.multi_agent,
         input_mode="requirement",
         current_stage=PipelineStage.requirement_analysis,
@@ -209,7 +209,7 @@ def run_requirement_analysis(
         db,
         run,
         PipelineStage.requirement_analysis,
-        inputs={"user_story": story.raw_text},
+        inputs={"user_story": requirement.raw_text},
         config=RunConfig.defaults(),
     )
 
@@ -225,15 +225,15 @@ def run_requirement_analysis(
 @router.get("/latest-analysis", response_model=RequirementAnalysisResult | None)
 def get_latest_analysis(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    story = _get_owned_story(project_id, story_id, user, db)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
     # Either input path (Analyzer-derived or user-supplied AC) surfaces here, so
     # select the latest multi-agent run that has criteria rather than requiring a
     # RequirementAnalysis row (AC-direct runs have none).
-    run = _latest_run_with_criteria(db, story.id)
+    run = _latest_run_with_criteria(db, requirement.id)
     if run is None:
         return None
     return _build_result(db, run, error=None)
@@ -242,7 +242,7 @@ def get_latest_analysis(
 @router.post("/acceptance-criteria", response_model=RequirementAnalysisResult)
 def submit_acceptance_criteria(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     payload: AcceptanceCriteriaIn,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -250,7 +250,7 @@ def submit_acceptance_criteria(
     """Alternative input path: the user supplies acceptance criteria directly,
     skipping requirement analysis. Creates a multi-agent run whose criteria come
     straight from the user, ready for test generation and the debate."""
-    story = _get_owned_story(project_id, story_id, user, db)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
 
     texts = [c.strip() for c in payload.criteria if c and c.strip()]
     if not texts:
@@ -260,7 +260,7 @@ def submit_acceptance_criteria(
         )
 
     run = PipelineRun(
-        user_story_id=story.id,
+        requirement_id=requirement.id,
         mode=ExperimentMode.multi_agent,
         input_mode="acceptance_criteria",
         current_stage=PipelineStage.test_generation,
@@ -281,12 +281,12 @@ def submit_acceptance_criteria(
 @router.post("/generate-test-cases", response_model=TestGenerationResult)
 def generate_test_cases(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> TestGenerationResult:
-    story = _get_owned_story(project_id, story_id, user, db)
-    run = _latest_run_with_criteria(db, story.id)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    run = _latest_run_with_criteria(db, requirement.id)
     if run is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -316,7 +316,7 @@ def generate_test_cases(
         run,
         PipelineStage.test_generation,
         inputs={
-            "user_story": story.raw_text,
+            "user_story": requirement.raw_text,
             "acceptance_criteria": [
                 {"id": criterion.id, "text": criterion.text} for criterion in criteria
             ],
@@ -334,16 +334,16 @@ def generate_test_cases(
 @router.get("/latest-test-cases", response_model=TestGenerationResult | None)
 def get_latest_test_cases(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    story = _get_owned_story(project_id, story_id, user, db)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
     run = db.scalar(
         select(PipelineRun)
         .join(TestCase, TestCase.pipeline_run_id == PipelineRun.id)
         .where(
-            PipelineRun.user_story_id == story.id,
+            PipelineRun.requirement_id == requirement.id,
             PipelineRun.mode == ExperimentMode.multi_agent,
         )
         .order_by(PipelineRun.created_at.desc(), PipelineRun.id.desc())
@@ -356,14 +356,14 @@ def get_latest_test_cases(
 @router.post("/review-consensus", response_model=DebateResult)
 def run_review_consensus(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> DebateResult:
     """Run the multi-agent Reviewer <-> Consensus debate over the latest set of
     generated test cases. This is the collaborative core of the framework."""
-    story = _get_owned_story(project_id, story_id, user, db)
-    run = _latest_run_with_test_cases(db, story.id)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    run = _latest_run_with_test_cases(db, requirement.id)
     if run is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -385,7 +385,7 @@ def run_review_consensus(
     summary = DefaultWorkflowEngine().run_debate(
         db,
         run,
-        user_story=story.raw_text,
+        user_story=requirement.raw_text,
         acceptance_criteria=[{"id": c.id, "text": c.text} for c in criteria],
         config=RunConfig.defaults(),
     )
@@ -400,15 +400,15 @@ def run_review_consensus(
 @router.get("/latest-review-consensus", response_model=DebateResult | None)
 def get_latest_review_consensus(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    story = _get_owned_story(project_id, story_id, user, db)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
     run = db.scalar(
         select(PipelineRun)
         .join(DebateTurn, DebateTurn.pipeline_run_id == PipelineRun.id)
-        .where(PipelineRun.user_story_id == story.id)
+        .where(PipelineRun.requirement_id == requirement.id)
         .order_by(PipelineRun.created_at.desc(), PipelineRun.id.desc())
     )
     if run is None:
@@ -461,14 +461,14 @@ def _build_coverage_result(
 @router.post("/coverage", response_model=CoverageResult)
 def run_coverage(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> CoverageResult:
     """Coverage / Validator agent: build the traceability matrix (deterministic)
     and judge whether each criterion's coverage is adequate (semantic)."""
-    story = _get_owned_story(project_id, story_id, user, db)
-    run = _latest_run_with_test_cases(db, story.id)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    run = _latest_run_with_test_cases(db, requirement.id)
     if run is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -480,7 +480,7 @@ def run_coverage(
     db.commit()
 
     DefaultWorkflowEngine().run_coverage(
-        db, run, user_story=story.raw_text, config=RunConfig.defaults()
+        db, run, user_story=requirement.raw_text, config=RunConfig.defaults()
     )
 
     run.status = RunStatus.completed
@@ -493,15 +493,15 @@ def run_coverage(
 @router.get("/latest-coverage", response_model=CoverageResult | None)
 def get_latest_coverage(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    story = _get_owned_story(project_id, story_id, user, db)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
     run = db.scalar(
         select(PipelineRun)
         .join(CoverageReport, CoverageReport.pipeline_run_id == PipelineRun.id)
-        .where(PipelineRun.user_story_id == story.id)
+        .where(PipelineRun.requirement_id == requirement.id)
         .order_by(PipelineRun.created_at.desc(), PipelineRun.id.desc())
     )
     if run is None:
@@ -512,14 +512,14 @@ def get_latest_coverage(
 @router.post("/prioritize", response_model=TestGenerationResult)
 def run_prioritization(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> TestGenerationResult:
     """Prioritizer agent: rank the current multi-agent test suite by importance,
     assigning priority, severity, and a unique rank to each case (in place)."""
-    story = _get_owned_story(project_id, story_id, user, db)
-    run = _latest_run_with_test_cases(db, story.id)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    run = _latest_run_with_test_cases(db, requirement.id)
     if run is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -531,7 +531,7 @@ def run_prioritization(
     db.commit()
 
     result = DefaultWorkflowEngine().run_prioritization(
-        db, run, user_story=story.raw_text, config=RunConfig.defaults()
+        db, run, user_story=requirement.raw_text, config=RunConfig.defaults()
     )
 
     run.status = RunStatus.completed if result.success else RunStatus.failed
@@ -545,17 +545,17 @@ def run_prioritization(
 @router.post("/baseline", response_model=TestGenerationResult)
 def run_single_llm_baseline(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> TestGenerationResult:
-    """Single-LLM baseline: one prompt turns the story straight into test cases.
+    """Single-LLM baseline: one prompt turns the requirement straight into test cases.
     Runs in its own pipeline run (mode=single_llm) so it never mixes with the
     multi-agent artifacts and can be compared against them."""
-    story = _get_owned_story(project_id, story_id, user, db)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
 
     run = PipelineRun(
-        user_story_id=story.id,
+        requirement_id=requirement.id,
         mode=ExperimentMode.single_llm,
         current_stage=PipelineStage.test_generation,
         status=RunStatus.running,
@@ -565,7 +565,7 @@ def run_single_llm_baseline(
     db.refresh(run)
 
     result = DefaultWorkflowEngine().run_baseline(
-        db, run, user_story=story.raw_text, config=RunConfig.defaults()
+        db, run, user_story=requirement.raw_text, config=RunConfig.defaults()
     )
 
     run.status = RunStatus.completed if result.success else RunStatus.failed
@@ -579,15 +579,15 @@ def run_single_llm_baseline(
 @router.get("/latest-baseline", response_model=TestGenerationResult | None)
 def get_latest_baseline(
     project_id: int,
-    story_id: int,
+    requirement_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    story = _get_owned_story(project_id, story_id, user, db)
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
     run = db.scalar(
         select(PipelineRun)
         .where(
-            PipelineRun.user_story_id == story.id,
+            PipelineRun.requirement_id == requirement.id,
             PipelineRun.mode == ExperimentMode.single_llm,
         )
         .order_by(PipelineRun.created_at.desc(), PipelineRun.id.desc())

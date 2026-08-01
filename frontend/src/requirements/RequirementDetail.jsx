@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { PIPELINE_STAGES } from "../pipeline/stages";
+import { REQ_TYPE_LABEL } from "./constants";
 
-export default function UserStoryDetail() {
-  const { projectId, storyId } = useParams();
+export default function RequirementDetail() {
+  const { projectId, requirementId } = useParams();
   const [story, setStory] = useState(null);
   const [result, setResult] = useState(null);
   const [generation, setGeneration] = useState(null);
@@ -27,12 +28,12 @@ export default function UserStoryDetail() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api.getUserStory(projectId, storyId),
-      api.getLatestAnalysis(projectId, storyId).catch(() => null),
-      api.getLatestTestCases(projectId, storyId).catch(() => null),
-      api.getLatestReviewConsensus(projectId, storyId).catch(() => null),
-      api.getLatestCoverage(projectId, storyId).catch(() => null),
-      api.getLatestBaseline(projectId, storyId).catch(() => null),
+      api.getRequirement(projectId, requirementId),
+      api.getLatestAnalysis(projectId, requirementId).catch(() => null),
+      api.getLatestTestCases(projectId, requirementId).catch(() => null),
+      api.getLatestReviewConsensus(projectId, requirementId).catch(() => null),
+      api.getLatestCoverage(projectId, requirementId).catch(() => null),
+      api.getLatestBaseline(projectId, requirementId).catch(() => null),
     ])
       .then(([s, r, g, d, cov, b]) => {
         setStory(s);
@@ -49,13 +50,13 @@ export default function UserStoryDetail() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [projectId, storyId]);
+  }, [projectId, requirementId]);
 
   async function onAnalyze() {
     setRunning(true);
     setError("");
     try {
-      setResult(await api.runRequirementAnalysis(projectId, storyId));
+      setResult(await api.runRequirementAnalysis(projectId, requirementId));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -74,7 +75,7 @@ export default function UserStoryDetail() {
     try {
       // A fresh criteria set means any previously generated cases / debate are
       // stale — clear them so the UI reflects the new run.
-      setResult(await api.submitAcceptanceCriteria(projectId, storyId, criteria));
+      setResult(await api.submitAcceptanceCriteria(projectId, requirementId, criteria));
       setGeneration(null);
       setDebate(null);
     } catch (err) {
@@ -88,7 +89,7 @@ export default function UserStoryDetail() {
     setGenerating(true);
     setError("");
     try {
-      setGeneration(await api.generateTestCases(projectId, storyId));
+      setGeneration(await api.generateTestCases(projectId, requirementId));
       setDebate(null); // stale once test cases change
       setCoverage(null);
     } catch (err) {
@@ -102,10 +103,10 @@ export default function UserStoryDetail() {
     setReviewing(true);
     setError("");
     try {
-      const d = await api.runReviewConsensus(projectId, storyId);
+      const d = await api.runReviewConsensus(projectId, requirementId);
       setDebate(d);
       // consensus can add/revise cases — refresh the multi-agent set
-      setGeneration(await api.getLatestTestCases(projectId, storyId));
+      setGeneration(await api.getLatestTestCases(projectId, requirementId));
       setCoverage(null); // coverage recomputed against the revised suite
     } catch (err) {
       setError(err.message);
@@ -118,7 +119,7 @@ export default function UserStoryDetail() {
     setPrioritizing(true);
     setError("");
     try {
-      setGeneration(await api.prioritize(projectId, storyId));
+      setGeneration(await api.prioritize(projectId, requirementId));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -130,7 +131,7 @@ export default function UserStoryDetail() {
     setAnalysingCoverage(true);
     setError("");
     try {
-      setCoverage(await api.runCoverage(projectId, storyId));
+      setCoverage(await api.runCoverage(projectId, requirementId));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -142,7 +143,7 @@ export default function UserStoryDetail() {
     setBaselining(true);
     setError("");
     try {
-      setBaseline(await api.runBaseline(projectId, storyId));
+      setBaseline(await api.runBaseline(projectId, requirementId));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -173,9 +174,25 @@ export default function UserStoryDetail() {
       <div className="page">
         <p className="breadcrumb">
           <Link to="/">Home</Link> /{" "}
-          <Link to={`/projects/${projectId}`}>Project</Link> / {story?.title}
+          <Link to={`/projects/${projectId}`}>Project</Link> /{" "}
+          {story?.module_id && (
+            <>
+              <Link to={`/projects/${projectId}/modules/${story.module_id}`}>Module</Link> /{" "}
+            </>
+          )}
+          {story?.title}
         </p>
         <h1>{story?.title}</h1>
+        {story && (
+          <div className="case-badges" style={{ marginBottom: 8 }}>
+            <span className="badge badge-blue">{REQ_TYPE_LABEL[story.req_type] || story.req_type}</span>
+            <span className="badge badge-grey">priority: {story.priority}</span>
+            <span className="badge badge-grey">status: {story.status}</span>
+            {story.source_filename && (
+              <span className="badge badge-grey">📎 {story.source_filename}</span>
+            )}
+          </div>
+        )}
 
         <section className="section">
           <h2>User story</h2>

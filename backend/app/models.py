@@ -74,6 +74,41 @@ class ManualAction(str, enum.Enum):
     reject = "reject"
 
 
+class ModuleStatus(str, enum.Enum):
+    active = "active"
+    on_hold = "on_hold"
+    completed = "completed"
+    archived = "archived"
+
+
+class Priority(str, enum.Enum):
+    """Shared priority scale for modules and requirements."""
+
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+
+class RequirementType(str, enum.Enum):
+    """The source form a requirement was captured in (§5)."""
+
+    user_story = "user_story"
+    acceptance_criteria = "acceptance_criteria"
+    brd = "brd"
+    prd = "prd"
+    srs = "srs"
+    use_case = "use_case"
+    feature_description = "feature_description"
+
+
+class RequirementStatus(str, enum.Enum):
+    draft = "draft"
+    ready = "ready"
+    in_progress = "in_progress"
+    done = "done"
+    archived = "archived"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -97,7 +132,10 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     owner: Mapped["User"] = relationship(back_populates="projects")
-    user_stories: Mapped[list["UserStory"]] = relationship(
+    modules: Mapped[list["Module"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    requirements: Mapped[list["Requirement"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
 
@@ -116,29 +154,68 @@ class Dataset(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
-    user_stories: Mapped[list["UserStory"]] = relationship(
+    requirements: Mapped[list["Requirement"]] = relationship(
         back_populates="dataset"
     )
 
 
-class UserStory(Base):
-    __tablename__ = "user_stories"
+class Module(Base):
+    """A feature / functional area within a project (§4). Requirements are
+    grouped under modules; a module carries its own status and priority."""
+
+    __tablename__ = "modules"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[ModuleStatus] = mapped_column(
+        Enum(ModuleStatus), default=ModuleStatus.active
+    )
+    priority: Mapped[Priority] = mapped_column(Enum(Priority), default=Priority.medium)
+    order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="modules")
+    requirements: Mapped[list["Requirement"]] = relationship(
+        back_populates="module"
+    )
+
+
+class Requirement(Base):
+    """A requirement in any supported source form (§5): user story, acceptance
+    criteria, BRD, PRD, SRS, use case, or feature description. `raw_text` holds
+    the requirement content (typed or extracted from an uploaded document)."""
+
+    __tablename__ = "requirements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    module_id: Mapped[int | None] = mapped_column(
+        ForeignKey("modules.id"), nullable=True, index=True
+    )
     dataset_id: Mapped[int | None] = mapped_column(
         ForeignKey("datasets.id"), nullable=True, index=True
     )
     title: Mapped[str] = mapped_column(String(255))
     raw_text: Mapped[str] = mapped_column(Text)
+    req_type: Mapped[RequirementType] = mapped_column(
+        Enum(RequirementType), default=RequirementType.user_story
+    )
+    priority: Mapped[Priority] = mapped_column(Enum(Priority), default=Priority.medium)
+    status: Mapped[RequirementStatus] = mapped_column(
+        Enum(RequirementStatus), default=RequirementStatus.draft
+    )
+    source_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
-    project: Mapped["Project"] = relationship(back_populates="user_stories")
+    project: Mapped["Project"] = relationship(back_populates="requirements")
+    module: Mapped["Module | None"] = relationship(back_populates="requirements")
     dataset: Mapped["Dataset | None"] = relationship(
-        back_populates="user_stories"
+        back_populates="requirements"
     )
     pipeline_runs: Mapped[list["PipelineRun"]] = relationship(
-        back_populates="user_story", cascade="all, delete-orphan"
+        back_populates="requirement", cascade="all, delete-orphan"
     )
 
 
@@ -146,8 +223,8 @@ class PipelineRun(Base):
     __tablename__ = "pipeline_runs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_story_id: Mapped[int] = mapped_column(
-        ForeignKey("user_stories.id"), index=True
+    requirement_id: Mapped[int] = mapped_column(
+        ForeignKey("requirements.id"), index=True
     )
     experiment_id: Mapped[int | None] = mapped_column(
         ForeignKey("experiments.id"), nullable=True, index=True
@@ -171,7 +248,7 @@ class PipelineRun(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    user_story: Mapped["UserStory"] = relationship(back_populates="pipeline_runs")
+    requirement: Mapped["Requirement"] = relationship(back_populates="pipeline_runs")
 
 
 class AgentExecution(Base):

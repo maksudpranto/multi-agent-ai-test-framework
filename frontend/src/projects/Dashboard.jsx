@@ -65,8 +65,12 @@ export default function Dashboard() {
       const list = await api.listProjects();
       const withCounts = await Promise.all(
         list.map(async (p) => {
-          const stories = await api.listUserStories(p.id).catch(() => []);
-          return { ...p, storyCount: stories.length };
+          const mods = await api.listModules(p.id).catch(() => []);
+          const storyCount = mods.reduce(
+            (n, m) => n + (m.requirement_count || 0),
+            0
+          );
+          return { ...p, moduleCount: mods.length, storyCount };
         })
       );
       setProjects(withCounts);
@@ -188,9 +192,9 @@ export default function Dashboard() {
           <div className="stat-sub">Scoped to your account</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">User stories</div>
+          <div className="stat-label">Requirements</div>
           <div className="stat-value">{totalStories}</div>
-          <div className="stat-sub">Ready for requirement analysis</div>
+          <div className="stat-sub">Across all modules</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Test cases</div>
@@ -222,7 +226,7 @@ export default function Dashboard() {
 
           <div className="ptable-head">
             <div>Project</div>
-            <div>Stories</div>
+            <div>Requirements</div>
             <div>Pipeline stage</div>
             <div className="right">Quality</div>
             <div className="right">Updated</div>
@@ -249,13 +253,13 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="cell-num">
-                  <b>{p.storyCount}</b> <span className="s">{p.storyCount === 1 ? "story" : "stories"}</span>
+                  <b>{p.storyCount}</b> <span className="s">{p.storyCount === 1 ? "requirement" : "requirements"}</span>
                 </div>
                 <div>
-                  {p.storyCount > 0 ? (
-                    <span className="badge badge-blue">Ready to analyze</span>
+                  {p.moduleCount > 0 ? (
+                    <span className="badge badge-blue">{p.moduleCount} {p.moduleCount === 1 ? "module" : "modules"}</span>
                   ) : (
-                    <span className="badge badge-grey">No stories yet</span>
+                    <span className="badge badge-grey">No modules yet</span>
                   )}
                 </div>
                 <div className="right score-num" style={{ color: "var(--text-secondary)" }}>—</div>

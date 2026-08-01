@@ -6,10 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.routes import router as auth_router
 from app.config import get_settings
 from app.database import SessionLocal
+from app.modules.routes import router as modules_router
 from app.pipeline.routes import router as pipeline_router
 from app.projects.routes import router as projects_router
 from app.prompts.seed import seed_prompts
-from app.user_stories.routes import router as user_stories_router
+from app.requirements.routes import router as requirements_router
 
 settings = get_settings()
 
@@ -37,7 +38,8 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(projects_router)
-app.include_router(user_stories_router)
+app.include_router(modules_router)
+app.include_router(requirements_router)
 app.include_router(pipeline_router)
 
 

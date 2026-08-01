@@ -21,14 +21,15 @@ from app.models import (
     ExecutionStatus,
     ExperimentMode,
     GeneratedBy,
+    Module,
     PipelineRun,
     PipelineStage,
     Project,
+    Requirement,
     RequirementAnalysis,
     RunStatus,
     TestCase as GeneratedTestCase,
     User,
-    UserStory,
 )
 from app.prompts.seed import seed_prompts
 from app.workflow.config import RunConfig
@@ -84,12 +85,18 @@ def _seed_story(db):
     project = Project(owner_id=user.id, name="Demo")
     db.add(project)
     db.flush()
-    story = UserStory(
-        project_id=project.id, title="Login", raw_text="As a user I want to log in"
+    module = Module(project_id=project.id, name="Auth")
+    db.add(module)
+    db.flush()
+    requirement = Requirement(
+        project_id=project.id,
+        module_id=module.id,
+        title="Login",
+        raw_text="As a user I want to log in",
     )
-    db.add(story)
+    db.add(requirement)
     db.commit()
-    return story
+    return requirement
 
 
 def test_password_roundtrip():
@@ -109,7 +116,7 @@ def test_requirement_analysis_stage_persists_and_logs(db):
     story = _seed_story(db)
 
     run = PipelineRun(
-        user_story_id=story.id,
+        requirement_id=story.id,
         mode=ExperimentMode.multi_agent,
         current_stage=PipelineStage.requirement_analysis,
         status=RunStatus.running,
@@ -161,7 +168,7 @@ def test_requirement_analysis_stage_handles_bad_json(db):
     seed_prompts(db)
     story = _seed_story(db)
     run = PipelineRun(
-        user_story_id=story.id,
+        requirement_id=story.id,
         mode=ExperimentMode.multi_agent,
         status=RunStatus.running,
     )
@@ -197,7 +204,7 @@ def test_test_generation_stage_persists_traceable_test_cases(db):
     seed_prompts(db)
     story = _seed_story(db)
     run = PipelineRun(
-        user_story_id=story.id,
+        requirement_id=story.id,
         mode=ExperimentMode.multi_agent,
         current_stage=PipelineStage.test_generation,
         status=RunStatus.running,
@@ -251,7 +258,7 @@ def _run_multi_agent_through_generation(db):
     cfg = RunConfig(model="mock-model")
 
     run = PipelineRun(
-        user_story_id=story.id,
+        requirement_id=story.id,
         mode=ExperimentMode.multi_agent,
         status=RunStatus.running,
     )
@@ -439,7 +446,7 @@ def test_single_llm_baseline_runs_untraceable(db):
     engine = DefaultWorkflowEngine(llm_service=llm)
 
     run = PipelineRun(
-        user_story_id=story.id,
+        requirement_id=story.id,
         mode=ExperimentMode.single_llm,
         status=RunStatus.running,
     )
