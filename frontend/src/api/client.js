@@ -79,4 +79,18 @@ export const api = {
     }),
   getLatestTestCases: (projectId, storyId) =>
     request(`/projects/${projectId}/user-stories/${storyId}/latest-test-cases`),
+
+  runReviewConsensus: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/review-consensus`, {
+      method: "POST",
+    }),
+  getLatestReviewConsensus: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/latest-review-consensus`),
+
+  runBaseline: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/baseline`, {
+      method: "POST",
+    }),
+  getLatestBaseline: (projectId, storyId) =>
+    request(`/projects/${projectId}/user-stories/${storyId}/latest-baseline`),
 };

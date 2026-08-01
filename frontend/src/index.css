@@ -1023,6 +1023,155 @@ select:focus {
 .generated-case p {
   margin: 0;
 }
+.case-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Mode toggle: multi-agent vs single-LLM baseline */
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-mist);
+}
+.mode-btn {
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.mode-btn.active {
+  background: var(--blue-800);
+  color: #fff;
+}
+.mode-note {
+  margin: 4px 0 12px;
+  max-width: 70ch;
+}
+.inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+/* Debate transcript */
+.debate {
+  margin-top: 14px;
+}
+.debate-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.debate-round {
+  margin-bottom: 16px;
+}
+.round-label {
+  font-family: var(--font-headline, inherit);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.debate-turn {
+  padding: 14px 16px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  margin-bottom: 10px;
+  border-left-width: 4px;
+}
+.turn-reviewer {
+  border-left-color: var(--blue-600, #0a7);
+}
+.turn-consensus {
+  border-left-color: var(--poly-green, #7bc950);
+}
+.turn-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.speaker {
+  font-weight: 700;
+  font-size: 14px;
+}
+.finding-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.finding {
+  padding: 10px 12px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+}
+.finding p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+.finding-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.issue-type {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.rationale {
+  font-style: italic;
+}
+.sev,
+.decision {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.sev-high {
+  color: var(--crimson, #d80032);
+  background: rgba(216, 0, 50, 0.1);
+}
+.sev-medium {
+  color: #b26a00;
+  background: rgba(178, 106, 0, 0.12);
+}
+.sev-low {
+  color: var(--text-secondary);
+  background: var(--surface-mist);
+}
+.decision-revise {
+  color: var(--blue-800);
+  background: rgba(0, 102, 178, 0.1);
+}
+.decision-keep {
+  color: var(--text-secondary);
+  background: var(--surface-mist);
+}
+.decision-add {
+  color: var(--poly-green, #4a8a1f);
+  background: rgba(123, 201, 80, 0.16);
+}
 .story-text {
   white-space: pre-wrap;
   font-family: var(--font-body);

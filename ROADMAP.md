@@ -10,6 +10,15 @@ The primary research objective is to compare a **Single-LLM baseline** against a
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete system architecture.
 
+> ### Why this is agent-based, not a prompt pipeline
+> The project is only defensible as *multi-agent* research if it delivers, and measures, four properties — not just N prompts in a row:
+> 1. **Specialisation** — distinct role-specific agents (Requirement Analysis, Test Generation, Reviewer, Consensus, Quality).
+> 2. **Autonomy** — an agent's output *decides* the next step (see the Agent Autonomy section), rather than a fixed sequential engine.
+> 3. **Collaboration** — the **Reviewer ↔ Consensus bounded debate loop** (Phase 4): agents critique, disagree, rebut, and revise across rounds. **This is the core contribution.**
+> 4. **Measurable emergence** — the collaboration is measured against the single-LLM baseline (coverage %, duplicate rate, rounds-to-consensus) *and* ablated (with/without debate) to prove the collaboration — not extra prompts — causes the gain.
+>
+> **Preliminary development uses FREE providers only** — `MockProvider` (offline), **Gemini free tier**, and **Ollama** (local). The paid Claude API is reserved for the *final* thesis evaluation runs, so reported numbers come from one production-grade model. Provider is swapped via `LLM_PROVIDER` with no code changes.
+
 ---
 
 # Multi-Agent Pipeline
@@ -41,9 +50,9 @@ UI strategy: most pipeline stages render into **one shared User-Story run view**
 | Pipeline stepper | ✅ | ✅ | Stage status on story page |
 | Requirement Analysis | ✅ | ✅ | Actors/flows/acceptance criteria rendered |
 | Test Generation (multi-agent) | ✅ | ✅ | "Generate test cases" + case cards |
-| **Single-LLM baseline + mode switch** | ❌ | ❌ | **Next** — mode toggle, reuses case cards |
-| Review | ❌ | ❌ | Findings section in shared run view |
-| Consensus / debate | ❌ | ❌ | Debate transcript section |
+| Single-LLM baseline + mode switch | ✅ | ✅ | Mode toggle, reuses case cards |
+| Review | ✅ | ✅ | Reviewer findings in debate transcript |
+| Consensus / debate | ✅ | ✅ | Bounded Reviewer⇄Consensus debate + transcript |
 | Coverage | ❌ | ❌ | Coverage matrix / % |
 | Quality | ❌ | ❌ | Quality scores per test case |
 | Manual Review | ❌ | ❌ | Standalone approve/edit/reject screen |
@@ -123,7 +132,7 @@ UI strategy: most pipeline stages render into **one shared User-Story run view**
 
 ---
 
-# ⬜ Phase 2 — Test Generation
+# ✅ Phase 2 — Test Generation (DONE)
 
 ## Multi-Agent
 
@@ -134,34 +143,41 @@ UI strategy: most pipeline stages render into **one shared User-Story run view**
 
 ## Baseline
 
-- [ ] Single-LLM baseline (API)
-- [ ] Pipeline mode switching (API)
-- [ ] UI: mode toggle (single-LLM vs multi-agent)
+- [x] Single-LLM baseline (API)
+- [x] Pipeline mode switching (API)
+- [x] UI: mode toggle (single-LLM vs multi-agent)
 - [x] UI: generated test cases display
 
 ---
 
-# ⬜ Phase 3 — AI Review
+# ✅ Phase 3 — AI Review (DONE)
 
-- [ ] Review schema
-- [ ] Reviewer Agent
-- [ ] Missing scenario detection
-- [ ] Duplicate detection
-- [ ] Severity classification
-- [ ] Persist review results
-- [ ] UI: review findings section (in shared run view)
+- [x] Review schema (findings persisted as reviewer DebateTurn rows)
+- [x] Reviewer Agent
+- [x] Missing scenario detection
+- [x] Duplicate detection
+- [x] Severity classification
+- [x] **Revision verdict** — reviewer emits `needs_revision` + per-test-case issues (drives the debate loop; agent decides, engine does not)
+- [x] Persist review results
+- [x] UI: review findings section (in shared run view)
 
 ---
 
-# ⬜ Phase 4 — Consensus
+# ✅ Phase 4 — Consensus (DONE)  ⭐ (the agentic core — this is what makes it "multi-agent", not a pipeline)
 
-- [ ] Debate workflow
-- [ ] Debate transcript
-- [ ] Consensus Agent
-- [ ] Test Case revision
-- [ ] Consensus rationale
-- [ ] Consensus metrics
-- [ ] UI: debate transcript + consensus visualization (in shared run view)
+The debate loop is the thesis's central contribution. These items are what
+separate genuine agent collaboration from a one-way "critique-then-apply" step,
+so each is spelled out explicitly rather than left to interpretation:
+
+- [x] Consensus Agent
+- [x] **Bounded multi-round debate loop** (`max_debate_rounds`, config-driven)
+- [x] **Bidirectional exchange** — Consensus agent either *rebuts/defends* a flagged test case (with rationale) OR *revises* it; it does not blindly accept the review
+- [x] **Termination condition** — loop ends when the reviewer raises no issues (consensus reached) OR max rounds hit
+- [x] **Disagreements + rebuttals persisted** in the DebateTurn transcript (not just final output)
+- [x] Test Case revision → new versions (`generated_by=consensus`, `status=consensus_resolved`)
+- [x] Consensus rationale
+- [x] Consensus metrics (rounds-to-consensus, revisions made, issues resolved)
+- [x] UI: debate transcript + consensus visualization (in shared run view)
 
 ---
 
@@ -231,6 +247,8 @@ UI strategy: most pipeline stages render into **one shared User-Story run view**
 - [ ] Single-LLM execution
 - [ ] Multi-Agent execution
 - [ ] Batch execution
+- [ ] **Baseline parity** — single-LLM baseline uses the same input, output schema, dataset, and metrics as the multi-agent arm (fair comparison, not a strawman)
+- [ ] **Ablation** — multi-agent *with* debate loop vs *without*, to show the collaboration (not just "more prompts") causes the improvement
 
 ## Metrics
 
@@ -250,6 +268,18 @@ UI strategy: most pipeline stages render into **one shared User-Story run view**
 - [ ] UI: Charts
 - [ ] UI: Tables
 - [ ] UI: Export Results
+
+---
+
+# Agent Autonomy (what makes the agents *agents*, not functions)
+
+Specialisation alone is not agency. At least one agent's **output must decide
+what happens next**, rather than the engine running a fixed sequence:
+
+- [x] Wire `AgentResult.next_action` so it drives control flow (reviewer emits consensus/coverage)
+- [x] Reviewer decides whether another debate round is needed (`needs_revision`)
+- [x] Consensus decides per test case: keep · revise · add _(escalate-to-human: Phase 6)_
+- [x] Engine loops/branches on those decisions instead of a hardcoded order
 
 ---
 

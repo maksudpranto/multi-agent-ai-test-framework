@@ -4,9 +4,9 @@
 export const PIPELINE_STAGES = [
   { key: "add_user_story", label: "Add User Story", implemented: true },
   { key: "requirement_analysis", label: "Requirement Analysis", implemented: true },
-  { key: "test_generation", label: "Test Generation", implemented: false },
-  { key: "review", label: "Review", implemented: false },
-  { key: "consensus", label: "Consensus", implemented: false },
+  { key: "test_generation", label: "Test Generation", implemented: true },
+  { key: "review", label: "Review", implemented: true },
+  { key: "consensus", label: "Consensus", implemented: true },
   { key: "coverage", label: "Coverage", implemented: false },
   { key: "quality", label: "Quality Evaluation", implemented: false },
   { key: "manual_review", label: "Manual Review", implemented: false },

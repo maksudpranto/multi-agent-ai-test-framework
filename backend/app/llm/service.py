@@ -84,10 +84,106 @@ def extract_json(text: str) -> dict | list:
 
 
 def _dev_mock_responder(messages, system) -> str:
-    """Dev-only fallback used when no API key is configured, so the pipeline
-    produces something realistic offline. Returns a plausible requirement
-    analysis when the prompt is one; otherwise an empty JSON object."""
+    """Dev-only fallback used when no API key is configured, so the FULL pipeline
+    — requirement analysis, test generation, the reviewer<->consensus debate, and
+    the single-LLM baseline — runs offline and free. Each branch keys off a unique
+    marker in the seeded prompt and returns a schema-valid JSON reply.
+
+    Reviewer/consensus/baseline are matched before test-generation because their
+    prompts also embed the "acceptance criteria (database ids...)" phrase."""
     text = " ".join(m.content for m in messages).lower()
+
+    # --- Reviewer: flag once on round 1, be satisfied from round 2 (so the
+    # debate terminates by consensus rather than by hitting max rounds). ---
+    if "you are a meticulous qa reviewer" in text:
+        round_match = re.search(r"debate round:\s*(\d+)", text)
+        round_no = int(round_match.group(1)) if round_match else 1
+        if round_no >= 2:
+            return json.dumps({"needs_revision": False, "findings": []})
+        tail = text.split("current test cases", 1)[-1]
+        tc_id = re.search(r'"id":\s*(\d+)', tail)
+        ac_id = re.search(r'"acceptance_criterion_id":\s*(\d+)', tail)
+        return json.dumps(
+            {
+                "needs_revision": True,
+                "findings": [
+                    {
+                        "test_case_id": int(tc_id.group(1)) if tc_id else None,
+                        "acceptance_criterion_id": int(ac_id.group(1)) if ac_id else None,
+                        "issue_type": "weak_steps",
+                        "severity": "medium",
+                        "description": (
+                            "Steps are too vague to execute unambiguously and no "
+                            "negative path is covered."
+                        ),
+                        "suggestion": "Specify concrete input data and add an invalid-input case.",
+                    }
+                ],
+            }
+        )
+
+    # --- Consensus: agree with the reviewer and revise the flagged case. ---
+    if "you are the consensus agent" in text:
+        ftail = text.split("reviewer findings", 1)[-1]
+        tc_id = re.search(r'"test_case_id":\s*(\d+)', ftail)
+        ac_id = re.search(r'"acceptance_criterion_id":\s*(\d+)', ftail)
+        acid = int(ac_id.group(1)) if ac_id else 1
+        return json.dumps(
+            {
+                "resolutions": [
+                    {
+                        "test_case_id": int(tc_id.group(1)) if tc_id else None,
+                        "acceptance_criterion_id": acid,
+                        "decision": "revise",
+                        "rationale": (
+                            "The reviewer is right that the steps were vague; tightening "
+                            "them and adding explicit input data."
+                        ),
+                        "revised_test_case": {
+                            "acceptance_criterion_id": acid,
+                            "title": "Verify behaviour with explicit, unambiguous steps",
+                            "steps": [
+                                "Open the relevant feature",
+                                "Enter the specified valid input values",
+                                "Submit the form",
+                                "Observe the resulting state",
+                            ],
+                            "expected_result": "The system produces the specified verifiable outcome",
+                            "type": "functional",
+                            "priority": "high",
+                        },
+                    }
+                ]
+            }
+        )
+
+    # --- Single-LLM baseline: story -> a couple of untraceable test cases. ---
+    if "single-llm baseline" in text:
+        return json.dumps(
+            {
+                "test_cases": [
+                    {
+                        "title": "Happy path works end to end",
+                        "steps": [
+                            "Open the feature described in the story",
+                            "Provide valid input",
+                            "Submit",
+                        ],
+                        "expected_result": "The primary action succeeds",
+                        "type": "functional",
+                        "priority": "high",
+                    },
+                    {
+                        "title": "Invalid input is rejected",
+                        "steps": ["Open the feature", "Provide invalid input", "Submit"],
+                        "expected_result": "An error is shown and the action is denied",
+                        "type": "negative",
+                        "priority": "medium",
+                    },
+                ]
+            }
+        )
+
     if "acceptance_criteria" in text and "main_flow" in text:
         return json.dumps(
             {

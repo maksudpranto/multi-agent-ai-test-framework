@@ -1,0 +1,64 @@
+========================================================================
+ Multi-Agent AI Test Framework — Local Run Commands
+========================================================================
+
+Prerequisites (already installed on this machine):
+  - Python virtualenv at   backend/venv
+  - Node modules at        frontend/node_modules
+  - SQLite DB at           backend/app.db (migrated)
+
+If starting on a fresh machine, see "FIRST-TIME SETUP" at the bottom.
+
+------------------------------------------------------------------------
+ 0. ONE-TIME: create the .env files (skip if they already exist)
+------------------------------------------------------------------------
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+# The backend runs offline with a Mock LLM provider, so ANTHROPIC_API_KEY
+# can stay blank. Add a real key to backend/.env only for live Claude calls.
+
+------------------------------------------------------------------------
+ 1. TERMINAL A — Backend (FastAPI on http://localhost:8000)
+------------------------------------------------------------------------
+cd backend
+source venv/bin/activate
+alembic upgrade head          # no-op if DB already current; safe to keep
+uvicorn app.main:app --reload
+
+  Swagger / API docs:  http://localhost:8000/docs
+  Health check:        http://localhost:8000/health
+
+------------------------------------------------------------------------
+ 2. TERMINAL B — Frontend (Vite + React on http://localhost:5173)
+------------------------------------------------------------------------
+cd frontend
+npm run dev
+
+  App:  http://localhost:5173
+  Then register an account and log in.
+
+------------------------------------------------------------------------
+ 3. STOP
+------------------------------------------------------------------------
+Press Ctrl+C in each terminal.
+Deactivate the Python venv with:  deactivate
+
+========================================================================
+ FIRST-TIME SETUP (fresh machine only)
+========================================================================
+# Backend
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+alembic upgrade head
+
+# Frontend
+cd ../frontend
+npm install
+cp .env.example .env
+
+# Then run steps 1 and 2 above.
+========================================================================

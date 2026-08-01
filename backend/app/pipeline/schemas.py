@@ -46,15 +46,39 @@ class TestCaseOut(BaseModel):
 
     id: int
     version: int
+    parent_test_case_id: int | None = None
     title: str
     steps: list[str] | None
     expected_result: str | None
     type: str | None
     priority: str | None
     traces_to: int | None
+    generated_by: str
+    status: str
 
 
 class TestGenerationResult(BaseModel):
     run: PipelineRunOut
+    test_cases: list[TestCaseOut]
+    error: str | None = None
+
+
+class DebateTurnOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    round: int
+    speaker: str
+    content: dict | None
+    created_at: datetime
+
+
+class DebateResult(BaseModel):
+    run: PipelineRunOut
+    rounds_used: int
+    consensus_reached: bool
+    revisions_made: int
+    total_findings: int
+    turns: list[DebateTurnOut]
     test_cases: list[TestCaseOut]
     error: str | None = None
