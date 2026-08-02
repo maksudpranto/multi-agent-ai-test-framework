@@ -11,3 +11,5 @@ python-dotenv
 anthropic
 pytest
 httpx
+openpyxl
+fpdf2

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.routes import router as auth_router
 from app.config import get_settings
 from app.database import SessionLocal
+from app.export.routes import router as export_router
 from app.modules.routes import router as modules_router
 from app.pipeline.routes import router as pipeline_router
 from app.projects.routes import router as projects_router
@@ -41,6 +42,7 @@ app.include_router(projects_router)
 app.include_router(modules_router)
 app.include_router(requirements_router)
 app.include_router(pipeline_router)
+app.include_router(export_router)
 
 
 @app.get("/health", tags=["health"])
