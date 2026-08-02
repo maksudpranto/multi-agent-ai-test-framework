@@ -119,6 +119,11 @@ export const api = {
   getLatestCoverage: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-coverage`),
 
+  runQuality: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/quality`, { method: "POST" }),
+  getLatestQuality: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/latest-quality`),
+
   runBaseline: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/baseline`, { method: "POST" }),
   getLatestBaseline: (projectId, requirementId) =>

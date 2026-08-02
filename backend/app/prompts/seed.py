@@ -222,6 +222,33 @@ Return ONLY a JSON object:
 Do not include prose outside the JSON.
 """
 
+QUALITY_V1 = """\
+You are a test quality evaluator. Score the quality of each test case so a team
+knows which cases are well-formed and which need rework. This is the thesis's
+Quality Report.
+
+USER STORY:
+{user_story}
+
+CURRENT TEST CASES (database ids are authoritative):
+{test_cases}
+
+Score EACH test case on a 0.0–1.0 scale (1.0 = excellent):
+- "clarity": are the steps and expected result unambiguous and executable?
+- "atomicity": does it verify ONE thing (not a bundle of unrelated checks)?
+- "traceability": is it clearly tied to a specific requirement / acceptance
+  criterion?
+- "duplicate": true if this case substantially overlaps another in the set
+- "notes": one short sentence on the main quality issue, or "Well-formed"
+
+Return ONLY a JSON object:
+- "scores": array of objects, each with "test_case_id" (integer), "clarity"
+  (number), "atomicity" (number), "traceability" (number), "duplicate"
+  (boolean), "notes" (string)
+
+Do not include prose outside the JSON.
+"""
+
 SINGLE_LLM_BASELINE_V1 = """\
 You are a software tester. This is a SINGLE-LLM BASELINE: in one step, read the
 user story and write test cases for it. There is no separate analysis phase.
@@ -284,6 +311,12 @@ SEED_PROMPTS: list[dict] = [
         "version": "v1",
         "template": COVERAGE_V1,
         "description": "Coverage: judge adequacy of each criterion's traced cases.",
+    },
+    {
+        "stage": PipelineStage.quality,
+        "version": "v1",
+        "template": QUALITY_V1,
+        "description": "Quality: score each test case (clarity/atomicity/traceability) + duplicates.",
     },
     {
         # Single-LLM baseline. Kept inactive so it never shadows the multi-agent

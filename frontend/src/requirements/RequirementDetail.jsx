@@ -11,6 +11,7 @@ export default function RequirementDetail() {
   const [generation, setGeneration] = useState(null);
   const [debate, setDebate] = useState(null);
   const [coverage, setCoverage] = useState(null);
+  const [quality, setQuality] = useState(null);
   const [baseline, setBaseline] = useState(null);
   const [mode, setMode] = useState("multi"); // "multi" | "baseline"
   const [inputMode, setInputMode] = useState("requirement"); // "requirement" | "criteria"
@@ -23,6 +24,7 @@ export default function RequirementDetail() {
   const [reviewing, setReviewing] = useState(false);
   const [prioritizing, setPrioritizing] = useState(false);
   const [analysingCoverage, setAnalysingCoverage] = useState(false);
+  const [evaluatingQuality, setEvaluatingQuality] = useState(false);
   const [baselining, setBaselining] = useState(false);
 
   useEffect(() => {
@@ -33,14 +35,16 @@ export default function RequirementDetail() {
       api.getLatestTestCases(projectId, requirementId).catch(() => null),
       api.getLatestReviewConsensus(projectId, requirementId).catch(() => null),
       api.getLatestCoverage(projectId, requirementId).catch(() => null),
+      api.getLatestQuality(projectId, requirementId).catch(() => null),
       api.getLatestBaseline(projectId, requirementId).catch(() => null),
     ])
-      .then(([s, r, g, d, cov, b]) => {
+      .then(([s, r, g, d, cov, q, b]) => {
         setStory(s);
         setResult(r);
         setGeneration(g);
         setDebate(d);
         setCoverage(cov);
+        setQuality(q);
         setBaseline(b);
         // Reflect how the latest run was seeded: criteria supplied directly
         // (no analysis) vs derived from the requirement.
@@ -92,6 +96,7 @@ export default function RequirementDetail() {
       setGeneration(await api.generateTestCases(projectId, requirementId));
       setDebate(null); // stale once test cases change
       setCoverage(null);
+      setQuality(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -108,6 +113,7 @@ export default function RequirementDetail() {
       // consensus can add/revise cases — refresh the multi-agent set
       setGeneration(await api.getLatestTestCases(projectId, requirementId));
       setCoverage(null); // coverage recomputed against the revised suite
+      setQuality(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -136,6 +142,18 @@ export default function RequirementDetail() {
       setError(err.message);
     } finally {
       setAnalysingCoverage(false);
+    }
+  }
+
+  async function onQuality() {
+    setEvaluatingQuality(true);
+    setError("");
+    try {
+      setQuality(await api.runQuality(projectId, requirementId));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEvaluatingQuality(false);
     }
   }
 
@@ -449,6 +467,31 @@ export default function RequirementDetail() {
           </section>
         )}
 
+        {mode === "multi" && (
+          <section className="section">
+            <div className="section-head">
+              <h2>Quality Report</h2>
+              <button onClick={onQuality} disabled={multiCases.length === 0 || evaluatingQuality}>
+                {evaluatingQuality ? "Evaluating…" : quality ? "Re-run quality" : "Evaluate quality"}
+              </button>
+            </div>
+            <p className="muted mode-note">
+              The Quality agent scores every test case on clarity, atomicity, and
+              traceability, and flags duplicates — the thesis's Quality Report and
+              the final evaluated output of the pipeline.
+            </p>
+            {quality?.error && <p className="error">{quality.error}</p>}
+            {!quality ? (
+              <p className="muted">
+                Generate test cases, then evaluate quality to score the suite and
+                detect duplicates.
+              </p>
+            ) : (
+              <QualityMatrix quality={quality} />
+            )}
+          </section>
+        )}
+
         <section className="section">
           <h2>Pipeline stages</h2>
           <ol className="stepper">
@@ -655,6 +698,60 @@ function CoverageMatrix({ coverage }) {
                   : "—"}
               </td>
               <td className="muted">{it.gap_notes}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function scorePct(v) {
+  return v == null ? "—" : `${Math.round(v * 100)}%`;
+}
+
+function QualityMatrix({ quality }) {
+  const items = quality.items || [];
+  const overall = Math.round((quality.overall_score || 0) * 100);
+  return (
+    <div className="coverage">
+      <div className="debate-summary">
+        <span className={`badge ${overall >= 70 ? "badge-green" : "badge-red"}`}>
+          {overall}% overall quality
+        </span>
+        <span className="badge badge-grey">{quality.total} case(s)</span>
+        <span className={`badge ${quality.duplicate_count ? "badge-red" : "badge-grey"}`}>
+          {quality.duplicate_count} duplicate(s)
+        </span>
+      </div>
+      <table className="coverage-table">
+        <thead>
+          <tr>
+            <th>Test case</th>
+            <th>Clarity</th>
+            <th>Atomicity</th>
+            <th>Traceability</th>
+            <th>Dup?</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it) => (
+            <tr key={it.test_case_id}>
+              <td>
+                <span className="muted">#{it.test_case_id}</span> {it.title}
+              </td>
+              <td>{scorePct(it.clarity_score)}</td>
+              <td>{scorePct(it.atomicity_score)}</td>
+              <td>{scorePct(it.traceability_score)}</td>
+              <td>
+                {it.duplicate_flag ? (
+                  <span className="badge badge-red">dup</span>
+                ) : (
+                  <span className="muted">—</span>
+                )}
+              </td>
+              <td className="muted">{it.notes}</td>
             </tr>
           ))}
         </tbody>

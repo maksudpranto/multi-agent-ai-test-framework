@@ -231,6 +231,28 @@ def _dev_mock_responder(messages, system) -> str:
             }
         )
 
+    # --- Quality evaluator: score each current test case. ---
+    if "you are a test quality evaluator" in text:
+        tail = text.split("current test cases", 1)[-1]
+        ids = [int(m) for m in re.findall(r'"id":\s*(\d+)', tail)]
+        traced = re.findall(r'"acceptance_criterion_id":\s*(\d+|null)', tail)
+        scores = []
+        for i, tc_id in enumerate(dict.fromkeys(ids)):
+            # Cases traced to a criterion score full traceability; give a small
+            # deterministic spread so the report isn't uniform.
+            is_traced = i < len(traced) and traced[i] != "null"
+            scores.append(
+                {
+                    "test_case_id": tc_id,
+                    "clarity": 0.9,
+                    "atomicity": 0.85,
+                    "traceability": 1.0 if is_traced else 0.3,
+                    "duplicate": False,
+                    "notes": "Well-formed" if is_traced else "Not clearly traced to a criterion.",
+                }
+            )
+        return json.dumps({"scores": scores})
+
     # --- Single-LLM baseline: story -> a couple of untraceable test cases. ---
     if "single-llm baseline" in text:
         return json.dumps(

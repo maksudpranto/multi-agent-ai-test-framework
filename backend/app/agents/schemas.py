@@ -125,6 +125,25 @@ class CoverageOut(BaseModel):
     assessments: list[CoverageAssessmentOut] = Field(default_factory=list)
 
 
+# --- Quality --------------------------------------------------------------
+# The Quality agent scores each test case on clarity, atomicity, and
+# traceability, and flags duplicates — the thesis's Quality Report. Scores are
+# 0..1; the engine clamps and aggregates into an overall quality score.
+
+
+class QualityScoreOut(BaseModel):
+    test_case_id: int
+    clarity: float = 0.0
+    atomicity: float = 0.0
+    traceability: float = 0.0
+    duplicate: bool = False
+    notes: str | None = None
+
+
+class QualityOut(BaseModel):
+    scores: list[QualityScoreOut] = Field(default_factory=list)
+
+
 # --- Single-LLM baseline --------------------------------------------------
 # One prompt, story -> test cases, no acceptance-criterion traceability (the
 # baseline's honest limitation). Same shape otherwise, for a fair comparison.

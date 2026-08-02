@@ -9,7 +9,7 @@ export const PIPELINE_STAGES = [
   { key: "consensus", label: "Consensus", implemented: true },
   { key: "prioritization", label: "Prioritization", implemented: true },
   { key: "coverage", label: "Coverage", implemented: true },
-  { key: "quality", label: "Quality Evaluation", implemented: false },
+  { key: "quality", label: "Quality Evaluation", implemented: true },
   { key: "manual_review", label: "Manual Review", implemented: false },
   { key: "export", label: "Export", implemented: false },
 ];

@@ -439,6 +439,56 @@ def test_coverage_reports_traceability_and_gaps(db):
     assert gap is not None and gap.covered is False
 
 
+def test_quality_scores_and_reports(db):
+    engine, run, story, criteria, cfg = _run_multi_agent_through_generation(db)
+
+    summary = engine.run_quality(db, run, user_story=story.raw_text, config=cfg)
+    assert summary["total"] >= 3
+    assert 0.0 <= summary["overall_score"] <= 1.0
+
+    from app.models import QualityReport
+
+    reports = list(
+        db.scalars(
+            select(QualityReport).where(QualityReport.pipeline_run_id == run.id)
+        )
+    )
+    assert len(reports) == summary["total"]
+    for r in reports:
+        for s in (r.clarity_score, r.atomicity_score, r.traceability_score):
+            assert 0.0 <= s <= 1.0
+
+    execution = db.scalar(
+        select(AgentExecution).where(
+            AgentExecution.pipeline_run_id == run.id,
+            AgentExecution.stage == PipelineStage.quality,
+        )
+    )
+    assert execution is not None and execution.status == ExecutionStatus.success
+
+
+def test_quality_detects_duplicate_titles(db):
+    engine, run, story, criteria, cfg = _run_multi_agent_through_generation(db)
+    # Force a deterministic duplicate: add a case with a title identical to an
+    # existing current case.
+    existing = db.scalar(
+        select(GeneratedTestCase).where(GeneratedTestCase.pipeline_run_id == run.id)
+    )
+    dup = GeneratedTestCase(
+        pipeline_run_id=run.id,
+        version=1,
+        title=existing.title,
+        steps=["x"],
+        expected_result="y",
+        traces_to=existing.traces_to,
+    )
+    db.add(dup)
+    db.commit()
+
+    summary = engine.run_quality(db, run, user_story=story.raw_text, config=cfg)
+    assert summary["duplicate_count"] >= 1
+
+
 def test_single_llm_baseline_runs_untraceable(db):
     seed_prompts(db)
     story = _seed_story(db)

@@ -13,6 +13,7 @@ from app.models import (
     PipelineRun,
     PipelineStage,
     Project,
+    QualityReport,
     RequirementAnalysis,
     RunStatus,
     TestCase,
@@ -26,6 +27,8 @@ from app.pipeline.schemas import (
     CoverageItemOut,
     CoverageResult,
     DebateResult,
+    QualityItemOut,
+    QualityResult,
     RequirementAnalysisResult,
     TestGenerationResult,
 )
@@ -507,6 +510,100 @@ def get_latest_coverage(
     if run is None:
         return None
     return _build_coverage_result(db, run, error=None)
+
+
+def _build_quality_result(
+    db: Session, run: PipelineRun, error: str | None
+) -> QualityResult:
+    titles = {
+        c.id: c.title
+        for c in db.scalars(
+            select(TestCase).where(TestCase.pipeline_run_id == run.id)
+        )
+    }
+    reports = list(
+        db.scalars(
+            select(QualityReport)
+            .where(QualityReport.pipeline_run_id == run.id)
+            .order_by(QualityReport.id)
+        )
+    )
+    items = [
+        QualityItemOut(
+            test_case_id=r.test_case_id,
+            title=titles.get(r.test_case_id, ""),
+            clarity_score=r.clarity_score,
+            atomicity_score=r.atomicity_score,
+            traceability_score=r.traceability_score,
+            duplicate_flag=r.duplicate_flag,
+            notes=r.notes,
+        )
+        for r in reports
+    ]
+    total = len(items)
+    means = [
+        ((i.clarity_score or 0) + (i.atomicity_score or 0) + (i.traceability_score or 0)) / 3.0
+        for i in items
+    ]
+    return QualityResult(
+        run=run,
+        items=items,
+        total=total,
+        overall_score=round(sum(means) / total, 3) if total else 0.0,
+        duplicate_count=sum(1 for i in items if i.duplicate_flag),
+        error=error,
+    )
+
+
+@router.post("/quality", response_model=QualityResult)
+def run_quality(
+    project_id: int,
+    requirement_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> QualityResult:
+    """Quality agent: score each current test case on clarity, atomicity, and
+    traceability, and flag duplicates — the thesis's Quality Report."""
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    run = _latest_run_with_test_cases(db, requirement.id)
+    if run is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Generate test cases before evaluating quality",
+        )
+
+    run.status = RunStatus.running
+    run.completed_at = None
+    db.commit()
+
+    DefaultWorkflowEngine().run_quality(
+        db, run, user_story=requirement.raw_text, config=RunConfig.defaults()
+    )
+
+    run.status = RunStatus.completed
+    run.completed_at = utcnow()
+    db.commit()
+    db.refresh(run)
+    return _build_quality_result(db, run, error=None)
+
+
+@router.get("/latest-quality", response_model=QualityResult | None)
+def get_latest_quality(
+    project_id: int,
+    requirement_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    run = db.scalar(
+        select(PipelineRun)
+        .join(QualityReport, QualityReport.pipeline_run_id == PipelineRun.id)
+        .where(PipelineRun.requirement_id == requirement.id)
+        .order_by(PipelineRun.created_at.desc(), PipelineRun.id.desc())
+    )
+    if run is None:
+        return None
+    return _build_quality_result(db, run, error=None)
 
 
 @router.post("/prioritize", response_model=TestGenerationResult)

@@ -60,7 +60,7 @@ UI strategy: most pipeline stages render into **one shared User-Story run view**
 | Consensus / debate | ✅ | ✅ | Bounded Reviewer⇄Consensus debate + transcript |
 | Prioritization | ✅ | ✅ | Priority + severity + rank; suite ordered by rank |
 | Coverage / Validator | ✅ | ✅ | Traceability matrix + % covered + gap notes |
-| Quality | ❌ | ❌ | Quality scores per test case |
+| Quality | ✅ | ✅ | Per-case clarity/atomicity/traceability + duplicates + overall score |
 | Manual Review | ❌ | ❌ | Standalone approve/edit/reject screen |
 | Export | ❌ | ❌ | Format picker + download |
 | Experiment Dashboard | ❌ | ❌ | Standalone comparison charts (thesis eval) |
@@ -199,7 +199,7 @@ so each is spelled out explicitly rather than left to interpretation:
 
 ---
 
-# ◐ Phase 5 — Evaluation (Coverage DONE; Quality pending)
+# ✅ Phase 5 — Evaluation (Coverage + Quality DONE) — all 5 primary evaluated outputs complete
 
 ## Coverage ✅ DONE
 
@@ -209,24 +209,24 @@ so each is spelled out explicitly rather than left to interpretation:
 - [x] **Validator adequacy judgement** — agent flags superficial vs genuine coverage (`gap_notes`)
 - [x] UI: Coverage section / matrix + % covered (in shared run view)
 
-## Quality
+## Quality ✅ DONE
 
-- [ ] Quality Evaluation Agent
-- [ ] Clarity Score
-- [ ] Atomicity Score
-- [ ] Traceability Score
-- [ ] Duplicate Score
-- [ ] Overall Quality Score
+- [x] Quality Evaluation Agent
+- [x] Clarity Score
+- [x] Atomicity Score
+- [x] Traceability Score
+- [x] Duplicate Score (LLM flag + deterministic near-duplicate by title)
+- [x] Overall Quality Score
 
 ## Persistence
 
 - [x] CoverageReport
-- [ ] QualityReport
+- [x] QualityReport
 
 ## UI
 
 - [x] UI: Coverage section / matrix (in shared run view)
-- [ ] UI: Quality scores section (in shared run view)
+- [x] UI: Quality scores section / Quality Report (in shared run view)
 
 ---
 

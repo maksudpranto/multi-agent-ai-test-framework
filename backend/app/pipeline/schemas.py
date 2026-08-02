@@ -90,6 +90,25 @@ class CoverageResult(BaseModel):
     error: str | None = None
 
 
+class QualityItemOut(BaseModel):
+    test_case_id: int
+    title: str
+    clarity_score: float | None
+    atomicity_score: float | None
+    traceability_score: float | None
+    duplicate_flag: bool
+    notes: str | None = None
+
+
+class QualityResult(BaseModel):
+    run: PipelineRunOut
+    items: list[QualityItemOut]
+    total: int
+    overall_score: float
+    duplicate_count: int
+    error: str | None = None
+
+
 class DebateTurnOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

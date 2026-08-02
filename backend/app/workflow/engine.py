@@ -32,6 +32,7 @@ from app.models import (
     GeneratedBy,
     PipelineRun,
     PipelineStage,
+    QualityReport,
     TestCase,
     TestCaseStatus,
 )
@@ -83,6 +84,10 @@ class DefaultWorkflowEngine(WorkflowEngine):
             from app.agents.coverage import CoverageAgent
 
             return CoverageAgent(self.llm)
+        if stage == PipelineStage.quality:
+            from app.agents.quality import QualityAgent
+
+            return QualityAgent(self.llm)
         raise NotImplementedError(f"No agent registered for stage {stage.value}")
 
     # -- low-level: run one agent and log an AgentExecution row ---------------
@@ -300,6 +305,84 @@ class DefaultWorkflowEngine(WorkflowEngine):
             "covered_count": covered_count,
             "adequate_count": adequate_count,
             "coverage_pct": round(100.0 * covered_count / total, 1) if total else 0.0,
+        }
+
+    # -- quality: score each test case (clarity/atomicity/traceability) ------
+    @staticmethod
+    def _norm_title(title: str | None) -> str:
+        return " ".join((title or "").lower().split())
+
+    def run_quality(
+        self, db: Session, run: PipelineRun, *, user_story: str, config: RunConfig
+    ) -> dict[str, Any]:
+        """Score the current suite's quality. The agent judges clarity /
+        atomicity / traceability + duplicates; a deterministic near-duplicate
+        pass (normalized title) complements the agent's duplicate flag. Writes
+        QualityReport rows and returns an overall quality score + duplicate rate."""
+        current = self._current_test_cases(db, run)
+        if not current:
+            return {"total": 0, "overall_score": 0.0, "duplicate_count": 0}
+
+        payload = self._tc_payload(current)
+        _, result = self._run_agent_logged(
+            db,
+            run,
+            PipelineStage.quality,
+            inputs={"user_story": user_story, "test_cases": payload},
+            config=config,
+        )
+        scores = {}
+        if result.success:
+            for s in result.output.get("scores", []):
+                scores[s.get("test_case_id")] = s
+
+        # Deterministic near-duplicate detection: cases sharing a normalized
+        # title (beyond the first occurrence) are flagged regardless of the LLM.
+        seen_titles: dict[str, int] = {}
+        det_duplicate: set[int] = set()
+        for case in current:
+            key = self._norm_title(case.title)
+            if key in seen_titles:
+                det_duplicate.add(case.id)
+            else:
+                seen_titles[key] = case.id
+
+        db.query(QualityReport).filter(
+            QualityReport.pipeline_run_id == run.id
+        ).delete()
+
+        clamp = lambda v: max(0.0, min(1.0, float(v or 0.0)))  # noqa: E731
+        case_means = []
+        duplicate_count = 0
+        for case in current:
+            s = scores.get(case.id, {})
+            clarity = clamp(s.get("clarity"))
+            atomicity = clamp(s.get("atomicity"))
+            traceability = clamp(s.get("traceability"))
+            duplicate = bool(s.get("duplicate")) or case.id in det_duplicate
+            duplicate_count += 1 if duplicate else 0
+            case_means.append((clarity + atomicity + traceability) / 3.0)
+            db.add(
+                QualityReport(
+                    pipeline_run_id=run.id,
+                    test_case_id=case.id,
+                    clarity_score=clarity,
+                    atomicity_score=atomicity,
+                    traceability_score=traceability,
+                    duplicate_flag=duplicate,
+                    notes=s.get("notes") or ("Possible duplicate" if duplicate else None),
+                )
+            )
+
+        run.current_stage = PipelineStage.quality
+        db.commit()
+        total = len(current)
+        overall = round(sum(case_means) / total, 3) if total else 0.0
+        return {
+            "total": total,
+            "overall_score": overall,
+            "duplicate_count": duplicate_count,
+            "duplicate_rate": round(duplicate_count / total, 3) if total else 0.0,
         }
 
     # -- multi-agent debate: Reviewer <-> Consensus, bounded -----------------
