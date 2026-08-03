@@ -555,6 +555,35 @@ const TYPE_CHIP = {
 const PRIORITY_CHIP = { high: "chip-red", medium: "chip-amber", low: "chip-grey" };
 const SEV_CHIP = { critical: "chip-red", major: "chip-amber", minor: "chip-grey" };
 
+// Group the grid by type in a sensible order (happy path first).
+const TYPE_ORDER = {
+  functional: 0,
+  positive: 1,
+  negative: 2,
+  boundary: 3,
+  edge: 4,
+  security: 5,
+  api: 6,
+  performance: 7,
+  usability: 8,
+  integration: 9,
+};
+function typeRank(t) {
+  return t in TYPE_ORDER ? TYPE_ORDER[t] : 50;
+}
+
+// The Type column already shows functional/negative/…; drop a redundant
+// "<type>:" prefix from the title so it isn't repeated on every row.
+function cleanTitle(tc) {
+  let t = (tc.title || "").trim();
+  t = t.replace(
+    /^\s*(functional|negative|boundary|edge|security|api|performance|positive|usability|integration)\s*:\s*/i,
+    ""
+  );
+  if (t) t = t.charAt(0).toUpperCase() + t.slice(1);
+  return t;
+}
+
 function hasTestData(tc) {
   return (
     tc.test_data &&
@@ -577,10 +606,20 @@ function TestCaseTable({ cases, showTrace }) {
     return counts;
   }, [cases]);
 
-  const filtered =
+  const base =
     filter === "all"
       ? cases
       : cases.filter((tc) => (tc.type || "other") === filter);
+  const filtered = [...base].sort((a, b) => {
+    const ta = typeRank(a.type);
+    const tb = typeRank(b.type);
+    if (ta !== tb) return ta - tb;
+    if ((a.type || "") !== (b.type || "")) return (a.type || "").localeCompare(b.type || "");
+    const ra = a.rank != null ? a.rank : Infinity;
+    const rb = b.rank != null ? b.rank : Infinity;
+    if (ra !== rb) return ra - rb;
+    return a.id - b.id;
+  });
 
   function toggle(id) {
     setExpanded((prev) => {
@@ -654,7 +693,7 @@ function TestCaseTable({ cases, showTrace }) {
                         </span>
                       </td>
                       <td className="c-title">
-                        {tc.title}
+                        {cleanTitle(tc)}
                         {tc.generated_by === "consensus" && (
                           <span className="chip chip-green tc-mini">
                             consensus v{tc.version}
