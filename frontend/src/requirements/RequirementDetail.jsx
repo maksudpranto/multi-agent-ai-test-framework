@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { PIPELINE_STAGES } from "../pipeline/stages";
 import { REQ_TYPE_LABEL } from "./constants";
 
 export default function RequirementDetail() {
@@ -26,6 +25,7 @@ export default function RequirementDetail() {
   const [analysingCoverage, setAnalysingCoverage] = useState(false);
   const [evaluatingQuality, setEvaluatingQuality] = useState(false);
   const [baselining, setBaselining] = useState(false);
+  const [exporting, setExporting] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -169,6 +169,18 @@ export default function RequirementDetail() {
     }
   }
 
+  async function onExport(fmt) {
+    setExporting(fmt);
+    setError("");
+    try {
+      await api.exportPackage(projectId, requirementId, fmt);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExporting("");
+    }
+  }
+
   if (loading)
     return (
       <div className="content">
@@ -190,30 +202,37 @@ export default function RequirementDetail() {
   return (
     <div className="content">
       <div className="page">
-        <p className="breadcrumb">
-          <Link to="/">Home</Link> /{" "}
-          <Link to={`/projects/${projectId}`}>Project</Link> /{" "}
+        <p className="crumb">
+          <Link to="/">Home</Link>
+          <span className="sep">/</span>
+          <Link to={`/projects/${projectId}`}>Project</Link>
           {story?.module_id && (
             <>
-              <Link to={`/projects/${projectId}/modules/${story.module_id}`}>Module</Link> /{" "}
+              <span className="sep">/</span>
+              <Link to={`/projects/${projectId}/modules/${story.module_id}`}>Module</Link>
             </>
           )}
-          {story?.title}
+          <span className="sep">/</span>
+          <span>{story?.title}</span>
         </p>
-        <h1>{story?.title}</h1>
-        {story && (
-          <div className="case-badges" style={{ marginBottom: 8 }}>
-            <span className="badge badge-blue">{REQ_TYPE_LABEL[story.req_type] || story.req_type}</span>
-            <span className="badge badge-grey">priority: {story.priority}</span>
-            <span className="badge badge-grey">status: {story.status}</span>
-            {story.source_filename && (
-              <span className="badge badge-grey">📎 {story.source_filename}</span>
+        <header className="page-head">
+          <div>
+            <h1>{story?.title}</h1>
+            {story && (
+              <div className="case-badges" style={{ marginTop: 10 }}>
+                <span className="chip chip-accent">{REQ_TYPE_LABEL[story.req_type] || story.req_type}</span>
+                <span className="chip chip-grey">priority: {story.priority}</span>
+                <span className="chip chip-grey">status: {story.status}</span>
+                {story.source_filename && (
+                  <span className="chip chip-grey">📎 {story.source_filename}</span>
+                )}
+              </div>
             )}
           </div>
-        )}
+        </header>
 
         <section className="section">
-          <h2>User story</h2>
+          <h2>Requirement</h2>
           <p className="story-text">{story?.raw_text}</p>
         </section>
 
@@ -351,11 +370,7 @@ export default function RequirementDetail() {
                   directly), then generate a full, traceable test suite.
                 </p>
               ) : (
-                <div className="generated-cases">
-                  {multiCases.map((tc) => (
-                    <TestCaseCard key={tc.id} tc={tc} showTrace />
-                  ))}
-                </div>
+                <TestCaseTable cases={multiCases} showTrace />
               )}
             </>
           ) : (
@@ -376,11 +391,7 @@ export default function RequirementDetail() {
                   Run the baseline to generate test cases from the story in one step.
                 </p>
               ) : (
-                <div className="generated-cases">
-                  {baselineCases.map((tc) => (
-                    <TestCaseCard key={tc.id} tc={tc} />
-                  ))}
-                </div>
+                <TestCaseTable cases={baselineCases} />
               )}
             </>
           )}
@@ -493,75 +504,224 @@ export default function RequirementDetail() {
         )}
 
         <section className="section">
-          <h2>Pipeline stages</h2>
-          <ol className="stepper">
-            {PIPELINE_STAGES.map((stage, i) => (
-              <li
-                key={stage.key}
-                className={`step ${stage.implemented ? "done" : "pending"}`}
-              >
-                <span className="step-index">{i + 1}</span>
-                <span className="step-label">{stage.label}</span>
-                <span className="step-status">
-                  {stage.implemented ? "Ready" : "Not yet implemented"}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <h2>Export test design package</h2>
+          <p className="mode-note">
+            Download the complete package — requirement, acceptance criteria,
+            test cases with quality scores, and the coverage matrix — for the
+            latest multi-agent run.
+          </p>
+          {multiCases.length === 0 ? (
+            <p className="muted">
+              Generate a multi-agent test suite first, then export it in any format.
+            </p>
+          ) : (
+            <div className="export-bar">
+              <span className="lbl">Download as</span>
+              {EXPORT_FORMATS.map((f) => (
+                <button
+                  key={f.fmt}
+                  className="export-btn"
+                  onClick={() => onExport(f.fmt)}
+                  disabled={exporting !== ""}
+                >
+                  {exporting === f.fmt ? "Preparing…" : f.label}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>
   );
 }
 
-function TestCaseCard({ tc, showTrace }) {
-  const hasData =
+const EXPORT_FORMATS = [
+  { fmt: "json", label: "JSON" },
+  { fmt: "csv", label: "CSV" },
+  { fmt: "md", label: "Markdown" },
+  { fmt: "xlsx", label: "Excel" },
+  { fmt: "pdf", label: "PDF" },
+];
+
+const TYPE_CHIP = {
+  functional: "chip-green",
+  negative: "chip-red",
+  boundary: "chip-amber",
+  edge: "chip-amber",
+  security: "chip-purple",
+  api: "chip-accent",
+  performance: "chip-grey",
+};
+const PRIORITY_CHIP = { high: "chip-red", medium: "chip-amber", low: "chip-grey" };
+const SEV_CHIP = { critical: "chip-red", major: "chip-amber", minor: "chip-grey" };
+
+function hasTestData(tc) {
+  return (
     tc.test_data &&
     (Array.isArray(tc.test_data)
       ? tc.test_data.length > 0
-      : Object.keys(tc.test_data).length > 0);
+      : Object.keys(tc.test_data).length > 0)
+  );
+}
+
+function TestCaseTable({ cases, showTrace }) {
+  const [filter, setFilter] = useState("all");
+  const [expanded, setExpanded] = useState(() => new Set());
+
+  const typeCounts = useMemo(() => {
+    const counts = {};
+    for (const tc of cases) {
+      const t = tc.type || "other";
+      counts[t] = (counts[t] || 0) + 1;
+    }
+    return counts;
+  }, [cases]);
+
+  const filtered =
+    filter === "all"
+      ? cases
+      : cases.filter((tc) => (tc.type || "other") === filter);
+
+  function toggle(id) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const colCount = showTrace ? 7 : 6;
+
   return (
-    <article className="generated-case">
-      <div className="generated-case-head">
-        <h3>{tc.title}</h3>
-        <div className="case-badges">
-          {tc.rank != null && (
-            <span className="badge badge-rank">#{tc.rank}</span>
-          )}
-          {tc.type && <span className={`badge type-${tc.type}`}>{tc.type}</span>}
-          {tc.generated_by === "consensus" && (
-            <span className="badge badge-green">consensus v{tc.version}</span>
-          )}
-          {tc.status === "reviewer_flagged" && (
-            <span className="badge badge-red">flagged</span>
-          )}
-          {showTrace &&
-            (tc.traces_to ? (
-              <span className="badge badge-blue">AC #{tc.traces_to}</span>
-            ) : (
-              <span className="badge badge-grey">no trace</span>
-            ))}
-          {tc.severity && (
-            <span className={`badge sev-badge sev-${tc.severity}`}>{tc.severity}</span>
-          )}
-          <span className="badge badge-grey">{tc.priority}</span>
-        </div>
+    <div className="tc-panel">
+      <div className="tc-tabs">
+        <button
+          className={filter === "all" ? "active" : ""}
+          onClick={() => setFilter("all")}
+        >
+          All <span className="n">{cases.length}</span>
+        </button>
+        {Object.keys(typeCounts)
+          .sort()
+          .map((t) => (
+            <button
+              key={t}
+              className={filter === t ? "active" : ""}
+              onClick={() => setFilter(t)}
+            >
+              {t} <span className="n">{typeCounts[t]}</span>
+            </button>
+          ))}
       </div>
-      <ol>
-        {tc.steps?.map((step, index) => (
-          <li key={index}>{step}</li>
-        ))}
-      </ol>
-      <p>
-        <strong>Expected:</strong> {tc.expected_result}
-      </p>
-      {hasData && (
-        <div className="test-data">
-          <span className="test-data-label">Test data</span>
-          <pre>{JSON.stringify(tc.test_data, null, 2)}</pre>
-        </div>
-      )}
-    </article>
+
+      <div className="tc-tablewrap">
+        <table className="tc-table">
+          <thead>
+            <tr>
+              <th className="c-ex" aria-label="expand" />
+              <th className="c-num">#</th>
+              <th>Type</th>
+              <th>Test case</th>
+              {showTrace && <th>Traces</th>}
+              <th>Priority</th>
+              <th>Severity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td className="tc-empty" colSpan={colCount}>
+                  No {filter} test cases.
+                </td>
+              </tr>
+            ) : (
+              filtered.map((tc, i) => {
+                const open = expanded.has(tc.id);
+                return (
+                  <Fragment key={tc.id}>
+                    <tr
+                      className={`tc-row ${i % 2 ? "alt" : ""} ${open ? "open" : ""}`}
+                      onClick={() => toggle(tc.id)}
+                    >
+                      <td className="c-ex">
+                        <span className={`caret ${open ? "down" : ""}`}>▸</span>
+                      </td>
+                      <td className="c-num">{tc.rank != null ? tc.rank : i + 1}</td>
+                      <td>
+                        <span className={`chip ${TYPE_CHIP[tc.type] || "chip-grey"}`}>
+                          {tc.type || "—"}
+                        </span>
+                      </td>
+                      <td className="c-title">
+                        {tc.title}
+                        {tc.generated_by === "consensus" && (
+                          <span className="chip chip-green tc-mini">
+                            consensus v{tc.version}
+                          </span>
+                        )}
+                        {tc.status === "reviewer_flagged" && (
+                          <span className="chip chip-red tc-mini">flagged</span>
+                        )}
+                      </td>
+                      {showTrace && (
+                        <td>
+                          {tc.traces_to ? (
+                            <span className="chip chip-accent">AC #{tc.traces_to}</span>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
+                      )}
+                      <td>
+                        <span className={`chip ${PRIORITY_CHIP[tc.priority] || "chip-grey"}`}>
+                          {tc.priority}
+                        </span>
+                      </td>
+                      <td>
+                        {tc.severity ? (
+                          <span className={`chip ${SEV_CHIP[tc.severity] || "chip-grey"}`}>
+                            {tc.severity}
+                          </span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="tc-detail">
+                        <td colSpan={colCount}>
+                          <div className="tc-detail-grid">
+                            <div>
+                              <div className="tc-lbl">Steps</div>
+                              <ol>
+                                {tc.steps?.map((step, idx) => (
+                                  <li key={idx}>{step}</li>
+                                ))}
+                              </ol>
+                            </div>
+                            <div>
+                              <div className="tc-lbl">Expected result</div>
+                              <p>{tc.expected_result}</p>
+                            </div>
+                            {hasTestData(tc) && (
+                              <div className="full">
+                                <div className="tc-lbl">Test data</div>
+                                <pre>{JSON.stringify(tc.test_data, null, 2)}</pre>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

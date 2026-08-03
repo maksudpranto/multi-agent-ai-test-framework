@@ -128,4 +128,30 @@ export const api = {
     request(`${P(projectId)}/requirements/${requirementId}/baseline`, { method: "POST" }),
   getLatestBaseline: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-baseline`),
+
+  // --- Export (§10): fetch the package as a blob and download it ---
+  async exportPackage(projectId, requirementId, fmt) {
+    const token = getToken();
+    const res = await fetch(
+      `${API_URL}${P(projectId)}/requirements/${requirementId}/export?fmt=${fmt}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      const detail = data?.detail || `Export failed (${res.status})`;
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get("Content-Disposition") || "";
+    const match = cd.match(/filename="?([^"]+)"?/);
+    const filename = match ? match[1] : `test-design.${fmt}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };

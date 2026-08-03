@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
-import AuthBrand from "./AuthBrand";
 
 export default function Register() {
   const { register } = useAuth();
@@ -26,13 +25,19 @@ export default function Register() {
   }
 
   return (
-    <div className="auth-wrap">
-      <AuthBrand />
-      <div className="auth-panel">
-        <div className="auth-card">
+    <div className="auth">
+      <div className="auth-box">
+        <div className="auth-logo">
+          <div className="mark">M</div>
+          <div>
+            <div className="nm">MATF</div>
+            <div className="sb">Test Framework</div>
+          </div>
+        </div>
+        <div className="auth-card2">
           <h1>Create account</h1>
-          <p className="muted">Set up your workspace to start generating test cases.</p>
-          <form onSubmit={onSubmit}>
+          <p className="sub">Set up your workspace to start generating test cases.</p>
+          <form className="auth-form" onSubmit={onSubmit}>
             <label>
               Email
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -49,13 +54,13 @@ export default function Register() {
             </label>
             {error && <p className="error">{error}</p>}
             <button type="submit" disabled={busy}>
-              {busy ? "Creating…" : "Register"}
+              {busy ? "Creating…" : "Create account"}
             </button>
           </form>
-          <p className="muted">
-            Have an account? <Link to="/login">Sign in</Link>
-          </p>
         </div>
+        <p className="auth-alt">
+          Have an account? <Link to="/login">Sign in</Link>
+        </p>
       </div>
     </div>
   );

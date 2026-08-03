@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
-import AuthBrand from "./AuthBrand";
 
 export default function Login() {
   const { login } = useAuth();
@@ -26,13 +25,19 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-wrap">
-      <AuthBrand />
-      <div className="auth-panel">
-        <div className="auth-card">
+    <div className="auth">
+      <div className="auth-box">
+        <div className="auth-logo">
+          <div className="mark">M</div>
+          <div>
+            <div className="nm">MATF</div>
+            <div className="sb">Test Framework</div>
+          </div>
+        </div>
+        <div className="auth-card2">
           <h1>Sign in</h1>
-          <p className="muted">Welcome back to the test-generation platform.</p>
-          <form onSubmit={onSubmit}>
+          <p className="sub">Welcome back to the test-generation platform.</p>
+          <form className="auth-form" onSubmit={onSubmit}>
             <label>
               Email
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -46,10 +51,10 @@ export default function Login() {
               {busy ? "Signing in…" : "Sign in"}
             </button>
           </form>
-          <p className="muted">
-            No account? <Link to="/register">Register</Link>
-          </p>
         </div>
+        <p className="auth-alt">
+          No account? <Link to="/register">Create one</Link>
+        </p>
       </div>
     </div>
   );
