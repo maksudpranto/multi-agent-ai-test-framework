@@ -5,7 +5,6 @@ import Login from "./auth/Login";
 import Register from "./auth/Register";
 import Dashboard from "./projects/Dashboard";
 import ProjectDetail from "./projects/ProjectDetail";
-import ModuleDetail from "./modules/ModuleDetail";
 import RequirementDetail from "./requirements/RequirementDetail";
 
 function ProtectedRoute({ children }) {
@@ -59,14 +58,6 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ProjectDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/projects/:projectId/modules/:moduleId"
-        element={
-          <ProtectedRoute>
-            <ModuleDetail />
           </ProtectedRoute>
         }
       />

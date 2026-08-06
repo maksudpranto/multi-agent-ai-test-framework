@@ -19,7 +19,6 @@ class RequirementUpdate(BaseModel):
     req_type: RequirementType | None = None
     priority: Priority | None = None
     status: RequirementStatus | None = None
-    module_id: int | None = None
 
 
 class RequirementOut(BaseModel):

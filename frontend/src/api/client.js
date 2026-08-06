@@ -58,25 +58,15 @@ export const api = {
   createProject: (name, description) =>
     request("/projects", { method: "POST", body: { name, description } }),
   getProject: (id) => request(`/projects/${id}`),
+  updateProject: (id, body) => request(`/projects/${id}`, { method: "PATCH", body }),
   deleteProject: (id) => request(`/projects/${id}`, { method: "DELETE" }),
 
-  // --- Modules (§4) ---
-  listModules: (projectId) => request(`${P(projectId)}/modules`),
-  createModule: (projectId, body) =>
-    request(`${P(projectId)}/modules`, { method: "POST", body }),
-  getModule: (projectId, moduleId) => request(`${P(projectId)}/modules/${moduleId}`),
-  updateModule: (projectId, moduleId, body) =>
-    request(`${P(projectId)}/modules/${moduleId}`, { method: "PATCH", body }),
-  deleteModule: (projectId, moduleId) =>
-    request(`${P(projectId)}/modules/${moduleId}`, { method: "DELETE" }),
-
-  // --- Requirements (§5) ---
-  listRequirements: (projectId, moduleId) =>
-    request(`${P(projectId)}/modules/${moduleId}/requirements`),
-  createRequirement: (projectId, moduleId, body) =>
-    request(`${P(projectId)}/modules/${moduleId}/requirements`, { method: "POST", body }),
-  uploadRequirement: (projectId, moduleId, formData) =>
-    request(`${P(projectId)}/modules/${moduleId}/requirements/upload`, {
+  // --- Requirements (live directly under a project) ---
+  listRequirements: (projectId) => request(`${P(projectId)}/requirements`),
+  createRequirement: (projectId, body) =>
+    request(`${P(projectId)}/requirements`, { method: "POST", body }),
+  uploadRequirement: (projectId, formData) =>
+    request(`${P(projectId)}/requirements/upload`, {
       method: "POST",
       formData,
     }),

@@ -15,7 +15,6 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user
 from app.database import get_db
 from app.models import (
-    Module,
     Priority,
     Project,
     Requirement,
@@ -41,18 +40,6 @@ def _get_owned_project(project_id: int, user: User, db: Session) -> Project:
     return project
 
 
-def _get_owned_module(
-    project_id: int, module_id: int, user: User, db: Session
-) -> Module:
-    _get_owned_project(project_id, user, db)
-    module = db.get(Module, module_id)
-    if module is None or module.project_id != project_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Module not found"
-        )
-    return module
-
-
 def _get_owned_requirement(
     project_id: int, requirement_id: int, user: User, db: Session
 ) -> Requirement:
@@ -65,39 +52,38 @@ def _get_owned_requirement(
     return requirement
 
 
-@router.get("/modules/{module_id}/requirements", response_model=list[RequirementOut])
+@router.get("/requirements", response_model=list[RequirementOut])
 def list_requirements(
     project_id: int,
-    module_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[Requirement]:
-    _get_owned_module(project_id, module_id, user, db)
+    """All requirements for a project (requirements live directly under a
+    project — there is no module level)."""
+    _get_owned_project(project_id, user, db)
     return list(
         db.scalars(
             select(Requirement)
-            .where(Requirement.module_id == module_id)
+            .where(Requirement.project_id == project_id)
             .order_by(Requirement.created_at.desc())
         )
     )
 
 
 @router.post(
-    "/modules/{module_id}/requirements",
+    "/requirements",
     response_model=RequirementOut,
     status_code=status.HTTP_201_CREATED,
 )
 def create_requirement(
     project_id: int,
-    module_id: int,
     payload: RequirementCreate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> Requirement:
-    module = _get_owned_module(project_id, module_id, user, db)
+    _get_owned_project(project_id, user, db)
     requirement = Requirement(
         project_id=project_id,
-        module_id=module.id,
         title=payload.title,
         raw_text=payload.raw_text,
         req_type=payload.req_type,
@@ -111,13 +97,12 @@ def create_requirement(
 
 
 @router.post(
-    "/modules/{module_id}/requirements/upload",
+    "/requirements/upload",
     response_model=RequirementOut,
     status_code=status.HTTP_201_CREATED,
 )
 def upload_requirement_document(
     project_id: int,
-    module_id: int,
     file: UploadFile = File(...),
     title: str | None = Form(None),
     req_type: RequirementType = Form(RequirementType.feature_description),
@@ -128,7 +113,7 @@ def upload_requirement_document(
     """Create a requirement from an uploaded document. Text is extracted from
     UTF-8-decodable files (.txt/.md/.csv). Binary formats (PDF/DOCX) are accepted
     but stored with a placeholder note — richer parsing is a later enhancement."""
-    module = _get_owned_module(project_id, module_id, user, db)
+    _get_owned_project(project_id, user, db)
     raw_bytes = file.file.read()
     try:
         text = raw_bytes.decode("utf-8").strip()
@@ -141,7 +126,6 @@ def upload_requirement_document(
         )
     requirement = Requirement(
         project_id=project_id,
-        module_id=module.id,
         title=title or Path(file.filename or "Uploaded requirement").stem,
         raw_text=text,
         req_type=req_type,
@@ -175,9 +159,6 @@ def update_requirement(
 ) -> Requirement:
     requirement = _get_owned_requirement(project_id, requirement_id, user, db)
     data = payload.model_dump(exclude_unset=True)
-    # A module reassignment must stay within the same project.
-    if "module_id" in data and data["module_id"] is not None:
-        _get_owned_module(project_id, data["module_id"], user, db)
     for field, value in data.items():
         setattr(requirement, field, value)
     db.commit()

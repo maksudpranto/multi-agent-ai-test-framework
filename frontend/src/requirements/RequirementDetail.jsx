@@ -1,10 +1,37 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { REQ_TYPE_LABEL } from "./constants";
 
+const PIPELINE_STEPS = ["Analyze", "Generate", "Review", "Coverage", "Quality"];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Spinner + label shown on any agent button while it is working.
+function Busy({ children }) {
+  return (
+    <span className="busy-label">
+      <span className="spinner" />
+      {children}
+    </span>
+  );
+}
+
+export const REQ_TABS = [
+  { key: "overview", label: "Overview" },
+  { key: "test", label: "Test Cases" },
+  { key: "review", label: "Review" },
+  { key: "coverage", label: "Coverage" },
+  { key: "quality", label: "Quality" },
+  { key: "export", label: "Export" },
+];
+
 export default function RequirementDetail() {
   const { projectId, requirementId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "overview";
+  function setTab(t) {
+    setSearchParams(t === "overview" ? {} : { tab: t }, { replace: true });
+  }
   const [story, setStory] = useState(null);
   const [result, setResult] = useState(null);
   const [generation, setGeneration] = useState(null);
@@ -26,6 +53,13 @@ export default function RequirementDetail() {
   const [evaluatingQuality, setEvaluatingQuality] = useState(false);
   const [baselining, setBaselining] = useState(false);
   const [exporting, setExporting] = useState("");
+  const [runningAll, setRunningAll] = useState(false);
+  const [pipelineIdx, setPipelineIdx] = useState(-1);
+  const [plSteps, setPlSteps] = useState(PIPELINE_STEPS);
+
+  // Floor each agent action to a short minimum so its loading state is
+  // actually visible (a no-op once a real LLM call takes longer).
+  const pace = (p) => Promise.all([p, sleep(500)]).then(([r]) => r);
 
   useEffect(() => {
     setLoading(true);
@@ -60,7 +94,7 @@ export default function RequirementDetail() {
     setRunning(true);
     setError("");
     try {
-      setResult(await api.runRequirementAnalysis(projectId, requirementId));
+      setResult(await pace(api.runRequirementAnalysis(projectId, requirementId)));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -79,7 +113,7 @@ export default function RequirementDetail() {
     try {
       // A fresh criteria set means any previously generated cases / debate are
       // stale — clear them so the UI reflects the new run.
-      setResult(await api.submitAcceptanceCriteria(projectId, requirementId, criteria));
+      setResult(await pace(api.submitAcceptanceCriteria(projectId, requirementId, criteria)));
       setGeneration(null);
       setDebate(null);
     } catch (err) {
@@ -93,7 +127,7 @@ export default function RequirementDetail() {
     setGenerating(true);
     setError("");
     try {
-      setGeneration(await api.generateTestCases(projectId, requirementId));
+      setGeneration(await pace(api.generateTestCases(projectId, requirementId)));
       setDebate(null); // stale once test cases change
       setCoverage(null);
       setQuality(null);
@@ -108,7 +142,7 @@ export default function RequirementDetail() {
     setReviewing(true);
     setError("");
     try {
-      const d = await api.runReviewConsensus(projectId, requirementId);
+      const d = await pace(api.runReviewConsensus(projectId, requirementId));
       setDebate(d);
       // consensus can add/revise cases — refresh the multi-agent set
       setGeneration(await api.getLatestTestCases(projectId, requirementId));
@@ -125,7 +159,7 @@ export default function RequirementDetail() {
     setPrioritizing(true);
     setError("");
     try {
-      setGeneration(await api.prioritize(projectId, requirementId));
+      setGeneration(await pace(api.prioritize(projectId, requirementId)));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -137,7 +171,7 @@ export default function RequirementDetail() {
     setAnalysingCoverage(true);
     setError("");
     try {
-      setCoverage(await api.runCoverage(projectId, requirementId));
+      setCoverage(await pace(api.runCoverage(projectId, requirementId)));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -149,7 +183,7 @@ export default function RequirementDetail() {
     setEvaluatingQuality(true);
     setError("");
     try {
-      setQuality(await api.runQuality(projectId, requirementId));
+      setQuality(await pace(api.runQuality(projectId, requirementId)));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -161,11 +195,86 @@ export default function RequirementDetail() {
     setBaselining(true);
     setError("");
     try {
-      setBaseline(await api.runBaseline(projectId, requirementId));
+      setBaseline(await pace(api.runBaseline(projectId, requirementId)));
     } catch (err) {
       setError(err.message);
     } finally {
       setBaselining(false);
+    }
+  }
+
+  // One-click: run the whole multi-agent pipeline end to end.
+  async function onRunAll() {
+    setError("");
+    setRunningAll(true);
+    setMode("multi");
+    // Each agent call is paced to a minimum visible duration so the progress
+    // bar actually reads as "the AI is working" even on the instant mock
+    // provider. With a real LLM the call dominates and this floor is a no-op.
+    const MIN = 700;
+    const paced = async (promise) => {
+      const [res] = await Promise.all([promise, sleep(MIN)]);
+      return res;
+    };
+    // Number the steps by what actually runs this time: if acceptance criteria
+    // already exist, the analysis step is skipped, so it isn't counted.
+    const willAnalyze = criteria.length === 0;
+    const steps = willAnalyze ? PIPELINE_STEPS : PIPELINE_STEPS.slice(1);
+    setPlSteps(steps);
+    let i = 0;
+    try {
+      let crit = criteria;
+      if (willAnalyze) {
+        setPipelineIdx(i);
+        if (inputMode === "criteria") {
+          const lines = acText
+            .split("\n")
+            .map((l) => l.trim())
+            .filter(Boolean);
+          if (lines.length === 0)
+            throw new Error(
+              "Add acceptance criteria (one per line), or switch Input to “From Requirement”."
+            );
+          const res = await paced(
+            api.submitAcceptanceCriteria(projectId, requirementId, lines)
+          );
+          setResult(res);
+          crit = res?.acceptance_criteria || [];
+        } else {
+          const res = await paced(api.runRequirementAnalysis(projectId, requirementId));
+          setResult(res);
+          crit = res?.acceptance_criteria || [];
+        }
+        i++;
+      }
+      if (crit.length === 0)
+        throw new Error("No acceptance criteria were produced — nothing to generate from.");
+
+      // Generate.
+      setPipelineIdx(i++);
+      setGeneration(await paced(api.generateTestCases(projectId, requirementId)));
+
+      // Review & consensus (may revise the suite).
+      setPipelineIdx(i++);
+      setDebate(await paced(api.runReviewConsensus(projectId, requirementId)));
+      setGeneration(await api.getLatestTestCases(projectId, requirementId));
+
+      // Coverage.
+      setPipelineIdx(i++);
+      setCoverage(await paced(api.runCoverage(projectId, requirementId)));
+
+      // Quality.
+      setPipelineIdx(i++);
+      setQuality(await paced(api.runQuality(projectId, requirementId)));
+
+      // Let the bar reach 100% and settle before clearing.
+      setPipelineIdx(steps.length);
+      await sleep(500);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRunningAll(false);
+      setPipelineIdx(-1);
     }
   }
 
@@ -206,12 +315,6 @@ export default function RequirementDetail() {
           <Link to="/">Home</Link>
           <span className="sep">/</span>
           <Link to={`/projects/${projectId}`}>Project</Link>
-          {story?.module_id && (
-            <>
-              <span className="sep">/</span>
-              <Link to={`/projects/${projectId}/modules/${story.module_id}`}>Module</Link>
-            </>
-          )}
           <span className="sep">/</span>
           <span>{story?.title}</span>
         </p>
@@ -231,9 +334,81 @@ export default function RequirementDetail() {
           </div>
         </header>
 
+        <div className="tabbar">
+          {REQ_TABS.map((t) => (
+            <button
+              key={t.key}
+              className={activeTab === t.key ? "active" : ""}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {error && <p className="error" style={{ margin: "0 0 4px" }}>{error}</p>}
+
+        {activeTab === "overview" && (
+          <>
         <section className="section">
           <h2>Requirement</h2>
           <p className="story-text">{story?.raw_text}</p>
+        </section>
+
+        <section className="runall-bar">
+          <div className="txt">
+            <h3>Generate the full test design in one go</h3>
+            <p>
+              Runs the whole multi-agent pipeline — analysis → generation →
+              review &amp; consensus → coverage → quality — end to end. You can
+              still run any stage individually below.
+            </p>
+          </div>
+          <button className="btn-primary" onClick={onRunAll} disabled={runningAll}>
+            {runningAll ? (
+              <>
+                <span className="spinner" /> Working…
+              </>
+            ) : generation ? (
+              "Re-run full pipeline"
+            ) : (
+              "Run full pipeline"
+            )}
+          </button>
+          {runningAll &&
+            (() => {
+              const total = plSteps.length;
+              const done = Math.min(pipelineIdx, total);
+              const pct = Math.round((Math.min(pipelineIdx + 1, total) / total) * 100);
+              const current = plSteps[pipelineIdx];
+              return (
+                <div className="pl-progress">
+                  <div className="pl-head">
+                    <span className="step">
+                      {current
+                        ? `Step ${done + 1} of ${total} · ${current}`
+                        : "Finishing up"}
+                    </span>
+                    <span className="pct">{pct}%</span>
+                  </div>
+                  <div className="pl-track">
+                    <div className="pl-fill" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="pipeline-progress">
+                    {plSteps.map((s, i) => (
+                      <div
+                        key={s}
+                        className={`pp-step ${
+                          i < pipelineIdx ? "done" : i === pipelineIdx ? "active" : ""
+                        }`}
+                      >
+                        <span className="pp-dot" /> {s}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
         </section>
 
         <section className="section">
@@ -262,8 +437,14 @@ export default function RequirementDetail() {
                 testable specification and derives acceptance criteria.
               </p>
               <div className="inline-actions">
-                <button onClick={onAnalyze} disabled={running}>
-                  {running ? "Analyzing…" : analysis ? "Re-run analysis" : "Run analysis"}
+                <button onClick={onAnalyze} disabled={running || runningAll}>
+                  {running ? (
+                    <Busy>Analyzing…</Busy>
+                  ) : analysis ? (
+                    "Re-run analysis"
+                  ) : (
+                    "Run analysis"
+                  )}
                 </button>
               </div>
             </>
@@ -282,13 +463,12 @@ export default function RequirementDetail() {
               />
               <div className="inline-actions">
                 <button onClick={onSubmitCriteria} disabled={submittingAc || !acText.trim()}>
-                  {submittingAc ? "Saving…" : "Use these criteria"}
+                  {submittingAc ? <Busy>Saving…</Busy> : "Use these criteria"}
                 </button>
               </div>
             </>
           )}
 
-          {error && <p className="error">{error}</p>}
           {result?.error && <p className="error">{result.error}</p>}
 
           {analysis && (
@@ -332,6 +512,11 @@ export default function RequirementDetail() {
           )}
         </section>
 
+          </>
+        )}
+
+        {activeTab === "test" && (
+          <>
         {/* Mode toggle: the two research arms compared side by side. */}
         <section className="section">
           <div className="section-head">
@@ -360,8 +545,8 @@ export default function RequirementDetail() {
                 collaboratively.
               </p>
               <div className="inline-actions">
-                <button onClick={onGenerate} disabled={criteria.length === 0 || generating}>
-                  {generating ? "Generating…" : "Generate test cases"}
+                <button onClick={onGenerate} disabled={criteria.length === 0 || generating || runningAll}>
+                  {generating ? <Busy>Generating…</Busy> : "Generate test cases"}
                 </button>
               </div>
               {multiCases.length === 0 ? (
@@ -383,7 +568,7 @@ export default function RequirementDetail() {
               </p>
               <div className="inline-actions">
                 <button onClick={onBaseline} disabled={baselining}>
-                  {baselining ? "Running…" : "Run single-LLM baseline"}
+                  {baselining ? <Busy>Running…</Busy> : "Run single-LLM baseline"}
                 </button>
               </div>
               {baselineCases.length === 0 ? (
@@ -397,15 +582,24 @@ export default function RequirementDetail() {
           )}
         </section>
 
-        {mode === "multi" && (
+          </>
+        )}
+
+        {activeTab === "review" && (
           <section className="section">
             <div className="section-head">
               <h2>Review &amp; Consensus — multi-agent debate</h2>
               <button
                 onClick={onReviewConsensus}
-                disabled={multiCases.length === 0 || reviewing}
+                disabled={multiCases.length === 0 || reviewing || runningAll}
               >
-                {reviewing ? "Debating…" : debate ? "Re-run debate" : "Run review & consensus"}
+                {reviewing ? (
+                  <Busy>Debating…</Busy>
+                ) : debate ? (
+                  "Re-run debate"
+                ) : (
+                  "Run review & consensus"
+                )}
               </button>
             </div>
             <p className="muted mode-note">
@@ -425,12 +619,12 @@ export default function RequirementDetail() {
           </section>
         )}
 
-        {mode === "multi" && (
+        {activeTab === "test" && (
           <section className="section">
             <div className="section-head">
               <h2>Prioritization</h2>
               <button onClick={onPrioritize} disabled={multiCases.length === 0 || prioritizing}>
-                {prioritizing ? "Prioritizing…" : "Prioritize suite"}
+                {prioritizing ? <Busy>Prioritizing…</Busy> : "Prioritize suite"}
               </button>
             </div>
             <p className="muted mode-note">
@@ -452,12 +646,18 @@ export default function RequirementDetail() {
           </section>
         )}
 
-        {mode === "multi" && (
+        {activeTab === "coverage" && (
           <section className="section">
             <div className="section-head">
               <h2>Coverage &amp; Validation</h2>
-              <button onClick={onCoverage} disabled={multiCases.length === 0 || analysingCoverage}>
-                {analysingCoverage ? "Analysing…" : coverage ? "Re-run coverage" : "Analyse coverage"}
+              <button onClick={onCoverage} disabled={multiCases.length === 0 || analysingCoverage || runningAll}>
+                {analysingCoverage ? (
+                  <Busy>Analysing…</Busy>
+                ) : coverage ? (
+                  "Re-run coverage"
+                ) : (
+                  "Analyse coverage"
+                )}
               </button>
             </div>
             <p className="muted mode-note">
@@ -478,12 +678,18 @@ export default function RequirementDetail() {
           </section>
         )}
 
-        {mode === "multi" && (
+        {activeTab === "quality" && (
           <section className="section">
             <div className="section-head">
               <h2>Quality Report</h2>
-              <button onClick={onQuality} disabled={multiCases.length === 0 || evaluatingQuality}>
-                {evaluatingQuality ? "Evaluating…" : quality ? "Re-run quality" : "Evaluate quality"}
+              <button onClick={onQuality} disabled={multiCases.length === 0 || evaluatingQuality || runningAll}>
+                {evaluatingQuality ? (
+                  <Busy>Evaluating…</Busy>
+                ) : quality ? (
+                  "Re-run quality"
+                ) : (
+                  "Evaluate quality"
+                )}
               </button>
             </div>
             <p className="muted mode-note">
@@ -503,6 +709,7 @@ export default function RequirementDetail() {
           </section>
         )}
 
+        {activeTab === "export" && (
         <section className="section">
           <h2>Export test design package</h2>
           <p className="mode-note">
@@ -530,6 +737,7 @@ export default function RequirementDetail() {
             </div>
           )}
         </section>
+        )}
       </div>
     </div>
   );
