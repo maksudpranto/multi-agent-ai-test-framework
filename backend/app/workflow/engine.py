@@ -583,3 +583,167 @@ class DefaultWorkflowEngine(WorkflowEngine):
             "revisions_made": revisions_made,
             "total_findings": total_findings,
         }
+
+    # -- agentic orchestration: LLM planner + deterministic guardrails --------
+    def _orch_criteria(self, db: Session, run: PipelineRun) -> list[AcceptanceCriterion]:
+        return list(
+            db.scalars(
+                select(AcceptanceCriterion)
+                .where(AcceptanceCriterion.pipeline_run_id == run.id)
+                .order_by(AcceptanceCriterion.order)
+            )
+        )
+
+    def _orch_state(self, db: Session, run: PipelineRun) -> dict[str, Any]:
+        """Snapshot the run so the planner can reason about what remains."""
+        criteria = self._orch_criteria(db, run)
+        cases = self._current_test_cases(db, run)
+        debated = (
+            db.scalar(
+                select(DebateTurn.id)
+                .where(DebateTurn.pipeline_run_id == run.id)
+                .limit(1)
+            )
+            is not None
+        )
+        cov = list(
+            db.scalars(
+                select(CoverageReport).where(CoverageReport.pipeline_run_id == run.id)
+            )
+        )
+        qual = list(
+            db.scalars(
+                select(QualityReport).where(QualityReport.pipeline_run_id == run.id)
+            )
+        )
+        covered = sum(1 for r in cov if r.covered)
+        return {
+            "has_criteria": bool(criteria),
+            "n_criteria": len(criteria),
+            "num_cases": len(cases),
+            "debated": debated,
+            "prioritized": any(c.rank is not None for c in cases),
+            "coverage_done": bool(cov),
+            "coverage_pct": round(100.0 * covered / len(cov), 1) if cov else 0.0,
+            "quality_done": bool(qual),
+        }
+
+    @staticmethod
+    def _orch_legal(state: dict[str, Any]) -> list[str]:
+        """Guardrail: the legal next actions given the state. Enforces valid
+        transitions (can't generate before criteria exist, etc.) and prevents
+        loops (each stage offered until done, then removed)."""
+        if not state["has_criteria"]:
+            return ["analyze"]
+        if state["num_cases"] == 0:
+            return ["generate"]
+        legal: list[str] = []
+        if not state["debated"]:
+            legal.append("debate")
+        if not state["coverage_done"]:
+            legal.append("coverage")
+        if not state["quality_done"]:
+            legal.append("quality")
+        if not state["prioritized"]:
+            legal.append("prioritize")
+        legal.append("finish")
+        return legal
+
+    def _log_planner(
+        self, db, run, step_no, state, legal, action, rationale, fallback
+    ) -> None:
+        db.add(
+            AgentExecution(
+                pipeline_run_id=run.id,
+                stage=PipelineStage.planning,
+                attempt_no=step_no,
+                raw_input={"state": state, "legal_actions": legal},
+                raw_output={
+                    "action": action,
+                    "rationale": rationale,
+                    "planner_fallback": fallback,
+                },
+                reasoning=rationale,
+                status=ExecutionStatus.success,
+            )
+        )
+        db.flush()
+
+    def _orch_dispatch(self, db, run, requirement, action, config) -> None:
+        story = requirement.raw_text
+        if action == "analyze":
+            self.run_stage(
+                db, run, PipelineStage.requirement_analysis,
+                {"user_story": story}, config,
+            )
+        elif action == "generate":
+            criteria = self._orch_criteria(db, run)
+            self.run_stage(
+                db, run, PipelineStage.test_generation,
+                {
+                    "user_story": story,
+                    "acceptance_criteria": [
+                        {"id": c.id, "text": c.text} for c in criteria
+                    ],
+                },
+                config,
+            )
+        elif action == "debate":
+            criteria = self._orch_criteria(db, run)
+            self.run_debate(
+                db, run, user_story=story,
+                acceptance_criteria=[{"id": c.id, "text": c.text} for c in criteria],
+                config=config,
+            )
+        elif action == "coverage":
+            self.run_coverage(db, run, user_story=story, config=config)
+        elif action == "quality":
+            self.run_quality(db, run, user_story=story, config=config)
+        elif action == "prioritize":
+            self.run_prioritization(db, run, user_story=story, config=config)
+
+    def run_orchestration(
+        self, db: Session, run: PipelineRun, *, requirement, config: RunConfig, goal: dict | None = None
+    ) -> dict[str, Any]:
+        """The agentic control loop. An LLM planner picks the next specialist
+        agent from live state each step; guardrails cap the step budget and the
+        legal move set. Every decision is logged as an AgentExecution
+        (stage=planning), so the run is an auditable trace of which agent acted
+        and why — the framework's evidence of agency."""
+        from app.agents.planner import PlannerAgent
+
+        goal = goal or {"coverage_target": 100, "max_steps": 10}
+        max_steps = int(goal.get("max_steps", 10))
+        planner = PlannerAgent(self.llm)
+        decisions: list[dict] = []
+
+        for step_no in range(1, max_steps + 1):
+            state = self._orch_state(db, run)
+            legal = self._orch_legal(state)
+            choice = planner.decide(
+                goal=goal, state=state, legal_actions=legal, model=config.model
+            )
+            action = choice.get("action")
+            fallback = action not in legal
+            if fallback:
+                action = legal[0]
+            rationale = choice.get("rationale") or f"Selected '{action}'."
+            self._log_planner(db, run, step_no, state, legal, action, rationale, fallback)
+            decisions.append(
+                {
+                    "step": step_no,
+                    "action": action,
+                    "rationale": rationale,
+                    "planner_fallback": fallback,
+                }
+            )
+            if action == "finish":
+                break
+            self._orch_dispatch(db, run, requirement, action, config)
+
+        db.commit()
+        return {
+            "decisions": decisions,
+            "final_state": self._orch_state(db, run),
+            "steps_used": len(decisions),
+        }

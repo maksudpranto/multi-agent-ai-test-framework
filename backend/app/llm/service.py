@@ -124,6 +124,22 @@ def _dev_mock_responder(messages, system) -> str:
     raw = " ".join(m.content for m in messages)
     text = raw.lower()
 
+    # --- Orchestrator planner: pick the first legal candidate action. Matched
+    # first so its prompt never falls through to a specialist branch. ---
+    if "you are the orchestrator" in text:
+        m = re.search(r"candidate actions \(choose exactly one\):\s*([^\n]+)", text)
+        action = "finish"
+        if m:
+            opts = [o.strip() for o in m.group(1).split(",") if o.strip()]
+            if opts:
+                action = opts[0]
+        return json.dumps(
+            {
+                "action": action,
+                "rationale": f"Offline planner: '{action}' is the next required step given the current state.",
+            }
+        )
+
     # --- Reviewer: flag once on round 1, be satisfied from round 2 (so the
     # debate terminates by consensus rather than by hitting max rounds). ---
     if "you are a meticulous qa reviewer" in text:

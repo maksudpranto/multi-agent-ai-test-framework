@@ -22,6 +22,7 @@ def utcnow() -> datetime:
 
 
 class PipelineStage(str, enum.Enum):
+    planning = "planning"  # Orchestrator planner decisions (agentic control)
     requirement_analysis = "requirement_analysis"
     test_generation = "test_generation"
     reviewer = "reviewer"

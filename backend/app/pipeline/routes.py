@@ -6,6 +6,7 @@ from app.auth.dependencies import get_current_user
 from app.database import get_db
 from app.models import (
     AcceptanceCriterion,
+    AgentExecution,
     CoverageReport,
     DebateSpeaker,
     DebateTurn,
@@ -637,6 +638,79 @@ def run_prioritization(
     db.commit()
     db.refresh(run)
     return _build_test_generation_result(db, run, error=result.error)
+
+
+@router.post("/orchestrate")
+def orchestrate(
+    project_id: int,
+    requirement_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Agentic run: the Orchestrator's planner drives the specialist agents to a
+    goal under guardrails, in a fresh multi-agent run. Returns the decision
+    trace (who acted and why) plus the resulting coverage/quality/suite."""
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+
+    run = PipelineRun(
+        requirement_id=requirement.id,
+        mode=ExperimentMode.multi_agent,
+        input_mode="requirement",
+        current_stage=PipelineStage.requirement_analysis,
+        status=RunStatus.running,
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+
+    summary = DefaultWorkflowEngine().run_orchestration(
+        db,
+        run,
+        requirement=requirement,
+        config=RunConfig.defaults(),
+        goal={"coverage_target": 100, "max_steps": 10},
+    )
+
+    run.status = RunStatus.completed
+    run.completed_at = utcnow()
+    db.commit()
+    db.refresh(run)
+
+    executions = list(
+        db.scalars(
+            select(AgentExecution)
+            .where(AgentExecution.pipeline_run_id == run.id)
+            .order_by(AgentExecution.id)
+        )
+    )
+    trace = []
+    for e in executions:
+        stage = e.stage.value if hasattr(e.stage, "value") else e.stage
+        out = e.raw_output or {}
+        is_plan = stage == "planning"
+        trace.append(
+            {
+                "stage": stage,
+                "attempt": e.attempt_no,
+                "action": out.get("action") if is_plan else None,
+                "rationale": e.reasoning if is_plan else None,
+                "planner_fallback": out.get("planner_fallback") if is_plan else None,
+                "status": e.status.value if hasattr(e.status, "value") else e.status,
+            }
+        )
+
+    coverage = _build_coverage_result(db, run, None)
+    quality = _build_quality_result(db, run, None)
+    return {
+        "run_id": run.id,
+        "steps_used": summary["steps_used"],
+        "decisions": summary["decisions"],
+        "final_state": summary["final_state"],
+        "trace": trace,
+        "coverage_pct": coverage.coverage_pct,
+        "quality_score": quality.overall_score,
+        "test_case_count": len(_current_test_cases(db, run)),
+    }
 
 
 @router.post("/baseline", response_model=TestGenerationResult)
