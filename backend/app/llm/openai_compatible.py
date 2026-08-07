@@ -54,12 +54,23 @@ class OpenAICompatibleProvider(LLMProvider):
         }
 
         start = time.monotonic()
-        response = httpx.post(
-            f"{self._base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=120.0,
-        )
+        # Free tiers cap per-request/per-minute tokens differently per model
+        # (e.g. Groq's 8B tier rejects an 8192 budget with 413 while 70B accepts
+        # it). Request the full budget, then halve-and-retry on 413 so capable
+        # models keep the headroom and constrained ones self-heal.
+        attempt_tokens = max_tokens
+        while True:
+            payload["max_tokens"] = attempt_tokens
+            response = httpx.post(
+                f"{self._base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=120.0,
+            )
+            if response.status_code == 413 and attempt_tokens > 2048:
+                attempt_tokens = max(2048, attempt_tokens // 2)
+                continue
+            break
         response.raise_for_status()
         data = response.json()
         latency_ms = int((time.monotonic() - start) * 1000)

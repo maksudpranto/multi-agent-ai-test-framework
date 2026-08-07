@@ -28,6 +28,19 @@ function modelBody() {
   return s && s.provider && s.model ? { provider: s.provider, model: s.model } : undefined;
 }
 
+// Wrap a pipeline call so the usage panel refreshes the moment it completes
+// (each of these consumes provider quota). Fires only on success.
+function pipe(promise) {
+  return promise.then((r) => {
+    try {
+      window.dispatchEvent(new Event("matf:usage"));
+    } catch {
+      /* non-browser context */
+    }
+    return r;
+  });
+}
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -82,6 +95,8 @@ export const api = {
 
   llmMeta: () => request("/meta/llm", { auth: false }),
   listModels: () => request("/meta/models", { auth: false }),
+  usage: (sessionSince) =>
+    request(`/meta/usage${sessionSince ? `?session_since=${encodeURIComponent(sessionSince)}` : ""}`),
 
   listProjects: () => request("/projects"),
   createProject: (name, description) =>
@@ -110,10 +125,12 @@ export const api = {
   // Each action attaches the current model selection (modelBody) so the chosen
   // provider+model drives that run; when none is set the backend uses its default.
   runRequirementAnalysis: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/analyze`, {
-      method: "POST",
-      body: modelBody(),
-    }),
+    pipe(
+      request(`${P(projectId)}/requirements/${requirementId}/analyze`, {
+        method: "POST",
+        body: modelBody(),
+      })
+    ),
   getLatestAnalysis: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-analysis`),
   submitAcceptanceCriteria: (projectId, requirementId, criteria) =>
@@ -122,54 +139,68 @@ export const api = {
       body: { criteria },
     }),
   generateTestCases: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/generate-test-cases`, {
-      method: "POST",
-      body: modelBody(),
-    }),
+    pipe(
+      request(`${P(projectId)}/requirements/${requirementId}/generate-test-cases`, {
+        method: "POST",
+        body: modelBody(),
+      })
+    ),
   getLatestTestCases: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-test-cases`),
 
   runReviewConsensus: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/review-consensus`, {
-      method: "POST",
-      body: modelBody(),
-    }),
+    pipe(
+      request(`${P(projectId)}/requirements/${requirementId}/review-consensus`, {
+        method: "POST",
+        body: modelBody(),
+      })
+    ),
   getLatestReviewConsensus: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-review-consensus`),
 
   prioritize: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/prioritize`, {
-      method: "POST",
-      body: modelBody(),
-    }),
+    pipe(
+      request(`${P(projectId)}/requirements/${requirementId}/prioritize`, {
+        method: "POST",
+        body: modelBody(),
+      })
+    ),
 
   runCoverage: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/coverage`, {
-      method: "POST",
-      body: modelBody(),
-    }),
+    pipe(
+      request(`${P(projectId)}/requirements/${requirementId}/coverage`, {
+        method: "POST",
+        body: modelBody(),
+      })
+    ),
   getLatestCoverage: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-coverage`),
 
   runQuality: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/quality`, {
-      method: "POST",
-      body: modelBody(),
-    }),
+    pipe(
+      request(`${P(projectId)}/requirements/${requirementId}/quality`, {
+        method: "POST",
+        body: modelBody(),
+      })
+    ),
   getLatestQuality: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-quality`),
 
   runBaseline: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/baseline`, {
-      method: "POST",
-      body: modelBody(),
-    }),
+    pipe(
+      request(`${P(projectId)}/requirements/${requirementId}/baseline`, {
+        method: "POST",
+        body: modelBody(),
+      })
+    ),
 
   orchestrate: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/orchestrate`, {
-      method: "POST",
-      body: modelBody(),
-    }),
+    pipe(
+      request(`${P(projectId)}/requirements/${requirementId}/orchestrate`, {
+        method: "POST",
+        body: modelBody(),
+      })
+    ),
   getLatestBaseline: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-baseline`),
 

@@ -650,7 +650,7 @@ class DefaultWorkflowEngine(WorkflowEngine):
         return legal
 
     def _log_planner(
-        self, db, run, step_no, state, legal, action, rationale, fallback
+        self, db, run, step_no, state, legal, action, rationale, fallback, model=None
     ) -> None:
         db.add(
             AgentExecution(
@@ -664,6 +664,7 @@ class DefaultWorkflowEngine(WorkflowEngine):
                     "planner_fallback": fallback,
                 },
                 reasoning=rationale,
+                model=model,
                 status=ExecutionStatus.success,
             )
         )
@@ -728,7 +729,7 @@ class DefaultWorkflowEngine(WorkflowEngine):
             if fallback:
                 action = legal[0]
             rationale = choice.get("rationale") or f"Selected '{action}'."
-            self._log_planner(db, run, step_no, state, legal, action, rationale, fallback)
+            self._log_planner(db, run, step_no, state, legal, action, rationale, fallback, model=config.model)
             decisions.append(
                 {
                     "step": step_no,

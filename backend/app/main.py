@@ -1,11 +1,13 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
+from app.auth.dependencies import get_current_user
 from app.auth.routes import router as auth_router
 from app.config import get_settings
-from app.database import SessionLocal
+from app.database import SessionLocal, get_db
 from app.export.routes import router as export_router
 from app.pipeline.routes import router as pipeline_router
 from app.projects.routes import router as projects_router
@@ -86,3 +88,17 @@ def model_catalog() -> dict:
         "models": catalog.annotated(settings),
         "default": {"provider": settings.llm_provider.lower().strip(), "model": settings.effective_model},
     }
+
+
+@app.get("/meta/usage", tags=["meta"])
+def usage(
+    session_since: str | None = None,
+    db: Session = Depends(get_db),
+    _user=Depends(get_current_user),
+) -> dict:
+    """Per-provider call counts (today / month / session) from the audit log,
+    plus approximate free-tier remaining and reset time. Counts reflect calls
+    made through this app only."""
+    from app.llm.usage import compute_usage
+
+    return compute_usage(db, settings, session_since)

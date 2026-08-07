@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, getModelSelection, setModelSelection } from "../api/client";
 import { REQ_TYPE_LABEL } from "./constants";
+import UsagePanel from "../components/UsagePanel";
 
 const PROVIDER_LABEL = {
   gemini: "Google Gemini",
@@ -501,6 +502,8 @@ export default function RequirementDetail() {
           <h2>Requirement</h2>
           <p className="story-text">{story?.raw_text}</p>
         </section>
+
+        <UsagePanel />
 
         <section className="runall-bar">
           <div className="txt">

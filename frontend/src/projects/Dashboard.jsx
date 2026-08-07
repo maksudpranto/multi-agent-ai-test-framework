@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import UsagePanel from "../components/UsagePanel";
 
 const ICON_BG = [
   "var(--grad-deep-blue)",
@@ -197,6 +198,8 @@ export default function Dashboard() {
           <div className="h">Across all projects</div>
         </div>
       </section>
+
+      <UsagePanel />
 
       {error && <p className="error">{error}</p>}
 

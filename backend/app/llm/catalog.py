@@ -85,3 +85,30 @@ def find(provider: str, model: str) -> dict | None:
 def annotated(settings: Settings) -> list[dict]:
     """Catalog entries + a `ready` flag, for the UI to enable/disable options."""
     return [{**entry, "ready": provider_ready(entry["provider"], settings)} for entry in FREE_MODELS]
+
+
+_MODEL_TO_PROVIDER = {e["model"]: e["provider"] for e in FREE_MODELS}
+
+
+def provider_for_model(model: str | None) -> str:
+    """Best-effort provider name for a recorded model id (used by usage stats).
+
+    Prefers the exact catalog match, then falls back to id conventions:
+    OpenRouter ids carry a 'org/model' slash; Gemini/Claude have clear prefixes;
+    bare Llama ids come from Groq."""
+    if not model:
+        return "unknown"
+    if model in _MODEL_TO_PROVIDER:
+        return _MODEL_TO_PROVIDER[model]
+    m = model.lower()
+    if "/" in model:
+        return "openrouter"
+    if m.startswith("gemini"):
+        return "gemini"
+    if m.startswith("claude"):
+        return "anthropic"
+    if m.startswith("mock"):
+        return "mock"
+    if "llama" in m or "versatile" in m or "instant" in m or "qwen" in m:
+        return "groq"
+    return "unknown"
