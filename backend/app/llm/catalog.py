@@ -37,23 +37,24 @@ FREE_MODELS: list[dict] = [
         "label": "Llama 3.1 8B",
         "note": "Groq · instant, lightweight",
     },
+    # OpenRouter's ':free' catalog changes often — these were verified live.
     {
         "provider": "openrouter",
-        "model": "deepseek/deepseek-r1:free",
-        "label": "DeepSeek R1",
-        "note": "OpenRouter · reasoning model",
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "label": "Nemotron 3 Ultra 550B",
+        "note": "OpenRouter · flagship, most capable",
     },
     {
         "provider": "openrouter",
-        "model": "meta-llama/llama-3.3-70b-instruct:free",
-        "label": "Llama 3.3 70B (OR)",
-        "note": "OpenRouter · free tier",
+        "model": "openai/gpt-oss-20b:free",
+        "label": "GPT-OSS 20B",
+        "note": "OpenRouter · OpenAI open model",
     },
     {
         "provider": "openrouter",
-        "model": "qwen/qwen-2.5-72b-instruct:free",
-        "label": "Qwen 2.5 72B",
-        "note": "OpenRouter · free tier",
+        "model": "nvidia/nemotron-nano-9b-v2:free",
+        "label": "Nemotron Nano 9B",
+        "note": "OpenRouter · fast, lightweight",
     },
 ]
 

@@ -15,7 +15,7 @@ const PROVIDER_LABEL = {
 // Dropdown to choose which free model powers every agent action on this page.
 // Selection persists in localStorage (via the api client) and is attached to
 // each generate/run/orchestrate call, so switching models needs no file edits.
-function ModelPicker() {
+function ModelPicker({ onProviderChange }) {
   const [catalog, setCatalog] = useState(null);
   const [sel, setSel] = useState(getModelSelection());
 
@@ -24,20 +24,23 @@ function ModelPicker() {
       .listModels()
       .then((data) => {
         setCatalog(data);
-        if (!getModelSelection()) {
+        let current = getModelSelection();
+        if (!current) {
           const d = data.default;
           const match = data.models.find(
             (m) => m.provider === d.provider && m.model === d.model && m.ready
           );
           const first = match || data.models.find((m) => m.ready);
           if (first) {
-            setModelSelection(first);
-            setSel({ provider: first.provider, model: first.model });
+            current = { provider: first.provider, model: first.model };
+            setModelSelection(current);
+            setSel(current);
           }
         }
+        if (current) onProviderChange?.(current.provider);
       })
       .catch(() => {});
-  }, []);
+  }, [onProviderChange]);
 
   if (!catalog) return null;
 
@@ -50,6 +53,7 @@ function ModelPicker() {
     const [provider, model] = e.target.value.split("::");
     setModelSelection({ provider, model });
     setSel({ provider, model });
+    onProviderChange?.(provider);
   }
 
   return (
@@ -175,6 +179,7 @@ export default function RequirementDetail() {
   const [plSteps, setPlSteps] = useState(PIPELINE_STEPS);
   const [orchestrating, setOrchestrating] = useState(false);
   const [orchestration, setOrchestration] = useState(null);
+  const [selectedProvider, setSelectedProvider] = useState(getModelSelection()?.provider || null);
 
   // Floor each agent action to a short minimum so its loading state is
   // actually visible (a no-op once a real LLM call takes longer).
@@ -479,7 +484,7 @@ export default function RequirementDetail() {
               </div>
             )}
           </div>
-          <ModelPicker />
+          <ModelPicker onProviderChange={setSelectedProvider} />
         </header>
 
         <div className="tabbar">
@@ -503,7 +508,7 @@ export default function RequirementDetail() {
           <p className="story-text">{story?.raw_text}</p>
         </section>
 
-        <UsagePanel />
+        <UsagePanel providerFilter={selectedProvider} />
 
         <section className="runall-bar">
           <div className="txt">

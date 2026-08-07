@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { api } from "../api/client";
 
 // Inline 16px stroke icons — no icon dependency.
 const icons = {
@@ -48,19 +46,6 @@ export default function AppShell({ children }) {
   const atHome = pathname === "/";
   const inProject = pathname.startsWith("/projects");
 
-  const [llm, setLlm] = useState(null);
-  useEffect(() => {
-    api.llmMeta().then(setLlm).catch(() => setLlm(null));
-  }, []);
-
-  const llmState = !llm
-    ? null
-    : llm.is_mock
-    ? { cls: "warn", dot: "warn", text: "Offline stub (mock)", sub: "Not real AI" }
-    : llm.key_missing
-    ? { cls: "warn", dot: "warn", text: llm.provider_label, sub: "API key missing" }
-    : { cls: "ok", dot: "ok", text: llm.provider_label, sub: llm.model };
-
   return (
     <div className="app">
       <aside className="side">
@@ -83,16 +68,6 @@ export default function AppShell({ children }) {
             Projects
           </Link>
         </nav>
-
-        {llmState && (
-          <div className={`llm-badge ${llmState.cls}`} title={`AI backend: ${llmState.text} · ${llmState.sub}`}>
-            <span className={`llm-dot ${llmState.dot}`} />
-            <div className="llm-meta">
-              <div className="llm-t">{llmState.text}</div>
-              <div className="llm-s">{llmState.sub}</div>
-            </div>
-          </div>
-        )}
 
         <div className="side-user">
           <div className="avatar">{initials}</div>

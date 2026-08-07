@@ -20,7 +20,7 @@ function resetsIn(iso) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-export default function UsagePanel({ refreshKey = 0 }) {
+export default function UsagePanel({ refreshKey = 0, providerFilter = null }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(false);
   const sinceRef = useRef(sessionSince());
@@ -58,7 +58,10 @@ export default function UsagePanel({ refreshKey = 0 }) {
   if (err) return null;
   if (!data) return null;
 
-  const providers = data.providers.filter((p) => p.daily_limit != null);
+  let providers = data.providers.filter((p) => p.daily_limit != null);
+  // On the requirement page we scope the panel to the model chosen in the
+  // dropdown, so usage shown matches what the next run will actually consume.
+  if (providerFilter) providers = providers.filter((p) => p.provider === providerFilter);
   if (!providers.length) return null;
 
   return (
@@ -82,6 +85,9 @@ export default function UsagePanel({ refreshKey = 0 }) {
                 <span className="usage-name">
                   {p.label}
                   {!p.ready && <span className="usage-off"> · no key</span>}
+                  <span className={`usage-src ${p.source === "provider" ? "live" : ""}`}>
+                    {p.source === "provider" ? "live" : "est."}
+                  </span>
                 </span>
                 <span className={`usage-remain ${low ? "low" : ""}`}>
                   {p.remaining_today}
@@ -98,6 +104,9 @@ export default function UsagePanel({ refreshKey = 0 }) {
                 <span>session <b>{p.session}</b></span>
                 <span>today <b>{p.today}</b></span>
                 <span>month <b>{p.month}</b></span>
+                {p.live_remaining_tokens != null && (
+                  <span>tokens <b>{p.live_remaining_tokens.toLocaleString()}</b> left</span>
+                )}
                 <span className="usage-reset">
                   resets in {resetsIn(p.next_reset_utc)} · {p.reset_label}
                 </span>
@@ -108,8 +117,10 @@ export default function UsagePanel({ refreshKey = 0 }) {
       </div>
 
       <p className="usage-foot">
-        Counts only calls made in this app · daily caps are approximate — these are free
-        tiers with no monthly limit, so “month” is your usage to date.
+        <b>live</b> = real remaining reported by the provider (matches its dashboard, counts
+        all usage); <b>est.</b> = our app-log count vs the published cap (Gemini exposes no
+        live quota). session/today/month = calls made in this app. These are free tiers with
+        no monthly limit, so “month” is usage to date.
       </p>
     </section>
   );

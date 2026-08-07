@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.llm import catalog
+from app.llm import catalog, ratelimit
 from app.models import AgentExecution
 
 # Approximate free-tier daily caps + when they reset. These drift; the UI labels
@@ -25,10 +25,10 @@ PROVIDER_LIMITS = {
         "note": "Flash tier (Flash-Lite ~1000/day). Estimate — Google exposes no live quota.",
     },
     "groq": {
-        "daily_limit": 1000,
+        "daily_limit": 14400,
         "reset_tz": "UTC",
         "reset_label": "rolling + daily (UTC)",
-        "note": "~100k tokens/day on 70B is often the real cap.",
+        "note": "Real cap is tokens-per-minute (~6k TPM), not requests — pace, don't stop.",
     },
     "openrouter": {
         "daily_limit": 50,
@@ -115,8 +115,24 @@ def compute_usage(db: Session, settings: Settings, session_since: str | None = N
         counts = agg.get(provider, {"today": 0, "month": 0, "session": 0})
         limits = PROVIDER_LIMITS.get(provider, {})
         daily = limits.get("daily_limit")
+        # App-log estimate (our own successful calls vs the documented cap).
         remaining = max(0, daily - counts["today"]) if daily is not None else None
         reset_tz = limits.get("reset_tz")
+
+        # If the provider reported real remaining in its response headers, that
+        # is authoritative (matches its dashboard, counts external + retry
+        # calls) — prefer it and mark the source accordingly.
+        live = ratelimit.get(provider)
+        source = "estimate"
+        live_limit = None
+        live_remaining = None
+        if live and live.get("remaining_requests") is not None:
+            live_remaining = live["remaining_requests"]
+            live_limit = live.get("limit_requests") or daily
+            remaining = live_remaining
+            daily = live_limit or daily
+            source = "provider"
+
         providers.append(
             {
                 "provider": provider,
@@ -127,10 +143,14 @@ def compute_usage(db: Session, settings: Settings, session_since: str | None = N
                 "session": counts["session"],
                 "daily_limit": daily,
                 "remaining_today": remaining,
+                "source": source,
+                "live_remaining_tokens": live.get("remaining_tokens") if live else None,
+                "live_limit_tokens": live.get("limit_tokens") if live else None,
+                "live_captured_at": live.get("captured_at") if live else None,
                 "reset_label": limits.get("reset_label"),
                 "next_reset_utc": _next_reset_utc(reset_tz).isoformat() if reset_tz else None,
                 "note": limits.get("note"),
-                "approx": True,
+                "approx": source != "provider",
             }
         )
 

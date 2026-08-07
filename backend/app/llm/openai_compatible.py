@@ -4,7 +4,13 @@ import time
 
 import httpx
 
+from app.llm import ratelimit
 from app.llm.base import LLMMessage, LLMProvider, LLMResponse
+
+# Learned per-model completion-token ceiling. When a model/tier rejects a large
+# max_tokens with 413, we remember the value that worked so later calls start
+# there instead of burning a request on a guaranteed-413 first attempt.
+_MODEL_TOKEN_CEILING: dict[str, int] = {}
 
 
 class OpenAICompatibleProvider(LLMProvider):
@@ -56,9 +62,13 @@ class OpenAICompatibleProvider(LLMProvider):
         start = time.monotonic()
         # Free tiers cap per-request/per-minute tokens differently per model
         # (e.g. Groq's 8B tier rejects an 8192 budget with 413 while 70B accepts
-        # it). Request the full budget, then halve-and-retry on 413 so capable
-        # models keep the headroom and constrained ones self-heal.
+        # it). Start from the learned ceiling for this model (so we don't waste a
+        # request on a guaranteed 413), then halve-and-retry if the tier still
+        # rejects it — capable models keep the headroom, constrained ones heal.
         attempt_tokens = max_tokens
+        ceiling = _MODEL_TOKEN_CEILING.get(model)
+        if ceiling is not None:
+            attempt_tokens = min(attempt_tokens, ceiling)
         while True:
             payload["max_tokens"] = attempt_tokens
             response = httpx.post(
@@ -71,6 +81,13 @@ class OpenAICompatibleProvider(LLMProvider):
                 attempt_tokens = max(2048, attempt_tokens // 2)
                 continue
             break
+        # Remember what this model actually accepted, and capture the real
+        # remaining quota the provider reported for the usage panel.
+        _MODEL_TOKEN_CEILING[model] = attempt_tokens
+        try:
+            ratelimit.record(self.name, response.headers)
+        except Exception:
+            pass  # usage stats are best-effort, never block a completion
         response.raise_for_status()
         data = response.json()
         latency_ms = int((time.monotonic() - start) * 1000)

@@ -3618,3 +3618,11 @@ input[type="file"]::file-selector-button:hover {
   margin: 14px 0 0; font-size: 11.5px; line-height: 1.5;
   color: var(--text-secondary, #9ca3af);
 }
+
+/* usage source tag (live vs estimate) */
+.usage-src {
+  display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  color: #6b7280; background: #eef0f3; vertical-align: middle;
+}
+.usage-src.live { color: #047857; background: rgba(16, 185, 129, 0.14); }
