@@ -3600,7 +3600,11 @@ input[type="file"]::file-selector-button:hover {
   color: var(--text-secondary, #6b7280); cursor: pointer;
   transition: background 0.14s ease, color 0.14s ease;
 }
-.usage-refresh:hover { background: var(--surface-soft, #f6f7f9); color: var(--text, #1c1d22); }
+.usage-refresh:hover { background: var(--surface-soft, #f6f7f9); color: var(--accent, #4f46e5); border-color: var(--accent-border, rgba(79,70,229,0.22)); }
+.usage-refresh:active { transform: scale(0.94); }
+.usage-refresh svg { display: block; }
+.usage-refresh.spin svg { animation: uspin 0.7s linear infinite; transform-origin: 50% 50%; }
+@keyframes uspin { to { transform: rotate(360deg); } }
 
 .usage-grid {
   display: grid;
@@ -3677,10 +3681,15 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .ucard-foot {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11.5px; color: var(--text-muted, #9498a2);
-  padding-top: 2px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px 7px;
+  font-size: 12px; color: var(--text-secondary, #6c707a);
+  font-weight: 500;
+  padding-top: 4px;
 }
+.ufoot-main { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ucard-foot svg { color: var(--text-muted, #9498a2); flex: none; }
+.ucard-foot b { color: var(--text, #1c1d22); font-weight: 700; }
+.ucard-foot .ufoot-dim { color: var(--text-muted, #9498a2); font-weight: 500; white-space: nowrap; }
 
 /* ============================================================================
    Dashboard v2 — polished hero + cards

@@ -54,16 +54,20 @@ function Gauge({ pct, tone }) {
 export default function UsagePanel({ refreshKey = 0, providerFilter = null }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const sinceRef = useRef(sessionSince());
 
   const load = useCallback(() => {
-    api
+    setRefreshing(true);
+    return api
       .usage(sinceRef.current)
       .then((d) => {
         setData(d);
         setErr(false);
       })
-      .catch(() => setErr(true));
+      .catch(() => setErr(true))
+      // keep the spin visible briefly so a click always gives feedback
+      .finally(() => setTimeout(() => setRefreshing(false), 450));
   }, []);
 
   useEffect(() => {
@@ -102,18 +106,26 @@ export default function UsagePanel({ refreshKey = 0, providerFilter = null }) {
           </span>
           <h2>AI usage &amp; free quota</h2>
         </div>
-        <button className="usage-refresh" onClick={load} title="Refresh now" aria-label="Refresh">
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" />
-            <path d="M13.8 2.5V5h-2.5" />
+        <button
+          type="button"
+          className={`usage-refresh ${refreshing ? "spin" : ""}`}
+          onClick={load}
+          title="Refresh usage"
+          aria-label="Refresh usage"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <path d="M21 3v6h-6" />
           </svg>
         </button>
       </div>
 
       <div className={`usage-grid ${providers.length === 1 ? "single" : ""}`}>
         {providers.map((p) => {
+          // gauge shows % of today's quota still available; colour reflects it:
+          // green (healthy) → amber (≤30% left) → red (≤10% left)
           const rp = p.daily_limit ? (100 * p.remaining_today) / p.daily_limit : 0;
-          const tone = rp <= 10 ? "crit" : rp <= 25 ? "warn" : "ok";
+          const tone = rp <= 10 ? "crit" : rp <= 30 ? "warn" : "ok";
           return (
             <div className="ucard" key={p.provider}>
               <div className="ucard-top">
@@ -141,11 +153,14 @@ export default function UsagePanel({ refreshKey = 0, providerFilter = null }) {
               </div>
 
               <div className="ucard-foot">
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="8" cy="8" r="6" />
-                  <path d="M8 5v3l2 1.5" />
-                </svg>
-                resets in {resetsIn(p.next_reset_utc)} · {p.reset_label}
+                <span className="ufoot-main">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="8" cy="8" r="6" />
+                    <path d="M8 5v3l2 1.5" />
+                  </svg>
+                  Resets in <b>{resetsIn(p.next_reset_utc)}</b>
+                </span>
+                <span className="ufoot-dim">· {p.reset_label}</span>
               </div>
             </div>
           );
