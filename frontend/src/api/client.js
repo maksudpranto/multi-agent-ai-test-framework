@@ -1,6 +1,32 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const TOKEN_KEY = "matf_token";
+const MODEL_KEY = "matf_model";
+
+// --- Per-run model selection (chosen in the UI dropdown) ------------------
+// Stored in localStorage so every pipeline call picks it up automatically.
+export function getModelSelection() {
+  try {
+    return JSON.parse(localStorage.getItem(MODEL_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setModelSelection(sel) {
+  if (sel && sel.provider && sel.model) {
+    localStorage.setItem(MODEL_KEY, JSON.stringify({ provider: sel.provider, model: sel.model }));
+  } else {
+    localStorage.removeItem(MODEL_KEY);
+  }
+}
+
+// The request body attached to pipeline actions: the current model, or nothing
+// (so the backend falls back to its configured default).
+function modelBody() {
+  const s = getModelSelection();
+  return s && s.provider && s.model ? { provider: s.provider, model: s.model } : undefined;
+}
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -55,6 +81,7 @@ export const api = {
   me: () => request("/auth/me"),
 
   llmMeta: () => request("/meta/llm", { auth: false }),
+  listModels: () => request("/meta/models", { auth: false }),
 
   listProjects: () => request("/projects"),
   createProject: (name, description) =>
@@ -80,8 +107,13 @@ export const api = {
     request(`${P(projectId)}/requirements/${requirementId}`, { method: "DELETE" }),
 
   // --- Pipeline (operates on a requirement) ---
+  // Each action attaches the current model selection (modelBody) so the chosen
+  // provider+model drives that run; when none is set the backend uses its default.
   runRequirementAnalysis: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/analyze`, { method: "POST" }),
+    request(`${P(projectId)}/requirements/${requirementId}/analyze`, {
+      method: "POST",
+      body: modelBody(),
+    }),
   getLatestAnalysis: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-analysis`),
   submitAcceptanceCriteria: (projectId, requirementId, criteria) =>
@@ -92,6 +124,7 @@ export const api = {
   generateTestCases: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/generate-test-cases`, {
       method: "POST",
+      body: modelBody(),
     }),
   getLatestTestCases: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-test-cases`),
@@ -99,28 +132,44 @@ export const api = {
   runReviewConsensus: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/review-consensus`, {
       method: "POST",
+      body: modelBody(),
     }),
   getLatestReviewConsensus: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-review-consensus`),
 
   prioritize: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/prioritize`, { method: "POST" }),
+    request(`${P(projectId)}/requirements/${requirementId}/prioritize`, {
+      method: "POST",
+      body: modelBody(),
+    }),
 
   runCoverage: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/coverage`, { method: "POST" }),
+    request(`${P(projectId)}/requirements/${requirementId}/coverage`, {
+      method: "POST",
+      body: modelBody(),
+    }),
   getLatestCoverage: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-coverage`),
 
   runQuality: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/quality`, { method: "POST" }),
+    request(`${P(projectId)}/requirements/${requirementId}/quality`, {
+      method: "POST",
+      body: modelBody(),
+    }),
   getLatestQuality: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-quality`),
 
   runBaseline: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/baseline`, { method: "POST" }),
+    request(`${P(projectId)}/requirements/${requirementId}/baseline`, {
+      method: "POST",
+      body: modelBody(),
+    }),
 
   orchestrate: (projectId, requirementId) =>
-    request(`${P(projectId)}/requirements/${requirementId}/orchestrate`, { method: "POST" }),
+    request(`${P(projectId)}/requirements/${requirementId}/orchestrate`, {
+      method: "POST",
+      body: modelBody(),
+    }),
   getLatestBaseline: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-baseline`),
 

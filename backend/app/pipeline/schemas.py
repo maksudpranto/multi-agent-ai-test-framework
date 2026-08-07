@@ -3,9 +3,19 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class AcceptanceCriteriaIn(BaseModel):
+class ModelSelection(BaseModel):
+    """Optional per-run model override the client sends in the request body of
+    any pipeline action. When omitted (or partial) the configured default is
+    used. Validated against the free-model catalog in the route."""
+
+    provider: str | None = None
+    model: str | None = None
+
+
+class AcceptanceCriteriaIn(ModelSelection):
     """User-supplied acceptance criteria — the alternative input to a full user
-    story. Lets a user generate test cases directly from AC, skipping analysis."""
+    story. Lets a user generate test cases directly from AC, skipping analysis.
+    Inherits the optional model selection so this action can pick a model too."""
 
     criteria: list[str] = Field(min_length=1)
 

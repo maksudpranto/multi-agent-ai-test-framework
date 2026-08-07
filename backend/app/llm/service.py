@@ -382,13 +382,16 @@ def _dev_mock_responder(messages, system) -> str:
     return "{}"
 
 
-def build_provider() -> LLMProvider:
-    """Build the explicitly configured LLM provider.
+def build_provider(provider: str | None = None) -> LLMProvider:
+    """Build an LLM provider by name (defaults to the configured LLM_PROVIDER).
 
     Mock is the default so development and tests work without an external API.
+    Groq and OpenRouter share one OpenAI-compatible provider class.
     """
+    from app.config import GROQ_BASE_URL, OPENROUTER_BASE_URL
+
     settings = get_settings()
-    provider = settings.llm_provider.lower().strip()
+    provider = (provider or settings.llm_provider).lower().strip()
 
     if provider == "mock":
         from app.llm.mock_provider import MockProvider
@@ -409,17 +412,49 @@ def build_provider() -> LLMProvider:
 
         return GeminiProvider(api_key=settings.gemini_api_key)
 
+    if provider == "groq":
+        if not settings.groq_api_key:
+            raise ValueError("GROQ_API_KEY is required to use Groq models")
+        from app.llm.openai_compatible import OpenAICompatibleProvider
+
+        return OpenAICompatibleProvider(
+            base_url=GROQ_BASE_URL, api_key=settings.groq_api_key, name="groq"
+        )
+
+    if provider == "openrouter":
+        if not settings.openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY is required to use OpenRouter models")
+        from app.llm.openai_compatible import OpenAICompatibleProvider
+
+        return OpenAICompatibleProvider(
+            base_url=OPENROUTER_BASE_URL,
+            api_key=settings.openrouter_api_key,
+            name="openrouter",
+            # Optional attribution headers OpenRouter recommends (harmless if unused).
+            extra_headers={
+                "HTTP-Referer": "http://localhost:5173",
+                "X-Title": "Multi-Agent AI Test Framework",
+            },
+        )
+
     if provider == "ollama":
         from app.llm.ollama_provider import OllamaProvider
 
         return OllamaProvider(base_url=settings.ollama_base_url)
 
     raise ValueError(
-        f"Unsupported LLM_PROVIDER={settings.llm_provider!r}. "
-        "Choose mock, anthropic, gemini, or ollama."
+        f"Unsupported provider {provider!r}. "
+        "Choose mock, anthropic, gemini, groq, openrouter, or ollama."
     )
 
 
 @lru_cache
 def get_llm_service() -> LLMService:
     return LLMService(build_provider())
+
+
+@lru_cache
+def service_for_provider(provider: str) -> LLMService:
+    """An LLMService for a specific provider, cached per provider so per-run
+    model selection can switch backends without rebuilding a client each call."""
+    return LLMService(build_provider(provider))

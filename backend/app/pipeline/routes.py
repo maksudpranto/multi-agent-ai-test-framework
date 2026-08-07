@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
+from app.config import _PROVIDER_DEFAULT_MODEL, get_settings
 from app.database import get_db
+from app.llm import catalog
+from app.llm.service import service_for_provider
 from app.models import (
     AcceptanceCriterion,
     AgentExecution,
@@ -25,6 +28,7 @@ from app.models import (
 )
 from app.pipeline.schemas import (
     AcceptanceCriteriaIn,
+    ModelSelection,
     CoverageItemOut,
     CoverageResult,
     DebateResult,
@@ -56,6 +60,39 @@ def _get_owned_requirement(
             status_code=status.HTTP_404_NOT_FOUND, detail="Requirement not found"
         )
     return requirement
+
+
+def _resolve_run(
+    selection: ModelSelection | None,
+) -> tuple[DefaultWorkflowEngine, RunConfig]:
+    """Turn an optional {provider, model} body into the engine + config to run.
+
+    No selection -> the configured default backend. A selection is validated
+    against the free-model catalog and its provider must be configured, so the
+    UI dropdown can switch models per run without any file edits."""
+    settings = get_settings()
+    config = RunConfig.defaults()
+    if not selection or not (selection.provider or selection.model):
+        return DefaultWorkflowEngine(), config
+
+    provider = (selection.provider or settings.llm_provider).lower().strip()
+    model = selection.model
+    if catalog.find(provider, model) is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown or unsupported model: {provider} / {model}",
+        )
+    if not catalog.provider_ready(provider, settings):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{provider} is not configured — add its API key to the backend .env and restart.",
+        )
+    config.model = model or _PROVIDER_DEFAULT_MODEL.get(provider, config.model)
+    try:
+        engine = DefaultWorkflowEngine(service_for_provider(provider))
+    except ValueError as exc:  # missing key surfaced by the provider builder
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return engine, config
 
 
 def _build_result(db: Session, run: PipelineRun, error: str | None):
@@ -192,10 +229,12 @@ def _latest_run_with_criteria(db: Session, requirement_id: int) -> PipelineRun |
 def run_requirement_analysis(
     project_id: int,
     requirement_id: int,
+    selection: ModelSelection | None = Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> RequirementAnalysisResult:
     requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    engine, config = _resolve_run(selection)
 
     run = PipelineRun(
         requirement_id=requirement.id,
@@ -208,13 +247,12 @@ def run_requirement_analysis(
     db.commit()
     db.refresh(run)
 
-    engine = DefaultWorkflowEngine()
     result = engine.run_stage(
         db,
         run,
         PipelineStage.requirement_analysis,
         inputs={"user_story": requirement.raw_text},
-        config=RunConfig.defaults(),
+        config=config,
     )
 
     run.status = RunStatus.completed if result.success else RunStatus.failed
@@ -286,10 +324,12 @@ def submit_acceptance_criteria(
 def generate_test_cases(
     project_id: int,
     requirement_id: int,
+    selection: ModelSelection | None = Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> TestGenerationResult:
     requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    engine, config = _resolve_run(selection)
     run = _latest_run_with_criteria(db, requirement.id)
     if run is None:
         raise HTTPException(
@@ -315,7 +355,7 @@ def generate_test_cases(
     run.completed_at = None
     db.commit()
 
-    result = DefaultWorkflowEngine().run_stage(
+    result = engine.run_stage(
         db,
         run,
         PipelineStage.test_generation,
@@ -325,7 +365,7 @@ def generate_test_cases(
                 {"id": criterion.id, "text": criterion.text} for criterion in criteria
             ],
         },
-        config=RunConfig.defaults(),
+        config=config,
     )
     run.status = RunStatus.completed if result.success else RunStatus.failed
     if result.success:
@@ -361,12 +401,14 @@ def get_latest_test_cases(
 def run_review_consensus(
     project_id: int,
     requirement_id: int,
+    selection: ModelSelection | None = Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> DebateResult:
     """Run the multi-agent Reviewer <-> Consensus debate over the latest set of
     generated test cases. This is the collaborative core of the framework."""
     requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    engine, config = _resolve_run(selection)
     run = _latest_run_with_test_cases(db, requirement.id)
     if run is None:
         raise HTTPException(
@@ -386,12 +428,12 @@ def run_review_consensus(
     run.completed_at = None
     db.commit()
 
-    summary = DefaultWorkflowEngine().run_debate(
+    summary = engine.run_debate(
         db,
         run,
         user_story=requirement.raw_text,
         acceptance_criteria=[{"id": c.id, "text": c.text} for c in criteria],
-        config=RunConfig.defaults(),
+        config=config,
     )
 
     run.status = RunStatus.completed
@@ -466,12 +508,14 @@ def _build_coverage_result(
 def run_coverage(
     project_id: int,
     requirement_id: int,
+    selection: ModelSelection | None = Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> CoverageResult:
     """Coverage / Validator agent: build the traceability matrix (deterministic)
     and judge whether each criterion's coverage is adequate (semantic)."""
     requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    engine, config = _resolve_run(selection)
     run = _latest_run_with_test_cases(db, requirement.id)
     if run is None:
         raise HTTPException(
@@ -483,8 +527,8 @@ def run_coverage(
     run.completed_at = None
     db.commit()
 
-    DefaultWorkflowEngine().run_coverage(
-        db, run, user_story=requirement.raw_text, config=RunConfig.defaults()
+    engine.run_coverage(
+        db, run, user_story=requirement.raw_text, config=config
     )
 
     run.status = RunStatus.completed
@@ -560,12 +604,14 @@ def _build_quality_result(
 def run_quality(
     project_id: int,
     requirement_id: int,
+    selection: ModelSelection | None = Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> QualityResult:
     """Quality agent: score each current test case on clarity, atomicity, and
     traceability, and flag duplicates — the thesis's Quality Report."""
     requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    engine, config = _resolve_run(selection)
     run = _latest_run_with_test_cases(db, requirement.id)
     if run is None:
         raise HTTPException(
@@ -577,8 +623,8 @@ def run_quality(
     run.completed_at = None
     db.commit()
 
-    DefaultWorkflowEngine().run_quality(
-        db, run, user_story=requirement.raw_text, config=RunConfig.defaults()
+    engine.run_quality(
+        db, run, user_story=requirement.raw_text, config=config
     )
 
     run.status = RunStatus.completed
@@ -611,12 +657,14 @@ def get_latest_quality(
 def run_prioritization(
     project_id: int,
     requirement_id: int,
+    selection: ModelSelection | None = Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> TestGenerationResult:
     """Prioritizer agent: rank the current multi-agent test suite by importance,
     assigning priority, severity, and a unique rank to each case (in place)."""
     requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    engine, config = _resolve_run(selection)
     run = _latest_run_with_test_cases(db, requirement.id)
     if run is None:
         raise HTTPException(
@@ -628,8 +676,8 @@ def run_prioritization(
     run.completed_at = None
     db.commit()
 
-    result = DefaultWorkflowEngine().run_prioritization(
-        db, run, user_story=requirement.raw_text, config=RunConfig.defaults()
+    result = engine.run_prioritization(
+        db, run, user_story=requirement.raw_text, config=config
     )
 
     run.status = RunStatus.completed if result.success else RunStatus.failed
@@ -644,6 +692,7 @@ def run_prioritization(
 def orchestrate(
     project_id: int,
     requirement_id: int,
+    selection: ModelSelection | None = Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict:
@@ -651,6 +700,7 @@ def orchestrate(
     goal under guardrails, in a fresh multi-agent run. Returns the decision
     trace (who acted and why) plus the resulting coverage/quality/suite."""
     requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    engine, config = _resolve_run(selection)
 
     run = PipelineRun(
         requirement_id=requirement.id,
@@ -663,11 +713,11 @@ def orchestrate(
     db.commit()
     db.refresh(run)
 
-    summary = DefaultWorkflowEngine().run_orchestration(
+    summary = engine.run_orchestration(
         db,
         run,
         requirement=requirement,
-        config=RunConfig.defaults(),
+        config=config,
         goal={"coverage_target": 100, "max_steps": 10},
     )
 
@@ -717,6 +767,7 @@ def orchestrate(
 def run_single_llm_baseline(
     project_id: int,
     requirement_id: int,
+    selection: ModelSelection | None = Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> TestGenerationResult:
@@ -724,6 +775,7 @@ def run_single_llm_baseline(
     Runs in its own pipeline run (mode=single_llm) so it never mixes with the
     multi-agent artifacts and can be compared against them."""
     requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    engine, config = _resolve_run(selection)
 
     run = PipelineRun(
         requirement_id=requirement.id,
@@ -735,8 +787,8 @@ def run_single_llm_baseline(
     db.commit()
     db.refresh(run)
 
-    result = DefaultWorkflowEngine().run_baseline(
-        db, run, user_story=requirement.raw_text, config=RunConfig.defaults()
+    result = engine.run_baseline(
+        db, run, user_story=requirement.raw_text, config=config
     )
 
     run.status = RunStatus.completed if result.success else RunStatus.failed

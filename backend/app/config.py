@@ -10,7 +10,13 @@ _PROVIDER_DEFAULT_MODEL = {
     "gemini": "gemini-flash-latest",
     "anthropic": "claude-sonnet-4-5",
     "ollama": "llama3.1",
+    "groq": "llama-3.3-70b-versatile",
+    "openrouter": "meta-llama/llama-3.3-70b-instruct:free",
 }
+
+# Base URLs for OpenAI-compatible hosts (one provider class serves all).
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class Settings(BaseSettings):
@@ -23,6 +29,8 @@ class Settings(BaseSettings):
     llm_provider: str = "mock"
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
+    groq_api_key: str = ""
+    openrouter_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
     default_llm_model: str = "mock-requirement-analysis"
     cors_origins: str = "http://localhost:5173"

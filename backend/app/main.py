@@ -74,3 +74,15 @@ def llm_meta() -> dict:
         "ready": not is_mock and not key_missing,
         "key_missing": key_missing,
     }
+
+
+@app.get("/meta/models", tags=["meta"])
+def model_catalog() -> dict:
+    """The free models offered in the UI dropdown, each flagged `ready` when its
+    provider's key/host is configured. `default` is the currently active model."""
+    from app.llm import catalog
+
+    return {
+        "models": catalog.annotated(settings),
+        "default": {"provider": settings.llm_provider.lower().strip(), "model": settings.effective_model},
+    }
