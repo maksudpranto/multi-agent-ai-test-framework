@@ -113,8 +113,8 @@ export default function UsagePanel({ refreshKey = 0, providerFilter = null }) {
           title="Refresh usage"
         >
           <svg className="uref-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="21 3 21 9 15 9" />
-            <path d="M21 9A9 9 0 1 0 18.4 5.6" />
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
           </svg>
           <span>Refresh</span>
         </button>
