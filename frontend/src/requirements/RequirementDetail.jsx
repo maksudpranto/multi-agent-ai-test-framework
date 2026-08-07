@@ -16,6 +16,51 @@ function Busy({ children }) {
   );
 }
 
+const AGENT_LABEL = {
+  analyze: "Analyst",
+  generate: "Generator",
+  debate: "Reviewer ⇄ Consensus",
+  coverage: "Validator",
+  quality: "Quality",
+  prioritize: "Prioritizer",
+  finish: "Done — goal met",
+};
+
+// The orchestrator's decision trace: which agent it dispatched each step and why.
+function OrchestrationTrace({ data }) {
+  const qpct = Math.round((data.quality_score || 0) * 100);
+  return (
+    <div className="orch">
+      <div className="debate-summary">
+        <span className="chip chip-accent">{data.steps_used} decisions</span>
+        <span className={`chip ${data.coverage_pct === 100 ? "chip-green" : "chip-amber"}`}>
+          {data.coverage_pct}% coverage
+        </span>
+        <span className="chip chip-grey">{qpct}% quality</span>
+        <span className="chip chip-grey">{data.test_case_count} test cases</span>
+      </div>
+      <ol className="orch-timeline">
+        {(data.decisions || []).map((d) => (
+          <li key={d.step} className="orch-step">
+            <span className="orch-num">{d.step}</span>
+            <div style={{ minWidth: 0 }}>
+              <div className="orch-agent">
+                {AGENT_LABEL[d.action] || d.action}
+                {d.planner_fallback && (
+                  <span className="chip chip-amber" style={{ marginLeft: 8 }}>
+                    guardrail
+                  </span>
+                )}
+              </div>
+              <div className="orch-why">{d.rationale}</div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export const REQ_TABS = [
   { key: "overview", label: "Overview" },
   { key: "test", label: "Test Cases" },
@@ -56,6 +101,8 @@ export default function RequirementDetail() {
   const [runningAll, setRunningAll] = useState(false);
   const [pipelineIdx, setPipelineIdx] = useState(-1);
   const [plSteps, setPlSteps] = useState(PIPELINE_STEPS);
+  const [orchestrating, setOrchestrating] = useState(false);
+  const [orchestration, setOrchestration] = useState(null);
 
   // Floor each agent action to a short minimum so its loading state is
   // actually visible (a no-op once a real LLM call takes longer).
@@ -278,6 +325,34 @@ export default function RequirementDetail() {
     }
   }
 
+  // Autonomous agentic run: the Orchestrator's planner drives the specialists.
+  async function onOrchestrate() {
+    setOrchestrating(true);
+    setError("");
+    setMode("multi");
+    try {
+      const res = await api.orchestrate(projectId, requirementId);
+      setOrchestration(res);
+      // Refresh every artifact so all tabs reflect the agentic run.
+      const [r, g, d, cov, q] = await Promise.all([
+        api.getLatestAnalysis(projectId, requirementId).catch(() => null),
+        api.getLatestTestCases(projectId, requirementId).catch(() => null),
+        api.getLatestReviewConsensus(projectId, requirementId).catch(() => null),
+        api.getLatestCoverage(projectId, requirementId).catch(() => null),
+        api.getLatestQuality(projectId, requirementId).catch(() => null),
+      ]);
+      setResult(r);
+      setGeneration(g);
+      setDebate(d);
+      setCoverage(cov);
+      setQuality(q);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOrchestrating(false);
+    }
+  }
+
   async function onExport(fmt) {
     setExporting(fmt);
     setError("");
@@ -409,6 +484,22 @@ export default function RequirementDetail() {
                 </div>
               );
             })()}
+        </section>
+
+        <section className="section orch-card">
+          <div className="section-head">
+            <h2>Autonomous agent · Orchestrator</h2>
+            <button className="btn-primary" onClick={onOrchestrate} disabled={orchestrating || runningAll}>
+              {orchestrating ? <Busy>Orchestrating…</Busy> : "Run agentic orchestrator"}
+            </button>
+          </div>
+          <p className="mode-note">
+            Unlike “Run full pipeline” (a fixed sequence), the Orchestrator’s
+            planner <strong>decides which agent to run next</strong> from the
+            live state, under guardrails — and logs every decision. This is the
+            framework’s agentic control loop.
+          </p>
+          {orchestration && <OrchestrationTrace data={orchestration} />}
         </section>
 
         <section className="section">

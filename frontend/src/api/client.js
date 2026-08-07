@@ -116,6 +116,9 @@ export const api = {
 
   runBaseline: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/baseline`, { method: "POST" }),
+
+  orchestrate: (projectId, requirementId) =>
+    request(`${P(projectId)}/requirements/${requirementId}/orchestrate`, { method: "POST" }),
   getLatestBaseline: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-baseline`),
 
