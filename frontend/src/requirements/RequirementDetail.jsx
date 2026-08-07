@@ -487,6 +487,8 @@ export default function RequirementDetail() {
           <ModelPicker onProviderChange={setSelectedProvider} />
         </header>
 
+        <UsagePanel providerFilter={selectedProvider} />
+
         <div className="tabbar">
           {REQ_TABS.map((t) => (
             <button
@@ -507,8 +509,6 @@ export default function RequirementDetail() {
           <h2>Requirement</h2>
           <p className="story-text">{story?.raw_text}</p>
         </section>
-
-        <UsagePanel providerFilter={selectedProvider} />
 
         <section className="runall-bar">
           <div className="txt">

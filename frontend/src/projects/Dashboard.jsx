@@ -76,6 +76,25 @@ export default function Dashboard() {
   const [eName, setEName] = useState("");
   const [eDesc, setEDesc] = useState("");
 
+  // headline "AI calls today" for the hero (real providers only)
+  const [callsToday, setCallsToday] = useState(null);
+  useEffect(() => {
+    const loadUsage = () =>
+      api
+        .usage()
+        .then((d) =>
+          setCallsToday(
+            (d.providers || [])
+              .filter((p) => p.daily_limit != null)
+              .reduce((n, p) => n + (p.today || 0), 0)
+          )
+        )
+        .catch(() => {});
+    loadUsage();
+    window.addEventListener("matf:usage", loadUsage);
+    return () => window.removeEventListener("matf:usage", loadUsage);
+  }, []);
+
   async function load() {
     setLoading(true);
     try {
@@ -168,35 +187,36 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="content">
-      <header className="page-head">
-        <div>
-          <h1>Projects</h1>
-          <p className="sub">
-            {greeting()}, {handle}. {projects.length}{" "}
-            {projects.length === 1 ? "project" : "projects"} · {totalReqs}{" "}
-            {totalReqs === 1 ? "requirement" : "requirements"}.
+    <div className="content dash">
+      <section className="dash-hero">
+        <div className="hero-main">
+          <p className="hero-eyebrow">{greeting()}, {handle}</p>
+          <h1>Your test-design workspace</h1>
+          <p className="hero-sub">
+            Turn requirements into validated, traceable test suites with a team of
+            specialized AI agents — analyze, generate, debate, and score.
           </p>
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <b>{projects.length}</b>
+              <span>{projects.length === 1 ? "Project" : "Projects"}</span>
+            </div>
+            <div className="hero-stat">
+              <b>{totalReqs}</b>
+              <span>{totalReqs === 1 ? "Requirement" : "Requirements"}</span>
+            </div>
+            <div className="hero-stat">
+              <b>{callsToday == null ? "—" : callsToday}</b>
+              <span>AI calls today</span>
+            </div>
+          </div>
         </div>
-        <button className="btn-primary" onClick={openCreate}>
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+        <button className="hero-cta" onClick={openCreate}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M8 3v10M3 8h10" />
           </svg>
           New project
         </button>
-      </header>
-
-      <section className="stats">
-        <div className="stat">
-          <div className="k">Projects</div>
-          <div className="v">{projects.length}</div>
-          <div className="h">Scoped to your account</div>
-        </div>
-        <div className="stat">
-          <div className="k">Requirements</div>
-          <div className="v">{totalReqs}</div>
-          <div className="h">Across all projects</div>
-        </div>
       </section>
 
       <UsagePanel />
@@ -293,8 +313,9 @@ export default function Dashboard() {
                     </div>
                   </Link>
                   <div className="pcard-foot">
-                    <span>{p.reqCount} {p.reqCount === 1 ? "requirement" : "requirements"}</span>
-                    <span className="fdot" />
+                    <span className="pcard-pill">
+                      {p.reqCount} {p.reqCount === 1 ? "req" : "reqs"}
+                    </span>
                     <span>{relTime(p.created_at)}</span>
                     <span className="pcard-acts" style={{ marginLeft: "auto" }}>
                       {openMenuId === p.id && (
