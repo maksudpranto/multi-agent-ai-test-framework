@@ -8,7 +8,11 @@ from app.llm.service import build_provider
 
 
 def _provider_for(monkeypatch, **settings):
-    monkeypatch.setattr("app.llm.service.get_settings", lambda: Settings(**settings))
+    # _env_file=None isolates the unit from the deployment .env so we test the
+    # code's default/selection logic, not whatever provider is configured live.
+    monkeypatch.setattr(
+        "app.llm.service.get_settings", lambda: Settings(_env_file=None, **settings)
+    )
     return build_provider()
 
 

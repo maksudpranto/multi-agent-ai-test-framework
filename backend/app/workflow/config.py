@@ -14,7 +14,9 @@ class RunConfig:
 
     model: str
     temperature: float = 0.0
-    max_tokens: int = 4096
+    # Headroom for "thinking" models (Gemini 2.5/3.x flash spend part of this
+    # budget on internal reasoning before emitting the JSON answer).
+    max_tokens: int = 8192
     reviewer_enabled: bool = True
     consensus_enabled: bool = True
     coverage_enabled: bool = True
@@ -23,7 +25,7 @@ class RunConfig:
 
     @classmethod
     def defaults(cls) -> "RunConfig":
-        return cls(model=get_settings().default_llm_model)
+        return cls(model=get_settings().effective_model)
 
     @classmethod
     def from_experiment_config(cls, cfg: ExperimentConfig) -> "RunConfig":

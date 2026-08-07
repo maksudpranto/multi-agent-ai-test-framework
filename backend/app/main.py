@@ -46,3 +46,31 @@ app.include_router(export_router)
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+_PROVIDER_LABEL = {
+    "gemini": "Google Gemini",
+    "anthropic": "Anthropic Claude",
+    "ollama": "Ollama (local)",
+    "mock": "Mock (offline stub)",
+}
+
+
+@app.get("/meta/llm", tags=["meta"])
+def llm_meta() -> dict:
+    """What's actually powering the agents — so the UI can show it and the user
+    can confirm real AI (not the offline stub) is in use."""
+    provider = settings.llm_provider.lower().strip()
+    is_mock = provider == "mock"
+    key_missing = (
+        (provider == "gemini" and not settings.gemini_api_key)
+        or (provider == "anthropic" and not settings.anthropic_api_key)
+    )
+    return {
+        "provider": provider,
+        "provider_label": _PROVIDER_LABEL.get(provider, provider),
+        "model": settings.effective_model,
+        "is_mock": is_mock,
+        "ready": not is_mock and not key_missing,
+        "key_missing": key_missing,
+    }

@@ -52,8 +52,23 @@ class GeminiProvider(LLMProvider):
         data = response.json()
         latency_ms = int((time.monotonic() - start) * 1000)
 
-        candidate = data["candidates"][0]
-        text = "".join(part.get("text", "") for part in candidate["content"]["parts"])
+        candidates = data.get("candidates") or []
+        candidate = candidates[0] if candidates else {}
+        # Gemini "thinking" models (2.5/3.x flash) can return an empty content
+        # block with finishReason=MAX_TOKENS when the token budget is spent on
+        # internal reasoning, and a safety block yields no parts either. Parse
+        # defensively so those cases surface as empty text (the JSON layer then
+        # raises a clear ValueError) instead of a KeyError deep in the provider.
+        parts = (candidate.get("content") or {}).get("parts") or []
+        text = "".join(part.get("text", "") for part in parts)
+        finish = candidate.get("finishReason")
+        if not text and finish == "MAX_TOKENS":
+            raise ValueError(
+                "Gemini returned no text: output token budget exhausted "
+                "(likely spent on model 'thinking'). Increase max_tokens."
+            )
+        if not text and finish in {"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT"}:
+            raise ValueError(f"Gemini blocked the response (finishReason={finish}).")
         usage = data.get("usageMetadata", {})
         return LLMResponse(
             text=text,

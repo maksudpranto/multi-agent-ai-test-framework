@@ -2,6 +2,16 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Sensible default model per provider, so switching to a real backend only
+# requires setting LLM_PROVIDER (+ the key). A model literally named after the
+# mock (or left blank) is treated as "not chosen" and resolved from here.
+_PROVIDER_DEFAULT_MODEL = {
+    "mock": "mock-requirement-analysis",
+    "gemini": "gemini-flash-latest",
+    "anthropic": "claude-sonnet-4-5",
+    "ollama": "llama3.1",
+}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -20,6 +30,21 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def effective_model(self) -> str:
+        """The model name to actually send to the provider.
+
+        If DEFAULT_LLM_MODEL is a real, provider-appropriate value the user set,
+        respect it. Otherwise (blank, or still the mock placeholder while the
+        provider is real) fall back to a sane default for the chosen provider —
+        so "make it AI-powered" is just LLM_PROVIDER + key, no model guessing."""
+        provider = self.llm_provider.lower().strip()
+        chosen = (self.default_llm_model or "").strip()
+        placeholder = not chosen or chosen.startswith("mock")
+        if provider != "mock" and placeholder:
+            return _PROVIDER_DEFAULT_MODEL.get(provider, chosen or "")
+        return chosen or _PROVIDER_DEFAULT_MODEL.get(provider, "")
 
 
 @lru_cache

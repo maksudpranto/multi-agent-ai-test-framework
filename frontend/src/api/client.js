@@ -54,6 +54,8 @@ export const api = {
     request("/auth/login", { method: "POST", form: { username: email, password }, auth: false }),
   me: () => request("/auth/me"),
 
+  llmMeta: () => request("/meta/llm", { auth: false }),
+
   listProjects: () => request("/projects"),
   createProject: (name, description) =>
     request("/projects", { method: "POST", body: { name, description } }),
