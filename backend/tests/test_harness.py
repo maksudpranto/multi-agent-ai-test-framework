@@ -31,7 +31,7 @@ def _mutants(prog: dict) -> list[dict]:
 
 
 def test_good_inputs_kill_every_mutant_across_corpus():
-    """Each program's canonical (good) inputs should kill all three seeded bugs."""
+    """Each program's canonical (good) inputs should kill all its seeded bugs."""
     for prog in PROGRAMS:
         result = score_suite(
             reference_code=prog["reference"],
@@ -40,7 +40,7 @@ def test_good_inputs_kill_every_mutant_across_corpus():
             inputs=prog["canonical_inputs"],
         )
         assert result.suite_valid, prog["slug"]
-        assert result.killed == result.total == 3, (
+        assert result.killed == result.total == len(prog["mutants"]), (
             prog["slug"],
             [m for m in result.per_mutant if not m["killed"]],
         )
@@ -48,12 +48,13 @@ def test_good_inputs_kill_every_mutant_across_corpus():
 
 
 def test_weak_inputs_let_boundary_mutant_survive():
-    """A thin suite that omits the boundary case misses the off-by-one mutant.
+    """A thin suite that omits the boundary case misses the boundary mutant.
 
-    grade_calculator m1 moves the 'A' cut-off from 90 to 89; only an input at
-    the 89/90 boundary reveals it. A weak suite of interior points does not."""
-    prog = _prog("grade_calculator")
-    weak_inputs = [[95], [50]]  # clearly-A and clearly-F, no boundary
+    ipv4_validator m4 rejects exactly 255 (off-by-one on the upper bound); only
+    an input whose octet is exactly 255 reveals it. A weak suite of one valid and
+    one obviously-invalid address does not."""
+    prog = _prog("ipv4_validator")
+    weak_inputs = [["1.2.3.4"], ["256.1.1.1"]]  # valid + over-256, no 255 boundary
     result = score_suite(
         reference_code=prog["reference"],
         mutants=_mutants(prog),
@@ -61,29 +62,31 @@ def test_weak_inputs_let_boundary_mutant_survive():
         inputs=weak_inputs,
     )
     survivors = {m["key"] for m in result.per_mutant if not m["killed"]}
-    assert "m1" in survivors  # boundary bug survives the weak suite
+    assert "m4" in survivors  # the 255-boundary bug survives the weak suite
     assert result.mutation_score < 1.0
-    # And adding the boundary input flips it to killed.
+    # And adding the exact-255 boundary input flips it to killed.
     strong = score_suite(
         reference_code=prog["reference"],
         mutants=_mutants(prog),
         entrypoint=prog["entrypoint"],
-        inputs=weak_inputs + [[89]],
+        inputs=weak_inputs + [["255.255.255.255"]],
     )
-    assert all(m["killed"] for m in strong.per_mutant if m["key"] == "m1")
+    assert all(m["killed"] for m in strong.per_mutant if m["key"] == "m4")
 
 
 # --- Sandbox behaviours ------------------------------------------------------
 
 
 def test_type_only_divergence_is_a_kill():
-    """fizzbuzz m3 returns an int 7 where the reference returns the str '7'."""
-    prog = _prog("fizzbuzz")
+    """rpn_calculator m4 truncates division to an int, where the reference
+    returns a float — a type-only difference the harness must catch."""
+    prog = _prog("rpn_calculator")
+    m4 = next(m for m in prog["mutants"] if m["key"] == "m4")
     result = score_suite(
         reference_code=prog["reference"],
-        mutants=[{"key": "m3", "code": _prog("fizzbuzz")["mutants"][2]["code"]}],
-        entrypoint="fizzbuzz",
-        inputs=[[7]],
+        mutants=[{"key": "m4", "code": m4["code"]}],
+        entrypoint=prog["entrypoint"],
+        inputs=[["8 2 /"]],
     )
     assert result.killed == 1
 
@@ -116,7 +119,7 @@ def test_timeout_is_killed_and_reference_stays_usable():
 
 
 def test_identical_code_kills_nothing():
-    prog = _prog("leap_year")
+    prog = _prog("version_compare")
     result = score_suite(
         reference_code=prog["reference"],
         mutants=[{"key": "clone", "code": prog["reference"]}],
@@ -144,7 +147,7 @@ def test_suite_invalid_when_reference_never_runs():
 
 
 def test_empty_suite_scores_zero_and_is_invalid():
-    prog = _prog("bmi_calculator")
+    prog = _prog("ipv4_validator")
     result = score_suite(
         reference_code=prog["reference"],
         mutants=_mutants(prog),
@@ -153,7 +156,7 @@ def test_empty_suite_scores_zero_and_is_invalid():
     )
     assert not result.suite_valid
     assert result.mutation_score == 0.0
-    assert result.total == 3
+    assert result.total == 4
 
 
 # --- Materializer ------------------------------------------------------------
@@ -162,7 +165,7 @@ def test_empty_suite_scores_zero_and_is_invalid():
 def test_materializer_falls_back_to_canonical_on_bad_output():
     """The mock provider returns '{}' for the materializer prompt (no matching
     branch), which is unusable -> fall back to canonical inputs."""
-    prog = _prog("bmi_calculator")
+    prog = _prog("ipv4_validator")
     llm = LLMService(MockProvider(response="{}"))
     inputs, materialized = materialize_inputs(
         llm,
@@ -177,8 +180,8 @@ def test_materializer_falls_back_to_canonical_on_bad_output():
 
 
 def test_materializer_accepts_wellformed_llm_inputs():
-    prog = _prog("fizzbuzz")
-    llm = LLMService(MockProvider(response="[[3], [5], [15], [7]]"))
+    prog = _prog("ipv4_validator")
+    llm = LLMService(MockProvider(response='[["1.2.3.4"], ["256.1.1.1"], ["01.2.3.4"]]'))
     inputs, materialized = materialize_inputs(
         llm,
         signature=prog["signature"],
@@ -188,13 +191,13 @@ def test_materializer_accepts_wellformed_llm_inputs():
         model="mock",
     )
     assert materialized is True
-    assert inputs == [[3], [5], [15], [7]]
+    assert inputs == [["1.2.3.4"], ["256.1.1.1"], ["01.2.3.4"]]
 
 
 def test_materializer_rejects_wrong_arity():
     """Two-arg tuples for a one-arg function are dropped; nothing usable
     remains, so it falls back."""
-    prog = _prog("fizzbuzz")
+    prog = _prog("ipv4_validator")
     llm = LLMService(MockProvider(response="[[1, 2], [3, 4]]"))
     inputs, materialized = materialize_inputs(
         llm,
@@ -235,7 +238,7 @@ def test_seed_benchmark_is_idempotent_and_complete():
         assert second["refreshed"] == len(PROGRAMS)
 
         assert db.query(BenchmarkItem).count() == len(PROGRAMS)
-        assert db.query(BenchmarkMutant).count() == len(PROGRAMS) * 3
+        assert db.query(BenchmarkMutant).count() == len(PROGRAMS) * 4
         # Every item is bound to a real requirement the pipeline can consume.
         for item in db.query(BenchmarkItem).all():
             assert item.requirement is not None

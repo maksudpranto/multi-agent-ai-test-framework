@@ -92,7 +92,7 @@ def test_full_evaluation_flow(client):
     assert r.status_code == 200
     items = r.json()
     assert len(items) == 8
-    assert all(it["n_mutants"] == 3 for it in items)
+    assert all(it["n_mutants"] == 4 for it in items)
     a_requirement = items[0]["requirement_id"]
 
     # Create an experiment.

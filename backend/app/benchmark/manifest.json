@@ -1,433 +1,503 @@
 [
   {
-    "slug": "bmi_calculator",
-    "title": "BMI category classifier",
-    "entrypoint": "bmi_category",
-    "signature": "bmi_category(weight_kg: float, height_m: float) -> str",
+    "slug": "ipv4_validator",
+    "title": "IPv4 address validator",
+    "entrypoint": "is_valid_ipv4",
+    "signature": "is_valid_ipv4(s: str) -> bool",
     "params": [
       {
-        "name": "weight_kg",
-        "type": "float",
-        "note": "body weight in kilograms, > 0"
-      },
-      {
-        "name": "height_m",
-        "type": "float",
-        "note": "height in metres, > 0"
-      }
-    ],
-    "requirement": "As a health-app user, I want to enter my weight and height so the app\ntells me my BMI category.\n\nBMI is weight_kg divided by height_m squared. The category is decided by\nstandard WHO cut-offs applied to the BMI value:\n  - below 18.5           -> \"underweight\"\n  - 18.5 up to below 25  -> \"normal\"\n  - 25 up to below 30    -> \"overweight\"\n  - 30 and above         -> \"obese\"\n\nThe 18.5, 25 and 30 boundaries are inclusive on the lower side of each\nband, so a value of exactly 25 is \"overweight\", not \"normal\".",
-    "canonical_inputs": [
-      [
-        50,
-        1.7
-      ],
-      [
-        68,
-        1.7
-      ],
-      [
-        72.5,
-        1.72
-      ],
-      [
-        80,
-        1.7
-      ],
-      [
-        100,
-        1.7
-      ]
-    ],
-    "reference_file": "fixtures/bmi_calculator/reference.py",
-    "mutants": [
-      {
-        "key": "m1",
-        "description": "Normal/overweight boundary moved from 25 to 24 (off-by-one on the threshold).",
-        "file": "fixtures/bmi_calculator/mutants/m1.py"
-      },
-      {
-        "key": "m2",
-        "description": "BMI formula missing the square on height (divides by height, not height^2).",
-        "file": "fixtures/bmi_calculator/mutants/m2.py"
-      },
-      {
-        "key": "m3",
-        "description": "Underweight band mislabelled as 'normal'.",
-        "file": "fixtures/bmi_calculator/mutants/m3.py"
-      }
-    ]
-  },
-  {
-    "slug": "fizzbuzz",
-    "title": "FizzBuzz",
-    "entrypoint": "fizzbuzz",
-    "signature": "fizzbuzz(n: int) -> str",
-    "params": [
-      {
-        "name": "n",
-        "type": "int",
-        "note": "a positive integer"
-      }
-    ],
-    "requirement": "As a developer, I want a fizzbuzz(n) function that returns a string for a\nsingle number n.\n\nRules, applied in order:\n  - if n is divisible by both 3 and 5, return \"FizzBuzz\"\n  - else if n is divisible by 3, return \"Fizz\"\n  - else if n is divisible by 5, return \"Buzz\"\n  - otherwise return the number itself as a string, e.g. \"7\"\n\nThe result is always a string, even in the plain-number case.",
-    "canonical_inputs": [
-      [
-        1
-      ],
-      [
-        3
-      ],
-      [
-        5
-      ],
-      [
-        15
-      ],
-      [
-        7
-      ]
-    ],
-    "reference_file": "fixtures/fizzbuzz/reference.py",
-    "mutants": [
-      {
-        "key": "m1",
-        "description": "FizzBuzz check uses 30 instead of 15, so 15 yields 'Fizz'.",
-        "file": "fixtures/fizzbuzz/mutants/m1.py"
-      },
-      {
-        "key": "m2",
-        "description": "Fizz and Buzz swapped.",
-        "file": "fixtures/fizzbuzz/mutants/m2.py"
-      },
-      {
-        "key": "m3",
-        "description": "Plain-number case returns an int, not a string.",
-        "file": "fixtures/fizzbuzz/mutants/m3.py"
-      }
-    ]
-  },
-  {
-    "slug": "password_validator",
-    "title": "Password strength validator",
-    "entrypoint": "is_valid_password",
-    "signature": "is_valid_password(password: str) -> bool",
-    "params": [
-      {
-        "name": "password",
+        "name": "s",
         "type": "str",
-        "note": "the candidate password"
+        "note": "the string to validate"
       }
     ],
-    "requirement": "As a user signing up, I want my password checked so weak ones are rejected.\n\nis_valid_password(password) returns True only if ALL of these hold:\n  - it is at least 8 characters long\n  - it contains at least one digit\n  - it contains at least one uppercase letter\n  - it contains at least one lowercase letter\n\nIf any rule fails, return False. A 7-character password must be rejected;\nan 8-character one that meets the other rules is accepted.",
+    "requirement": "As a form-validation feature, I want is_valid_ipv4(s) to return True when a\nstring is a well-formed IPv4 address and False otherwise.\n\nA well-formed address is four decimal numbers separated by dots, and each\nnumber is in the range 0 to 255. For example \"192.168.0.1\" is valid and\n\"10.0.0.256\" is not. The function returns a boolean; it never raises.",
     "canonical_inputs": [
       [
-        "Abcdefg1"
+        "1.2.3.4"
       ],
       [
-        "Short1A"
+        "0.0.0.0"
       ],
       [
-        "alllower1"
+        "255.255.255.255"
       ],
       [
-        "ALLUPPER1"
+        "256.1.1.1"
       ],
       [
-        "NoDigitsAbc"
+        "01.2.3.4"
+      ],
+      [
+        "1.2.3.4.5"
+      ],
+      [
+        "1.2.3"
+      ],
+      [
+        "1.300.1.1"
+      ],
+      [
+        "a.b.c.d"
       ]
     ],
-    "reference_file": "fixtures/password_validator/reference.py",
+    "reference_file": "fixtures/ipv4_validator/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "Length check off-by-one: accepts 7-character passwords.",
-        "file": "fixtures/password_validator/mutants/m1.py"
+        "description": "No upper-bound check, so octets above 255 are accepted.",
+        "file": "fixtures/ipv4_validator/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "Digit requirement dropped.",
-        "file": "fixtures/password_validator/mutants/m2.py"
+        "description": "Leading-zero octets (e.g. '01') are wrongly accepted.",
+        "file": "fixtures/ipv4_validator/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "Lowercase requirement dropped.",
-        "file": "fixtures/password_validator/mutants/m3.py"
+        "description": "Accepts 4 OR MORE parts (uses < instead of !=).",
+        "file": "fixtures/ipv4_validator/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Boundary off-by-one: rejects exactly 255 (uses >= 255).",
+        "file": "fixtures/ipv4_validator/mutants/m4.py"
       }
     ]
   },
   {
-    "slug": "leap_year",
-    "title": "Leap-year check",
-    "entrypoint": "is_leap_year",
-    "signature": "is_leap_year(year: int) -> bool",
+    "slug": "balanced_brackets",
+    "title": "Balanced-brackets checker",
+    "entrypoint": "is_balanced",
+    "signature": "is_balanced(s: str) -> bool",
     "params": [
       {
-        "name": "year",
-        "type": "int",
-        "note": "a Gregorian calendar year"
+        "name": "s",
+        "type": "str",
+        "note": "a string possibly containing brackets"
       }
     ],
-    "requirement": "As a calendar feature, I want is_leap_year(year) to tell me whether a year\nis a leap year under the Gregorian rules:\n  - divisible by 400            -> leap (e.g. 2000)\n  - else divisible by 100       -> not leap (e.g. 1900)\n  - else divisible by 4         -> leap (e.g. 2024)\n  - otherwise                   -> not leap (e.g. 2023)\n\nThe century rule (1900 is NOT a leap year) and its 400-year exception\n(2000 IS) are the cases that catch naive implementations.",
+    "requirement": "As a code-editor helper, I want is_balanced(s) to check whether the brackets\nin a string are balanced. The three bracket kinds are (), [] and {}.\n\nBrackets are balanced when every opening bracket is closed by a matching\nclosing bracket in the correct order, e.g. \"(a[b]{c})\" is balanced. Any\ncharacters that are not brackets are ignored. Returns a boolean.",
     "canonical_inputs": [
       [
-        2000
+        "()"
       ],
       [
-        1900
+        "([])"
       ],
       [
-        2024
+        "([)]"
       ],
       [
-        2023
+        "("
       ],
       [
-        2400
+        ")"
+      ],
+      [
+        "(]"
+      ],
+      [
+        ""
+      ],
+      [
+        "a(b)c"
+      ],
+      [
+        "())"
       ]
     ],
-    "reference_file": "fixtures/leap_year/reference.py",
+    "reference_file": "fixtures/balanced_brackets/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "Missing the 400-year exception, so 2000 is wrongly not-leap.",
-        "file": "fixtures/leap_year/mutants/m1.py"
+        "description": "Closing bracket type is not checked (pops without matching).",
+        "file": "fixtures/balanced_brackets/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "Divisibility-by-4 test corrupted to '% 4 == 1'.",
-        "file": "fixtures/leap_year/mutants/m2.py"
+        "description": "Leftover unclosed brackets are ignored (always returns True at end).",
+        "file": "fixtures/balanced_brackets/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "Century rule inverted, so 1900 is wrongly leap.",
-        "file": "fixtures/leap_year/mutants/m3.py"
+        "description": "A closing bracket with nothing open is not treated as an error.",
+        "file": "fixtures/balanced_brackets/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Only round brackets are recognised as openers.",
+        "file": "fixtures/balanced_brackets/mutants/m4.py"
       }
     ]
   },
   {
-    "slug": "grade_calculator",
-    "title": "Letter-grade calculator",
-    "entrypoint": "letter_grade",
-    "signature": "letter_grade(score: int) -> str",
+    "slug": "slugify",
+    "title": "URL slug generator",
+    "entrypoint": "slugify",
+    "signature": "slugify(s: str) -> str",
     "params": [
       {
-        "name": "score",
-        "type": "int",
-        "note": "an exam score, 0-100"
+        "name": "s",
+        "type": "str",
+        "note": "a title or phrase"
       }
     ],
-    "requirement": "As a teacher, I want letter_grade(score) to convert a 0-100 score into a\nletter using these inclusive cut-offs:\n  - 90 and above -> \"A\"\n  - 80 to 89     -> \"B\"\n  - 70 to 79     -> \"C\"\n  - 60 to 69     -> \"D\"\n  - below 60     -> \"F\"\n\nThe boundaries are inclusive: a score of exactly 90 is an \"A\", exactly 80\nis a \"B\", and so on.",
+    "requirement": "As a blog CMS, I want slugify(s) to turn a title into a URL slug.\n\nThe slug is lowercase, with words separated by single hyphens. Letters and\ndigits are kept; spaces, hyphens and underscores become hyphens; other\npunctuation is dropped. For example \"Hello, World!\" becomes \"hello-world\".\nThe result has no leading or trailing hyphen and no doubled hyphens.",
     "canonical_inputs": [
       [
-        95
+        "Hello, World!"
       ],
       [
-        89
+        "  Spaced  "
       ],
       [
-        85
+        "Multiple   Spaces"
       ],
       [
-        72
+        "Trailing-"
       ],
       [
-        50
+        "ALL_CAPS"
+      ],
+      [
+        ""
+      ],
+      [
+        "a"
       ]
     ],
-    "reference_file": "fixtures/grade_calculator/reference.py",
+    "reference_file": "fixtures/slugify/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "A cut-off moved to 89, so 89 wrongly scores an 'A'.",
-        "file": "fixtures/grade_calculator/mutants/m1.py"
+        "description": "Does not lowercase the input.",
+        "file": "fixtures/slugify/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "Failing grade returns 'E' instead of 'F'.",
-        "file": "fixtures/grade_calculator/mutants/m2.py"
+        "description": "Does not collapse repeated hyphens.",
+        "file": "fixtures/slugify/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "B and C bands swapped.",
-        "file": "fixtures/grade_calculator/mutants/m3.py"
+        "description": "Does not strip leading/trailing hyphens.",
+        "file": "fixtures/slugify/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Underscores are dropped instead of becoming hyphens.",
+        "file": "fixtures/slugify/mutants/m4.py"
       }
     ]
   },
   {
-    "slug": "triangle_classifier",
-    "title": "Triangle classifier",
-    "entrypoint": "classify_triangle",
-    "signature": "classify_triangle(a: float, b: float, c: float) -> str",
+    "slug": "version_compare",
+    "title": "Semantic-version comparator",
+    "entrypoint": "compare_versions",
+    "signature": "compare_versions(a: str, b: str) -> int",
     "params": [
       {
         "name": "a",
-        "type": "float",
-        "note": "side length"
+        "type": "str",
+        "note": "a dotted version string, e.g. '1.2.0'"
       },
       {
         "name": "b",
-        "type": "float",
-        "note": "side length"
-      },
-      {
-        "name": "c",
-        "type": "float",
-        "note": "side length"
+        "type": "str",
+        "note": "a dotted version string"
       }
     ],
-    "requirement": "As a geometry tool, I want classify_triangle(a, b, c) to classify three\nside lengths:\n  - \"invalid\"      if any side <= 0, or the two shortest sides do not\n                   sum to strictly more than the longest (degenerate\n                   triangles such as 1, 2, 3 are invalid)\n  - \"equilateral\"  if all three sides are equal\n  - \"isosceles\"    if exactly two sides are equal\n  - \"scalene\"      if all three sides differ\n\nValidity is checked first. Note isosceles must catch any of the three\nequal pairs, e.g. a == c even when b differs.",
+    "requirement": "As a package manager, I want compare_versions(a, b) to compare two dotted\nversion strings and return -1 if a < b, 0 if they are equal, and 1 if a > b.\n\nEach component is compared numerically (so 1.10 is newer than 1.9). Missing\ntrailing components count as zero, so \"1.2\" and \"1.2.0\" are equal.",
     "canonical_inputs": [
       [
-        3,
-        3,
-        3
+        "1.0.0",
+        "1.0.0"
       ],
       [
-        3,
-        3,
-        5
+        "1.2.0",
+        "1.10.0"
       ],
       [
-        5,
-        3,
-        5
+        "1.2",
+        "1.2.0"
       ],
       [
-        3,
-        4,
-        5
+        "1.0",
+        "1.0.1"
       ],
       [
-        1,
-        2,
-        3
+        "1.0.1",
+        "1.0.2"
+      ],
+      [
+        "2.0",
+        "1.9"
       ]
     ],
-    "reference_file": "fixtures/triangle_classifier/reference.py",
+    "reference_file": "fixtures/version_compare/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "Degenerate check uses '<' not '<=', so 1,2,3 is wrongly valid.",
-        "file": "fixtures/triangle_classifier/mutants/m1.py"
+        "description": "Compares components as strings, so '2' > '10'.",
+        "file": "fixtures/version_compare/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "Equilateral case dropped, so 3,3,3 is reported isosceles.",
-        "file": "fixtures/triangle_classifier/mutants/m2.py"
+        "description": "No zero-padding, so '1.0' and '1.0.1' compare equal.",
+        "file": "fixtures/version_compare/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "Isosceles misses the a == c pair.",
-        "file": "fixtures/triangle_classifier/mutants/m3.py"
+        "description": "Sign inverted (returns 1 when a < b).",
+        "file": "fixtures/version_compare/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Only the first two components are compared.",
+        "file": "fixtures/version_compare/mutants/m4.py"
       }
     ]
   },
   {
-    "slug": "roman_numeral",
-    "title": "Integer to Roman numeral",
-    "entrypoint": "int_to_roman",
-    "signature": "int_to_roman(n: int) -> str",
+    "slug": "caesar_cipher",
+    "title": "Caesar cipher",
+    "entrypoint": "caesar_cipher",
+    "signature": "caesar_cipher(text: str, shift: int) -> str",
     "params": [
       {
-        "name": "n",
+        "name": "text",
+        "type": "str",
+        "note": "the text to encrypt"
+      },
+      {
+        "name": "shift",
         "type": "int",
-        "note": "an integer 1-3999"
+        "note": "how many letters to shift by"
       }
     ],
-    "requirement": "As a typography tool, I want int_to_roman(n) to convert an integer from 1\nto 3999 into its Roman-numeral string.\n\nIt must use the subtractive forms: 4 is \"IV\" (not \"IIII\"), 9 is \"IX\", 40\nis \"XL\", 90 is \"XC\", 400 is \"CD\", 900 is \"CM\". Examples: 4 -> \"IV\",\n58 -> \"LVIII\", 1994 -> \"MCMXCIV\".",
+    "requirement": "As a puzzle app, I want caesar_cipher(text, shift) to shift each letter of\ntext forward through the alphabet by `shift` positions.\n\nLetters wrap around the end of the alphabet (z shifts to a), and the case of\neach letter is preserved. Characters that are not letters are left\nunchanged. For example caesar_cipher(\"Abc\", 1) returns \"Bcd\".",
     "canonical_inputs": [
       [
-        4
+        "abc",
+        1
       ],
       [
-        9
+        "xyz",
+        3
       ],
       [
-        58
+        "ABC",
+        1
       ],
       [
-        1994
+        "Hello, World!",
+        5
       ],
       [
-        40
+        "abc",
+        0
+      ],
+      [
+        "abc",
+        27
       ]
     ],
-    "reference_file": "fixtures/roman_numeral/reference.py",
+    "reference_file": "fixtures/caesar_cipher/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "Subtractive 'IV' replaced by additive 'IIII', so 4 -> 'IIII'.",
-        "file": "fixtures/roman_numeral/mutants/m1.py"
+        "description": "No wrap-around (drops the modulo), so 'z' overflows past 'z'.",
+        "file": "fixtures/caesar_cipher/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "Loop uses '>' not '>=', dropping the last unit (58 -> 'LVII').",
-        "file": "fixtures/roman_numeral/mutants/m2.py"
+        "description": "Uppercase letters are left unshifted (case not handled).",
+        "file": "fixtures/caesar_cipher/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "Thousands symbol wrong ('D' for 1000), so 1994 -> 'DCMXCIV'.",
-        "file": "fixtures/roman_numeral/mutants/m3.py"
+        "description": "Non-letters are shifted too, corrupting punctuation/spaces.",
+        "file": "fixtures/caesar_cipher/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Wrap modulus is 25, not 26 \u2014 mishandles large shifts.",
+        "file": "fixtures/caesar_cipher/mutants/m4.py"
       }
     ]
   },
   {
-    "slug": "days_in_month",
-    "title": "Days in month",
-    "entrypoint": "days_in_month",
-    "signature": "days_in_month(month: int, year: int) -> int",
+    "slug": "duration_parser",
+    "title": "Duration parser",
+    "entrypoint": "parse_duration",
+    "signature": "parse_duration(s: str) -> int",
     "params": [
       {
-        "name": "month",
-        "type": "int",
-        "note": "month number 1-12"
-      },
-      {
-        "name": "year",
-        "type": "int",
-        "note": "a Gregorian year"
+        "name": "s",
+        "type": "str",
+        "note": "a duration like '1h30m'"
       }
     ],
-    "requirement": "As a date library, I want days_in_month(month, year) to return the number\nof days in a given month:\n  - April, June, September, November (4, 6, 9, 11) -> 30\n  - February -> 29 in a leap year, otherwise 28\n  - every other month -> 31\n\nFebruary depends on the full Gregorian leap rule, so February 1900 has 28\ndays but February 2000 has 29.",
+    "requirement": "As a scheduling tool, I want parse_duration(s) to turn a short duration\nstring into a total number of seconds.\n\nThe string is made of number+unit pieces, where the unit is h (hours),\nm (minutes) or s (seconds), e.g. \"1h30m\" is 5400 and \"45s\" is 45. Pieces may\nbe combined in any mix. An empty string is 0.",
     "canonical_inputs": [
       [
-        2,
-        2000
+        "1h"
       ],
       [
-        2,
-        1900
+        "30m"
       ],
       [
-        2,
-        2024
+        "45s"
       ],
       [
-        11,
-        2023
+        "1h30m"
       ],
       [
-        1,
-        2023
+        "2h15m30s"
+      ],
+      [
+        ""
+      ],
+      [
+        "90m"
       ]
     ],
-    "reference_file": "fixtures/days_in_month/reference.py",
+    "reference_file": "fixtures/duration_parser/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "February always returns 29 (ignores the leap check).",
-        "file": "fixtures/days_in_month/mutants/m1.py"
+        "description": "Hours use a 60x multiplier instead of 3600x.",
+        "file": "fixtures/duration_parser/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "30-day set has 12 instead of 11, so November gets 31, December 30.",
-        "file": "fixtures/days_in_month/mutants/m2.py"
+        "description": "Seconds are ignored.",
+        "file": "fixtures/duration_parser/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "Leap rule reduced to '% 4 == 0', so February 1900 wrongly gets 29.",
-        "file": "fixtures/days_in_month/mutants/m3.py"
+        "description": "Minutes are counted as seconds (no 60x).",
+        "file": "fixtures/duration_parser/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Only the first piece is parsed; the rest is dropped.",
+        "file": "fixtures/duration_parser/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "rpn_calculator",
+    "title": "RPN calculator",
+    "entrypoint": "rpn_eval",
+    "signature": "rpn_eval(expr: str) -> float",
+    "params": [
+      {
+        "name": "expr",
+        "type": "str",
+        "note": "a space-separated RPN expression"
+      }
+    ],
+    "requirement": "As a calculator engine, I want rpn_eval(expr) to evaluate a reverse-Polish\n(postfix) expression given as space-separated tokens and return the result\nas a float.\n\nTokens are numbers and the operators + - * /. Each operator pops the two\nmost recent values and applies itself, so \"10 2 -\" is 8 (the earlier value\nminus the later one) and \"3 4 +\" is 7. A lone number evaluates to itself.",
+    "canonical_inputs": [
+      [
+        "3 4 +"
+      ],
+      [
+        "10 2 -"
+      ],
+      [
+        "2 3 *"
+      ],
+      [
+        "8 2 /"
+      ],
+      [
+        "5"
+      ],
+      [
+        "1 2 - 3 *"
+      ]
+    ],
+    "reference_file": "fixtures/rpn_calculator/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Subtraction operands reversed (computes b - a).",
+        "file": "fixtures/rpn_calculator/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Division operands reversed (computes b / a).",
+        "file": "fixtures/rpn_calculator/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Multiplication is implemented as addition.",
+        "file": "fixtures/rpn_calculator/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Division truncates to an int, losing the float result type.",
+        "file": "fixtures/rpn_calculator/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "run_length_encode",
+    "title": "Run-length encoder",
+    "entrypoint": "rle_encode",
+    "signature": "rle_encode(s: str) -> str",
+    "params": [
+      {
+        "name": "s",
+        "type": "str",
+        "note": "the string to encode"
+      }
+    ],
+    "requirement": "As a compression utility, I want rle_encode(s) to run-length encode a string:\neach run of the same character becomes that character followed by the count\nof how many times it repeats.\n\nFor example \"aaabbc\" encodes to \"a3b2c1\". A single character becomes that\ncharacter followed by 1. The empty string encodes to the empty string.",
+    "canonical_inputs": [
+      [
+        "aaabbc"
+      ],
+      [
+        "a"
+      ],
+      [
+        ""
+      ],
+      [
+        "abc"
+      ],
+      [
+        "aaaa"
+      ],
+      [
+        "aabbbba"
+      ]
+    ],
+    "reference_file": "fixtures/run_length_encode/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Forgets to emit the final run.",
+        "file": "fixtures/run_length_encode/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Run count starts at 0, so every count is one too low.",
+        "file": "fixtures/run_length_encode/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Empty input is not special-cased and crashes.",
+        "file": "fixtures/run_length_encode/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Count is not reset after a run ends.",
+        "file": "fixtures/run_length_encode/mutants/m4.py"
       }
     ]
   }

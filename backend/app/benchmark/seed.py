@@ -145,6 +145,22 @@ def seed_benchmark(db: Session, owner_id: int) -> dict[str, Any]:
         db.flush()
         item_ids.append(item.id)
 
+    # Prune benchmark items whose slug is no longer in the corpus (the corpus is
+    # authoritative), so re-seeding after the corpus changes never leaves stale
+    # programs behind to pollute an experiment. Their mutants cascade-delete.
+    current_slugs = {p["slug"] for p in PROGRAMS}
+    stale = [
+        it
+        for it in db.scalars(
+            select(BenchmarkItem).where(BenchmarkItem.dataset_id == dataset.id)
+        )
+        if it.slug not in current_slugs
+    ]
+    pruned = len(stale)
+    for it in stale:
+        db.delete(it)
+    db.flush()
+
     db.commit()
     return {
         "dataset_id": dataset.id,
@@ -152,5 +168,6 @@ def seed_benchmark(db: Session, owner_id: int) -> dict[str, Any]:
         "n_items": len(PROGRAMS),
         "created": created,
         "refreshed": refreshed,
+        "pruned": pruned,
         "item_ids": item_ids,
     }
