@@ -375,10 +375,68 @@ function SignificanceCard({ cmp }) {
   );
 }
 
+function fmtInput(args) {
+  if (!Array.isArray(args)) return String(args);
+  return args.map((a) => JSON.stringify(a)).join(", ");
+}
+
+// One planted bug: its description, the buggy code, and a caught/missed verdict
+// per condition (with the exact input that exposed it).
+function BugRow({ mutant, conditions }) {
+  const [open, setOpen] = useState(false);
+  const perCond = conditions.map((c) => {
+    const pm = (c.detail?.per_mutant || []).find((m) => m.key === mutant.key);
+    return { c, killed: pm ? pm.killed : null, by: pm?.killed_by_input };
+  });
+  return (
+    <div className={`bug ${open ? "open" : ""}`}>
+      <button className="bug-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span className="bug-caret">▸</span>
+        <span className="bug-desc">{mutant.description}</span>
+        <span className="bug-verdicts">
+          {perCond.map(({ c, killed }) => (
+            <span
+              key={c.condition}
+              className={`verdict ${killed === null ? "na" : killed ? "ok" : "miss"}`}
+              title={`${c.label}: ${killed === null ? "not scored" : killed ? "caught" : "missed"}`}
+            >
+              {killed === null ? "—" : killed ? "✓" : "✗"}
+            </span>
+          ))}
+        </span>
+      </button>
+      {open && (
+        <div className="bug-body">
+          <div className="bug-code">
+            <div className="bug-code-label">The planted bug</div>
+            <pre>{mutant.code}</pre>
+          </div>
+          <div className="bug-catches">
+            {perCond.map(({ c, killed, by }) => (
+              <div key={c.condition} className={`bug-catch ${killed ? "ok" : killed === null ? "na" : "miss"}`}>
+                <span className="bc-name">
+                  <span className="fd-dot" style={{ "--dot": conditionColor(c.condition), background: conditionColor(c.condition) }} />
+                  {c.label}
+                </span>
+                <span className="bc-verdict">
+                  {killed === null ? "not scored" : killed
+                    ? <>caught — input <code>{fmtInput(by)}</code></>
+                    : "missed this bug"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DrilldownItem({ item, experimentId }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showCases, setShowCases] = useState(null); // condition key whose cases are shown
 
   async function toggle() {
     const next = !open;
@@ -395,6 +453,9 @@ function DrilldownItem({ item, experimentId }) {
     }
   }
 
+  const conditions = detail?.conditions || [];
+  const mutants = detail?.item?.mutants || [];
+
   return (
     <div className={`drill ${open ? "open" : ""}`}>
       <button className="drill-head" onClick={toggle} aria-expanded={open}>
@@ -407,28 +468,70 @@ function DrilldownItem({ item, experimentId }) {
         <div className="drill-body">
           {loading && <p className="muted">Loading…</p>}
           {detail && (
-            <div className="drill-conds">
-              {detail.conditions.map((c) => {
-                const mut = c.metrics?.mutation_score;
-                const killed = c.metrics?.mutants_killed;
-                const total = c.metrics?.mutants_total;
-                return (
-                  <div key={c.condition} className="drill-cond">
-                    <div className="drill-cond-head">
-                      <span className="fd-dot" style={{ "--dot": conditionColor(c.condition), background: conditionColor(c.condition) }} />
-                      <b>{c.label}</b>
-                      <span className="drill-cond-score">
-                        {mut != null ? `${Math.round(mut * 100)}% caught` : "—"}
-                        {killed != null && total != null ? ` (${killed}/${total})` : ""}
+            <>
+              {detail.item?.requirement_text && (
+                <p className="drill-req">{detail.item.requirement_text.split("\n")[0]}</p>
+              )}
+
+              {/* Per-condition score summary */}
+              <div className="drill-summary">
+                {conditions.map((c) => {
+                  const killed = c.metrics?.mutants_killed;
+                  const total = c.metrics?.mutants_total;
+                  const nCases = (c.test_cases || []).length;
+                  return (
+                    <div key={c.condition} className="dsum">
+                      <span className="dsum-name">
+                        <span className="fd-dot" style={{ "--dot": conditionColor(c.condition), background: conditionColor(c.condition) }} />
+                        {c.label}
                       </span>
+                      <span className="dsum-score">
+                        {killed != null && total != null ? `${killed}/${total} bugs` : "—"}
+                      </span>
+                      <button
+                        className="dsum-cases"
+                        onClick={() => setShowCases(showCases === c.condition ? null : c.condition)}
+                      >
+                        {nCases} test case{nCases === 1 ? "" : "s"} {showCases === c.condition ? "▲" : "▼"}
+                      </button>
                     </div>
-                    <div className="drill-cases">
-                      {(c.test_cases || []).length} test case{(c.test_cases || []).length === 1 ? "" : "s"}
-                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Test cases for the chosen condition */}
+              {showCases && (
+                <ol className="drill-caselist">
+                  {(conditions.find((c) => c.condition === showCases)?.test_cases || []).map((tc) => (
+                    <li key={tc.id}>
+                      <b>{tc.title}</b>
+                      {tc.type && <span className="tc-type">{tc.type}</span>}
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              {/* Bug-by-bug matrix */}
+              {mutants.length > 0 ? (
+                <div className="bug-matrix">
+                  <div className="bug-matrix-head">
+                    <span>Each planted bug — who caught it</span>
+                    <span className="bug-cols">
+                      {conditions.map((c) => (
+                        <span key={c.condition} className="bug-col" title={c.label}>
+                          {c.label.split(" ")[0].slice(0, 4)}
+                        </span>
+                      ))}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                  {mutants.map((m) => (
+                    <BugRow key={m.key} mutant={m} conditions={conditions} />
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">Per-bug detail isn't available for this run.</p>
+              )}
+            </>
           )}
         </div>
       )}

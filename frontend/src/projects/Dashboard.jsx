@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import UsagePanel from "../components/UsagePanel";
+import HowItWorks from "../components/HowItWorks";
 
 const ICON_BG = [
   "var(--grad-deep-blue)",
@@ -62,6 +63,7 @@ function greeting() {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -191,10 +193,10 @@ export default function Dashboard() {
       <section className="dash-hero">
         <div className="hero-main">
           <p className="hero-eyebrow">{greeting()}, {handle}</p>
-          <h1>Your test-design workspace</h1>
+          <h1>Turn requirements into proven test suites</h1>
           <p className="hero-sub">
-            Turn requirements into validated, traceable test suites with a team of
-            specialized AI agents — analyze, generate, debate, and score.
+            A team of AI agents writes your test cases — then we prove they're good
+            by running them against code with planted bugs and counting the catches.
           </p>
           <div className="hero-stats">
             <div className="hero-stat">
@@ -211,11 +213,42 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <button className="hero-cta" onClick={openCreate}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M8 3v10M3 8h10" />
-          </svg>
-          New project
+      </section>
+
+      <section className="hiw-section">
+        <div className="hiw-head">
+          <h2>How it works</h2>
+          <span className="muted">Three steps, one idea</span>
+        </div>
+        <HowItWorks />
+      </section>
+
+      <section className="doors">
+        <button className="door" onClick={openCreate}>
+          <span className="door-ic gen" aria-hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8" cy="8" r="3" /><circle cx="16" cy="8" r="3" />
+              <path d="M3 20c0-2.8 2.2-5 5-5s5 2.2 5 5M13.5 15.2A5 5 0 0 1 21 20" />
+            </svg>
+          </span>
+          <span className="door-txt">
+            <b>Generate tests</b>
+            <span>Start a project, add a requirement, and watch the AI team build a test suite.</span>
+          </span>
+          <span className="door-go" aria-hidden>→</span>
+        </button>
+
+        <button className="door proof" onClick={() => navigate("/experiments")}>
+          <span className="door-ic prove" aria-hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" /><path d="M9 12l2 2 4-4" />
+            </svg>
+          </span>
+          <span className="door-txt">
+            <b>See the proof — Experiments</b>
+            <span>Run the AI team against a single-AI baseline and measure who catches more bugs.</span>
+          </span>
+          <span className="door-go" aria-hidden>→</span>
         </button>
       </section>
 

@@ -348,9 +348,13 @@ def get_item_drilldown(
         conditions_out.append({
             "condition": key,
             "label": CONDITIONS[key].label if key in CONDITIONS else key,
+            "is_baseline": CONDITIONS[key].is_baseline if key in CONDITIONS else False,
             "run_id": run.id,
             "status": run.status.value if hasattr(run.status, "value") else run.status,
             "metrics": metrics,
+            # Concrete per-bug verdict for this condition (which bug caught, and
+            # the exact input that exposed it).
+            "detail": run.eval_detail,
             "test_cases": [
                 {"id": c.id, "title": c.title, "type": c.type, "steps": c.steps}
                 for c in cases
@@ -366,8 +370,9 @@ def get_item_drilldown(
             "entrypoint": item.entrypoint if item else None,
             "signature": item.signature if item else None,
             "requirement_text": item.requirement.raw_text if item else None,
+            "reference_code": item.reference_code if item else None,
             "mutants": [
-                {"key": m.mutant_key, "description": m.description}
+                {"key": m.mutant_key, "description": m.description, "code": m.code}
                 for m in (item.mutants if item else [])
             ],
         } if item else None,

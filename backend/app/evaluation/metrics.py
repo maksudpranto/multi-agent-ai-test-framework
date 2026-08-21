@@ -80,16 +80,24 @@ def _fault_detection(
     cases: list[TestCase],
     llm_service,
     model: str,
-) -> dict[str, float]:
-    """Harvest the suite's inputs and score them against the item's mutants."""
+) -> tuple[dict[str, float], dict]:
+    """Harvest the suite's inputs and score them against the item's mutants.
+    Returns (scalar metrics, drill-down detail)."""
     mutants = [{"key": m.mutant_key, "code": m.code} for m in item.mutants]
     if not cases:
-        return {
-            MUTATION_SCORE: 0.0, SUITE_VALID: 0.0, N_INPUTS: 0.0,
-            MUTANTS_KILLED: 0.0, MUTANTS_TOTAL: float(len(mutants)),
+        detail = {
+            "suite_valid": False, "materialized": False, "inputs": [],
+            "n_usable_inputs": 0, "reason": "no_test_cases",
+            "per_mutant": [{"key": m["key"], "killed": False, "killed_by_input": None}
+                           for m in mutants],
         }
+        return (
+            {MUTATION_SCORE: 0.0, SUITE_VALID: 0.0, N_INPUTS: 0.0,
+             MUTANTS_KILLED: 0.0, MUTANTS_TOTAL: float(len(mutants))},
+            detail,
+        )
 
-    inputs, _materialized = materialize_inputs(
+    inputs, materialized = materialize_inputs(
         llm_service,
         signature=item.signature or item.entrypoint,
         params=item.params,
@@ -103,13 +111,23 @@ def _fault_detection(
         entrypoint=item.entrypoint,
         inputs=inputs,
     )
-    return {
-        MUTATION_SCORE: result.mutation_score,
-        SUITE_VALID: 1.0 if result.suite_valid else 0.0,
-        N_INPUTS: float(result.n_inputs),
-        MUTANTS_KILLED: float(result.killed),
-        MUTANTS_TOTAL: float(result.total),
+    detail = {
+        "suite_valid": result.suite_valid,
+        "materialized": materialized,
+        "inputs": result.inputs,
+        "n_usable_inputs": result.n_usable_inputs,
+        "per_mutant": result.per_mutant,
     }
+    return (
+        {
+            MUTATION_SCORE: result.mutation_score,
+            SUITE_VALID: 1.0 if result.suite_valid else 0.0,
+            N_INPUTS: float(result.n_inputs),
+            MUTANTS_KILLED: float(result.killed),
+            MUTANTS_TOTAL: float(result.total),
+        },
+        detail,
+    )
 
 
 def _coverage_pct(db: Session, run: PipelineRun) -> float | None:
@@ -181,8 +199,11 @@ def compute_run_metrics(
     cases = _current_test_cases(db, run)
 
     metrics: dict[str, float] = {}
-    metrics.update(_fault_detection(db, run, item, cases, llm_service, model))
+    fault_metrics, detail = _fault_detection(db, run, item, cases, llm_service, model)
+    metrics.update(fault_metrics)
     metrics[N_TEST_CASES] = float(len(cases))
+    # Stash the concrete drill-down detail on the run for the results screen.
+    run.eval_detail = detail
 
     cov = _coverage_pct(db, run)
     if cov is not None:

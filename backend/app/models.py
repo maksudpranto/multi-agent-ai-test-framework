@@ -252,6 +252,11 @@ class PipelineRun(Base):
     status: Mapped[RunStatus] = mapped_column(
         Enum(RunStatus), default=RunStatus.pending
     )
+    # Fault-detection detail for an evaluation run: the harvested inputs and, per
+    # seeded bug, whether this run's suite killed it and which input exposed it.
+    # Persisted so the results drill-down can show the concrete bug/test/verdict
+    # without re-running the (LLM-driven, non-deterministic) materializer.
+    eval_detail: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
