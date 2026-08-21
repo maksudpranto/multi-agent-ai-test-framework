@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import ModelPicker from "../components/ModelPicker";
@@ -8,7 +8,10 @@ const STATUS_CHIP = {
   running: "chip-amber",
   completed: "chip-green",
   failed: "chip-red",
+  cancelled: "chip-grey",
 };
+
+const PAGE_SIZE = 6;
 
 function relTime(iso) {
   if (!iso) return "—";
@@ -23,13 +26,18 @@ function relTime(iso) {
   return then.toLocaleDateString();
 }
 
+const IconPlay = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 3.2v9.6l8-4.8z" /></svg>
+);
+const IconStop = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+    <circle cx="8" cy="8" r="6.5" /><rect x="5.5" y="5.5" width="5" height="5" rx="1" fill="currentColor" stroke="none" />
+  </svg>
+);
 const IconEdit = () => (
   <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M11.5 2.2l2.3 2.3-8 8-3 .7.7-3z" /><path d="M10.5 3.2l2.3 2.3" />
   </svg>
-);
-const IconStop = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="4" width="8" height="8" rx="1.5" /></svg>
 );
 const IconTrash = () => (
   <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -37,13 +45,15 @@ const IconTrash = () => (
   </svg>
 );
 
-// One experiment row: status chip + live progress bar while it runs, plus
-// rename / stop / delete controls.
+// One experiment row: status chip + live progress (with %) while it runs, plus
+// run/resume/re-run, stop, rename, and delete controls (delete uses an inline
+// confirm rather than a native dialog).
 function ExperimentRow({ exp, onChanged }) {
   const navigate = useNavigate();
   const [live, setLive] = useState(exp);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(exp.name);
+  const [confirm, setConfirm] = useState(null); // {label, action}
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setLive(exp), [exp]);
@@ -63,7 +73,7 @@ function ExperimentRow({ exp, onChanged }) {
 
   const prog = live.progress;
   const pct = prog ? prog.pct : live.status === "completed" ? 100 : 0;
-  const running = live.status === "running" || live.status === "pending";
+  const isRunning = live.status === "running";
 
   async function act(fn) {
     setBusy(true);
@@ -74,6 +84,7 @@ function ExperimentRow({ exp, onChanged }) {
       alert(err.message);
     } finally {
       setBusy(false);
+      setConfirm(null);
     }
   }
 
@@ -86,10 +97,27 @@ function ExperimentRow({ exp, onChanged }) {
     setEditing(false);
   }
 
-  function stopClick(e, fn) {
+  function stop(e, fn) {
     e.preventDefault();
     e.stopPropagation();
     fn();
+  }
+
+  // Run / Resume / Re-run depending on status.
+  const runInfo = isRunning
+    ? null
+    : live.status === "completed"
+      ? { label: "Re-run", fresh: true, confirm: "Re-run? (clears results)" }
+      : live.status === "pending"
+        ? { label: "Run", fresh: false }
+        : { label: "Resume", fresh: false }; // cancelled / failed
+
+  function doRun() {
+    if (runInfo.confirm) {
+      setConfirm({ label: runInfo.confirm, action: () => act(() => api.runExperiment(live.id, runInfo.fresh)) });
+    } else {
+      act(() => api.runExperiment(live.id, runInfo.fresh));
+    }
   }
 
   if (editing) {
@@ -119,36 +147,54 @@ function ExperimentRow({ exp, onChanged }) {
           {live.repetitions > 1 ? ` · ${live.repetitions} runs` : ""} · created {relTime(live.created_at)}
         </div>
       </div>
+
       <div className="exp-row-prog">
-        {running && prog && (
-          <div className="exp-bar" title={`${prog?.completed || 0} / ${prog?.total || 0} cells`}>
-            <span style={{ width: `${pct}%` }} />
-          </div>
+        {isRunning && prog && (
+          <>
+            <div className="exp-bar" title={`${prog.completed} / ${prog.total} cells`}>
+              <span style={{ width: `${pct}%` }} />
+            </div>
+            <span className="exp-prog-pct">{Math.round(pct)}%</span>
+          </>
         )}
       </div>
+
       <span className={`chip ${STATUS_CHIP[live.status] || "chip-grey"}`}>
-        {live.status === "running" && <span className="spinner sm" />}
+        {isRunning && <span className="spinner sm" />}
         {live.status}
       </span>
+
       <div className="exp-row-acts" onClick={(e) => e.stopPropagation()}>
-        {running && (
-          <button className="icon-btn" title="Stop" aria-label="Stop experiment" disabled={busy}
-            onClick={(e) => stopClick(e, () => act(() => api.stopExperiment(live.id)))}>
-            <IconStop />
-          </button>
+        {confirm ? (
+          <span className="row-confirm">
+            <span className="row-confirm-txt">{confirm.label}</span>
+            <button className="btn-sm solid-danger" disabled={busy} onClick={(e) => stop(e, confirm.action)}>Yes</button>
+            <button className="ghost btn-sm" onClick={(e) => stop(e, () => setConfirm(null))}>No</button>
+          </span>
+        ) : (
+          <>
+            {runInfo && (
+              <button className="icon-btn" title={runInfo.label} aria-label={runInfo.label} disabled={busy}
+                onClick={(e) => stop(e, doRun)}>
+                <IconPlay />
+              </button>
+            )}
+            {isRunning && (
+              <button className="icon-btn" title="Stop" aria-label="Stop experiment" disabled={busy}
+                onClick={(e) => stop(e, () => act(() => api.stopExperiment(live.id)))}>
+                <IconStop />
+              </button>
+            )}
+            <button className="icon-btn" title="Rename" aria-label="Rename experiment"
+              onClick={(e) => stop(e, () => { setEditName(live.name); setEditing(true); })}>
+              <IconEdit />
+            </button>
+            <button className="icon-btn danger" title="Delete" aria-label="Delete experiment" disabled={busy || isRunning}
+              onClick={(e) => stop(e, () => setConfirm({ label: "Delete?", action: () => act(() => api.deleteExperiment(live.id)) }))}>
+              <IconTrash />
+            </button>
+          </>
         )}
-        <button className="icon-btn" title="Rename" aria-label="Rename experiment"
-          onClick={(e) => stopClick(e, () => { setEditName(live.name); setEditing(true); })}>
-          <IconEdit />
-        </button>
-        <button className="icon-btn danger" title="Delete" aria-label="Delete experiment" disabled={busy || live.status === "running"}
-          onClick={(e) => stopClick(e, () => {
-            if (confirm(`Delete "${live.name}"? This removes the experiment and all its runs and results.`)) {
-              act(() => api.deleteExperiment(live.id));
-            }
-          })}>
-          <IconTrash />
-        </button>
       </div>
     </div>
   );
@@ -172,8 +218,11 @@ export default function ExperimentsList() {
   const [launching, setLaunching] = useState(false);
   const nameRef = useRef(null);
 
+  // List: search + pagination
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       const [conds, exps] = await Promise.all([
         api.listConditions(),
@@ -194,6 +243,19 @@ export default function ExperimentsList() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? experiments.filter((e) => e.name.toLowerCase().includes(q)) : experiments;
+  }, [experiments, query]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageItems = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(0);
+  }, [query]);
 
   async function onSeed() {
     setSeeding(true);
@@ -353,8 +415,21 @@ export default function ExperimentsList() {
       <section className="section">
         <div className="section-head">
           <h2>Your experiments</h2>
-          <span className="count">{loading ? "" : `${experiments.length} total`}</span>
+          <div className="exp-list-tools">
+            <div className="exp-search">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <circle cx="7" cy="7" r="4.5" /><path d="M13.5 13.5 10.5 10.5" />
+              </svg>
+              <input
+                placeholder="Search by name…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <span className="count">{loading ? "" : `${filtered.length} total`}</span>
+          </div>
         </div>
+
         {loading ? (
           <p className="muted" style={{ padding: "8px 0" }}>Loading…</p>
         ) : experiments.length === 0 ? (
@@ -362,12 +437,30 @@ export default function ExperimentsList() {
             <h3>No experiments yet</h3>
             <p>Seed the benchmark and launch your first study above.</p>
           </div>
-        ) : (
-          <div className="exp-list">
-            {experiments.map((exp) => (
-              <ExperimentRow key={exp.id} exp={exp} onChanged={load} />
-            ))}
+        ) : filtered.length === 0 ? (
+          <div className="empty">
+            <h3>No matches</h3>
+            <p>No experiments match “{query}”.</p>
           </div>
+        ) : (
+          <>
+            <div className="exp-list">
+              {pageItems.map((exp) => (
+                <ExperimentRow key={exp.id} exp={exp} onChanged={load} />
+              ))}
+            </div>
+            {pageCount > 1 && (
+              <div className="exp-pager">
+                <button className="ghost btn-sm" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+                  ← Prev
+                </button>
+                <span className="exp-pager-info">Page {safePage + 1} of {pageCount}</span>
+                <button className="ghost btn-sm" disabled={safePage >= pageCount - 1} onClick={() => setPage(safePage + 1)}>
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

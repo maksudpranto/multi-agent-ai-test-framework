@@ -78,6 +78,30 @@ def _get_owned_dataset(dataset_id: int, user: User, db: Session) -> Dataset:
     return dataset
 
 
+def _purge_runs(db: Session, experiment_id: int) -> None:
+    """Delete an experiment's runs, metrics, and the artifacts of those runs
+    (but not the experiment row). Shared by delete and by a fresh re-run."""
+    run_ids = [
+        r for r in db.scalars(
+            select(PipelineRun.id).where(PipelineRun.experiment_id == experiment_id)
+        )
+    ]
+    if run_ids:
+        for model in (
+            QualityReport, CoverageReport, DebateTurn, RequirementAnalysis,
+            AgentExecution, ExportLog, TestCase, AcceptanceCriterion,
+        ):
+            db.query(model).filter(
+                model.pipeline_run_id.in_(run_ids)
+            ).delete(synchronize_session=False)
+    db.query(ExperimentMetric).filter(
+        ExperimentMetric.experiment_id == experiment_id
+    ).delete(synchronize_session=False)
+    db.query(PipelineRun).filter(
+        PipelineRun.experiment_id == experiment_id
+    ).delete(synchronize_session=False)
+
+
 def _benchmark_dataset(user: User, db: Session) -> Dataset | None:
     return db.scalar(
         select(Dataset).where(
@@ -260,13 +284,15 @@ def create_experiment(
 def run_experiment_endpoint(
     experiment_id: int,
     background_tasks: BackgroundTasks,
+    fresh: bool = False,
     selection=Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> RunAccepted:
-    """Kick off (or resume) the study in the background. Returns 202 at once; the
-    grid runs cell by cell and is resumable, so calling this again after a
-    partial run only does the missing work."""
+    """Kick off, resume, or re-run the study in the background. Returns 202 at
+    once; the grid runs cell by cell and is resumable, so a normal call after a
+    partial run only does the missing work. Pass ``fresh=true`` to discard prior
+    runs and re-run the whole grid from scratch (a true re-run)."""
     from app.evaluation.schemas import ModelSelection
 
     experiment = _get_owned_experiment(experiment_id, user, db)
@@ -279,6 +305,8 @@ def run_experiment_endpoint(
     parsed = ModelSelection(**selection) if isinstance(selection, dict) else selection
     provider, model = _resolve_selection(parsed)
 
+    if fresh:
+        _purge_runs(db, experiment_id)
     experiment.status = RunStatus.running
     experiment.completed_at = None
     db.commit()
@@ -348,26 +376,7 @@ def delete_experiment(
             status_code=status.HTTP_409_CONFLICT,
             detail="Stop the experiment before deleting it.",
         )
-
-    run_ids = [
-        r for r in db.scalars(
-            select(PipelineRun.id).where(PipelineRun.experiment_id == experiment_id)
-        )
-    ]
-    if run_ids:
-        for model in (
-            QualityReport, CoverageReport, DebateTurn, RequirementAnalysis,
-            AgentExecution, ExportLog, TestCase, AcceptanceCriterion,
-        ):
-            db.query(model).filter(
-                model.pipeline_run_id.in_(run_ids)
-            ).delete(synchronize_session=False)
-    db.query(ExperimentMetric).filter(
-        ExperimentMetric.experiment_id == experiment_id
-    ).delete(synchronize_session=False)
-    db.query(PipelineRun).filter(
-        PipelineRun.experiment_id == experiment_id
-    ).delete(synchronize_session=False)
+    _purge_runs(db, experiment_id)
     db.delete(experiment)
     db.commit()
 

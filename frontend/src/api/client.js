@@ -213,9 +213,9 @@ export const api = {
   listExperiments: () => request("/evaluation/experiments"),
   createExperiment: (body) =>
     request("/evaluation/experiments", { method: "POST", body }),
-  runExperiment: (experimentId) =>
+  runExperiment: (experimentId, fresh = false) =>
     pipe(
-      request(`/evaluation/experiments/${experimentId}/run`, {
+      request(`/evaluation/experiments/${experimentId}/run${fresh ? "?fresh=true" : ""}`, {
         method: "POST",
         body: modelBody() ?? {},
       })
