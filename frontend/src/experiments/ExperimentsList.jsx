@@ -307,11 +307,11 @@ export default function ExperimentsList() {
 
       {error && <p className="error">{error}</p>}
 
-      {/* Step 1 — benchmark */}
+      {/* Section 1 — New experiment */}
       <section className="section exp-setup">
         <div className="section-head">
           <h2>
-            <span className="step-n">1</span> Benchmark corpus
+            <span className="step-n">1</span> New experiment
           </h2>
           <button className="ghost" onClick={onSeed} disabled={seeding}>
             {seeding ? (
@@ -322,10 +322,10 @@ export default function ExperimentsList() {
           </button>
         </div>
         <p className="muted exp-setup-copy">
-          Eight everyday features — ATM withdrawal, login lockout, sign-up validation,
-          bank transfer and more — each with a plain-language requirement, a reference
-          implementation, and four deliberately planted bugs. Seeding is safe to
-          re-run — it never duplicates anything.
+          Studies run against the benchmark — eight everyday features (ATM withdrawal,
+          login lockout, sign-up validation, bank transfer and more), each with four
+          deliberately planted bugs. Seed once (safe to re-run), then configure and
+          launch below. It runs on the model chosen in section 2.
         </p>
         {seed && (
           <div className="exp-seed-note">
@@ -334,15 +334,7 @@ export default function ExperimentsList() {
             {seed.refreshed ? ` (${seed.refreshed} refreshed)` : ""}.
           </div>
         )}
-      </section>
 
-      {/* Step 2 — configure + run */}
-      <section className="section">
-        <div className="section-head">
-          <h2>
-            <span className="step-n">2</span> New experiment
-          </h2>
-        </div>
         <form className="exp-create" onSubmit={onLaunch}>
           <label className="field">
             <span className="field-label">Name</span>
@@ -396,7 +388,10 @@ export default function ExperimentsList() {
           </div>
 
           <div className="exp-create-foot">
-            <ModelPicker onProviderChange={setSelectedProvider} />
+            <p className="muted exp-hint" style={{ margin: 0, maxWidth: "48ch" }}>
+              Runs in the background across every program × condition, on the model
+              selected in section 2. The offline mock runs for free.
+            </p>
             <button type="submit" disabled={launching || !name.trim() || nSelected === 0}>
               {launching ? (
                 <span className="busy-label"><span className="spinner" /> Launching…</span>
@@ -405,21 +400,30 @@ export default function ExperimentsList() {
               )}
             </button>
           </div>
-          <p className="muted exp-hint">
-            The study runs in the background across every program × condition. You can
-            watch progress below and open the results the moment it finishes. On a real
-            provider this spends free-tier quota; the offline mock runs for free.
-          </p>
         </form>
       </section>
 
-      {/* Live quota for the model that will run the study */}
-      <UsagePanel providerFilter={selectedProvider} />
-
-      {/* Experiments list */}
+      {/* Section 2 — AI model selection + live quota */}
       <section className="section">
         <div className="section-head">
-          <h2>Your experiments</h2>
+          <h2>
+            <span className="step-n">2</span> AI model selection &amp; details
+          </h2>
+        </div>
+        <p className="muted exp-setup-copy">
+          Choose the free model that powers every agent in your study. The panel below
+          shows how much free quota that provider has left right now.
+        </p>
+        <div className="exp-model-row">
+          <ModelPicker onProviderChange={setSelectedProvider} />
+        </div>
+        <UsagePanel providerFilter={selectedProvider} />
+      </section>
+
+      {/* Section 3 — Your experiments */}
+      <section className="section">
+        <div className="section-head">
+          <h2><span className="step-n">3</span> Your experiments</h2>
           <div className="exp-list-tools">
             <div className="exp-search">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">

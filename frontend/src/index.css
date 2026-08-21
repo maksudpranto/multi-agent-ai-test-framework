@@ -3874,6 +3874,12 @@ input[type="file"]::file-selector-button:hover {
 /* Pagination */
 .exp-pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
 .exp-pager-info { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
+
+/* Model selection row (section 2) */
+.exp-model-row { margin: 2px 0 16px; }
+.exp-model-row .model-picker { width: 100%; }
+.exp-model-row .model-picker select { flex: 1; }
+.section > .usage-card { margin-top: 0; box-shadow: none; border: 1px solid var(--border); }
 .exp-row-name { font-weight: 650; font-size: 14.5px; }
 .exp-row-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .exp-bar { height: 7px; border-radius: 999px; background: var(--surface-mist); overflow: hidden; }
