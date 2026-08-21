@@ -194,6 +194,93 @@ class DefaultWorkflowEngine(WorkflowEngine):
         db.commit()
         return result
 
+    # -- full multi-agent pipeline: toggle-aware sequencer (for experiments) --
+    def run_full_pipeline(
+        self,
+        db: Session,
+        run: PipelineRun,
+        *,
+        requirement,
+        config: RunConfig,
+    ) -> dict[str, Any]:
+        """Run the whole multi-agent pipeline for one requirement end-to-end,
+        honoring the RunConfig ablation toggles.
+
+        This is the sequencer the experiment runner drives, so a condition such
+        as `ablation_no_debate` (consensus_enabled=False) becomes a real,
+        measured arm rather than a manual click-through. It reuses the exact same
+        stage methods the interactive UI calls — no agent behaviour is forked for
+        experiments, which keeps the comparison honest.
+
+        Order: analyze -> generate -> [debate] -> [coverage] -> [quality] ->
+        prioritize. Bracketed stages are gated by their toggles."""
+        story = requirement.raw_text
+
+        # 1. Requirement analysis -> acceptance criteria (persisted as rows).
+        self.run_stage(
+            db, run, PipelineStage.requirement_analysis,
+            {"user_story": story}, config,
+        )
+        criteria = list(
+            db.scalars(
+                select(AcceptanceCriterion)
+                .where(AcceptanceCriterion.pipeline_run_id == run.id)
+                .order_by(AcceptanceCriterion.order)
+            )
+        )
+        criteria_payload = [{"id": c.id, "text": c.text} for c in criteria]
+
+        # 2. Test generation (needs criteria to trace against).
+        if criteria:
+            self.run_stage(
+                db, run, PipelineStage.test_generation,
+                {"user_story": story, "acceptance_criteria": criteria_payload},
+                config,
+            )
+
+        # 3. Reviewer <-> Consensus debate — the ablation switch. Skipped whole
+        #    when either half is disabled (that IS ablation_no_debate).
+        debate_summary = {
+            "rounds_used": 0, "consensus_reached": False,
+            "revisions_made": 0, "total_findings": 0,
+        }
+        if (
+            config.reviewer_enabled
+            and config.consensus_enabled
+            and self._current_test_cases(db, run)
+        ):
+            debate_summary = self.run_debate(
+                db, run, user_story=story,
+                acceptance_criteria=criteria_payload, config=config,
+            )
+
+        # 4. Coverage (gated).
+        coverage_summary = None
+        if config.coverage_enabled and self._current_test_cases(db, run):
+            coverage_summary = self.run_coverage(
+                db, run, user_story=story, config=config
+            )
+
+        # 5. Quality (gated).
+        quality_summary = None
+        if config.quality_enabled and self._current_test_cases(db, run):
+            quality_summary = self.run_quality(
+                db, run, user_story=story, config=config
+            )
+
+        # 6. Prioritize the final suite (annotation only).
+        if self._current_test_cases(db, run):
+            self.run_prioritization(db, run, user_story=story, config=config)
+
+        db.commit()
+        return {
+            "n_criteria": len(criteria),
+            "n_test_cases": len(self._current_test_cases(db, run)),
+            "debate": debate_summary,
+            "coverage": coverage_summary,
+            "quality": quality_summary,
+        }
+
     # -- prioritization: rank the current suite ------------------------------
     def run_prioritization(
         self, db: Session, run: PipelineRun, *, user_story: str, config: RunConfig
@@ -533,6 +620,14 @@ class DefaultWorkflowEngine(WorkflowEngine):
             # Autonomy: the reviewer's verdict — not the engine — ends the debate.
             if not review.get("needs_revision"):
                 consensus_reached = True
+                db.commit()
+                break
+
+            # Ablation switch: with consensus disabled the reviewer still
+            # critiques (its findings are recorded above), but no revision turn
+            # runs — the suite is left as generated. This is what makes
+            # `ablation_no_debate` a real, measured arm.
+            if not config.consensus_enabled:
                 db.commit()
                 break
 

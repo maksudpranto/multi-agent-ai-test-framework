@@ -81,14 +81,32 @@ first. Effort estimate: ~2–3 focused build sessions.
 ## Timeline
 Target submission ~2nd week of September 2026. Everything runs on **$0** (free tiers + mock).
 
+- **Phase 2 — DONE (2026-08-21).** Experiment runner + metrics + stats, all backend, verified on the
+  mock provider ($0). `engine.py`: `run_full_pipeline` (toggle-aware sequencer: analyze→generate→
+  [debate]→[coverage]→[quality]→prioritize, bracketed stages gated by RunConfig toggles) + `run_debate`
+  now honors `consensus_enabled` (skips the revision turn). `evaluation/conditions.py`: `CONDITIONS`
+  (single_llm / full_pipeline / ablation_no_debate), `resolve_conditions`, baseline-first ordering.
+  `evaluation/metrics.py`: `compute_run_metrics` → `ExperimentMetric` rows (mutation_score + suite_valid
+  via Phase 1 harness, coverage %, quality, duplicate rate, rounds-to-consensus, #cases, tokens,
+  latency). `evaluation/stats.py`: stdlib `wilcoxon_signed_rank` (normal approx, tie+continuity
+  corrected, via math.erf), `cohens_dz`, `rank_biserial`, `describe`, `aggregate_experiment`
+  (per-condition summaries + pairwise vs baseline, paired by benchmark item, + headline winner).
+  `evaluation/runner.py`: `ExperimentRunner` loops item×condition, resumable (skips scored cells),
+  fault-isolating; `run_experiment_task` (own session, for BackgroundTasks); `experiment_progress`.
+  NO new migration needed (experiment_condition + conditions already in Phase 1's `d4e5f6a7b8c9`).
+  Verified: `pytest tests/test_evaluation.py` (11 tests, incl. a hand-computed Wilcoxon) + full suite
+  39 passed. Mock note: all conditions score 1.0 (every suite falls back to canonical inputs → p=1.0);
+  differentiation only appears on a real provider — that's expected and correct.
+
 ## EXACT next action when resuming
-Phase 1 is done (uncommitted). Next is **Phase 2**: add `run_full_pipeline` (toggle-aware sequencer;
-guard `run_debate` with `consensus_enabled`) to `engine.py`; `evaluation/conditions.py` (CONDITIONS
-map); `evaluation/runner.py` (loop item × condition, each cell a `PipelineRun(experiment_condition=…)`,
-resumable); `evaluation/metrics.py` (→ `ExperimentMetric` rows incl. mutation score via the Phase 1
-harness); `evaluation/stats.py` (stdlib Wilcoxon + Cohen's dz + aggregate). Then Phase 3 API, Phase 4
-dashboard, Phase 5 verify (mock $0 dry-run → real Groq run). Do NOT start thesis writing until the
-build + real experiment results exist (never fabricate numbers).
+Phases 1 & 2 done. Next is **Phase 3** (API): new `backend/app/evaluation/routes.py` (register in
+`main.py`), mirroring existing `Depends(get_db)`/`get_current_user`/`ModelSelection` + ownership-check
+patterns: `POST /evaluation/benchmark/seed`, `GET …/datasets/{id}/items`, `POST …/experiments`,
+`POST …/experiments/{id}/run` (202, `BackgroundTasks` → `run_experiment_task`), `GET …/experiments/{id}`
+(status/progress via `experiment_progress`), `GET …/experiments/{id}/results` (`aggregate_experiment`),
+`GET …/experiments/{id}/items/{requirement_id}` (drill-down), `GET …/experiments` (list). Then Phase 4
+dashboard, Phase 5 verify (mock $0 dry-run → real Groq run). Do NOT start thesis writing until the build
++ real experiment results exist (never fabricate numbers).
 
 ## On-disk artifacts to copy if moving to a new machine
 - `~/.claude/projects/-Volumes-Pranto-SELF-Self-Projects-trip-track-main/memory/` (all memories)
