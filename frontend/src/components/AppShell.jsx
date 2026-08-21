@@ -20,6 +20,12 @@ const icons = {
       <path d="M10.5 11 13.5 8 10.5 5M13.2 8H6.2" />
     </svg>
   ),
+  experiments: (
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6.2 2h3.6M6.6 2v3.6L3.3 11.4A1.2 1.2 0 0 0 4.35 13.2h7.3a1.2 1.2 0 0 0 1.05-1.8L9.4 5.6V2" />
+      <path d="M5.4 9.2h5.2" />
+    </svg>
+  ),
 };
 
 export default function AppShell({ children }) {
@@ -45,6 +51,7 @@ export default function AppShell({ children }) {
 
   const atHome = pathname === "/";
   const inProject = pathname.startsWith("/projects");
+  const inExperiments = pathname.startsWith("/experiments");
 
   return (
     <div className="app">
@@ -66,6 +73,14 @@ export default function AppShell({ children }) {
           <Link to="/" className={`${inProject ? "active" : ""}`}>
             {icons.projects}
             Projects
+          </Link>
+        </nav>
+
+        <div className="side-label">Research</div>
+        <nav className="side-nav">
+          <Link to="/experiments" className={`${inExperiments ? "active" : ""}`}>
+            {icons.experiments}
+            Experiments
           </Link>
         </nav>
 

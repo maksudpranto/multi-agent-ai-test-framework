@@ -111,18 +111,34 @@ Target submission ~2nd week of September 2026. Everything runs on **$0** (free t
   `_resolve_engine_and_model` monkeypatched) + an ownership check. Full suite 41 passed. NB the dev `.env`
   uses `LLM_PROVIDER=gemini`, so offline tests MUST force mock (real runs otherwise hit Gemini 429s).
 
+- **Phase 4 — DONE (2026-08-21), browser-verified.** Experiments dashboard (frontend). `ModelPicker`
+  extracted to `components/ModelPicker.jsx` (RequirementDetail now imports it). `api/client.js` +
+  evaluation methods (listConditions, seedBenchmark, listBenchmarkItems, listExperiments,
+  createExperiment, runExperiment, getExperiment, getExperimentResults, getExperimentItem). Sidebar
+  "Research › Experiments" in `AppShell.jsx`; routes `/experiments`, `/experiments/:id` in `App.jsx`.
+  `experiments/ExperimentsList.jsx` (seed card, condition pills + ModelPicker, launch = create+run+nav,
+  live-polling experiment list). `experiments/ExperimentResults.jsx` (polls while running; headline
+  callout, fault-detection tiles with "Best" winner, significance cards, summary table with per-column
+  winner highlight, per-program drill-down, CSV + PNG export). Hand-rolled SVG charts in
+  `experiments/charts/` (BarChart, GroupedBarChart, palette.js, chartExport.js — svgToPng + downloadCsv).
+  Scoped `/* Experiments */` block appended to `index.css`. `npm run lint` clean (warnings only),
+  `npm run build` OK. Verified live in-browser end to end on the mock backend (register→login→seed→
+  configure→run→completed→results with all sections + drill-down). Mock verify note: to force the free
+  mock, run uvicorn with `LLM_PROVIDER=mock` AND clear the stored model (`localStorage.removeItem
+  ('matf_model')`) so no real provider selection is sent; `.test` emails are rejected by the validator,
+  use a real-looking domain. Demo user `matfdemo2026@example.com` + its experiment now live in the dev
+  `app.db`.
+
 ## EXACT next action when resuming
-Phases 1–3 done. Next is **Phase 4** (frontend dashboard): extract `ModelPicker` from
-`RequirementDetail.jsx` → `components/ModelPicker.jsx`; add `api/client.js` calls (listExperiments,
-createExperiment, getExperiment, getExperimentResults, seedBenchmark, exportExperiment); sidebar
-"Research › Experiments" in `AppShell.jsx` + routes `/experiments`, `/experiments/:id` in `App.jsx`;
-`experiments/ExperimentsList.jsx` (seed, pick conditions+model, run, polling table) and
-`experiments/ExperimentResults.jsx` (headline fault-detection tiles, hand-rolled SVG charts in
-`experiments/charts/`, significance callout, summary table, drill-down, CSV/PNG export). Must be
-HCI-friendly (Nielsen; examiner grasps it in seconds; tooltips for "mutation score"/"p-value"). Then
-Phase 5 verify (mock $0 dry-run → real Groq run). Do NOT start thesis writing until the build + real
-experiment results exist (never fabricate numbers). API shapes to build against: see
-`backend/app/evaluation/{routes.py,schemas.py}` and `stats.aggregate_experiment` return dict.
+Phases 1–4 done — the whole build is functional and browser-verified on mock. Next is **Phase 5**
+(verify + real numbers): (a) already have the mock $0 dry-run working; (b) run ONE real study on
+**Groq · Llama 3.3 70B** (fast, live free quota) to get actual differentiated numbers — set backend
+`LLM_PROVIDER`/keys or just pick Groq in the UI model picker, create an experiment, run it, confirm
+multi-agent ≥ baseline on mutation score for a majority of items and ideally a significant Wilcoxon on
+at least one comparison; (c) optionally add a couple of pytest cases already covered
+(harness/stats/runner/API green — 41 passing). Then update `ROADMAP.md` Phase 8 + `ARCHITECTURE.md`.
+The results screen's CSV/PNG exports feed the thesis Evaluation chapter directly. ONLY AFTER real
+numbers exist: begin thesis writing (LaTeX, PMIT template in `thesis/`). Never fabricate numbers.
 
 ## On-disk artifacts to copy if moving to a new machine
 - `~/.claude/projects/-Volumes-Pranto-SELF-Self-Projects-trip-track-main/memory/` (all memories)

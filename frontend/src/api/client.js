@@ -204,6 +204,28 @@ export const api = {
   getLatestBaseline: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-baseline`),
 
+  // --- Evaluation (fault-based experiments) ---
+  // The experiment run attaches the current model selection (modelBody) so the
+  // chosen provider+model drives the study; omitted -> backend default.
+  listConditions: () => request("/evaluation/conditions"),
+  seedBenchmark: () => pipe(request("/evaluation/benchmark/seed", { method: "POST" })),
+  listBenchmarkItems: (datasetId) => request(`/evaluation/datasets/${datasetId}/items`),
+  listExperiments: () => request("/evaluation/experiments"),
+  createExperiment: (body) =>
+    request("/evaluation/experiments", { method: "POST", body }),
+  runExperiment: (experimentId) =>
+    pipe(
+      request(`/evaluation/experiments/${experimentId}/run`, {
+        method: "POST",
+        body: modelBody() ?? {},
+      })
+    ),
+  getExperiment: (experimentId) => request(`/evaluation/experiments/${experimentId}`),
+  getExperimentResults: (experimentId) =>
+    request(`/evaluation/experiments/${experimentId}/results`),
+  getExperimentItem: (experimentId, requirementId) =>
+    request(`/evaluation/experiments/${experimentId}/items/${requirementId}`),
+
   // --- Export (§10): fetch the package as a blob and download it ---
   async exportPackage(projectId, requirementId, fmt) {
     const token = getToken();
