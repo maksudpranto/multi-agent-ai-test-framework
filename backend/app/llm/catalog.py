@@ -12,7 +12,18 @@ from app.config import Settings
 # provider   — which backend/key it runs on
 # model      — the exact model id sent to the provider
 # note       — short hint (speed / character), shown as a sublabel
+# NOTE: provider catalogs change over time — model ids get retired. Keep this in
+# sync with what the keys can actually call (Groq retired the Llama-3.x ids that
+# used to live here, which made every run 404). Gemini Flash-Lite is listed first
+# because it reliably returns the strict JSON our agents need; the Groq gpt-oss
+# and OpenRouter models are reasoning/`:free` models that can be flakier.
 FREE_MODELS: list[dict] = [
+    {
+        "provider": "gemini",
+        "model": "gemini-flash-lite-latest",
+        "label": "Gemini Flash-Lite",
+        "note": "Google · fast, reliable (recommended)",
+    },
     {
         "provider": "gemini",
         "model": "gemini-flash-latest",
@@ -20,34 +31,22 @@ FREE_MODELS: list[dict] = [
         "note": "Google · balanced, thinking",
     },
     {
-        "provider": "gemini",
-        "model": "gemini-flash-lite-latest",
-        "label": "Gemini Flash-Lite",
-        "note": "Google · fastest, cheapest",
+        "provider": "groq",
+        "model": "openai/gpt-oss-120b",
+        "label": "GPT-OSS 120B",
+        "note": "Groq · very fast, strong (reasoning)",
     },
     {
         "provider": "groq",
-        "model": "llama-3.3-70b-versatile",
-        "label": "Llama 3.3 70B",
-        "note": "Groq · very fast, strong",
+        "model": "openai/gpt-oss-20b",
+        "label": "GPT-OSS 20B",
+        "note": "Groq · instant, lightweight (reasoning)",
     },
-    {
-        "provider": "groq",
-        "model": "llama-3.1-8b-instant",
-        "label": "Llama 3.1 8B",
-        "note": "Groq · instant, lightweight",
-    },
-    # OpenRouter's ':free' catalog changes often — these were verified live.
-    {
-        "provider": "openrouter",
-        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
-        "label": "Nemotron 3 Ultra 550B",
-        "note": "OpenRouter · flagship, most capable",
-    },
+    # OpenRouter's ':free' catalog changes often — verify before relying on these.
     {
         "provider": "openrouter",
         "model": "openai/gpt-oss-20b:free",
-        "label": "GPT-OSS 20B",
+        "label": "GPT-OSS 20B (OpenRouter)",
         "note": "OpenRouter · OpenAI open model",
     },
     {

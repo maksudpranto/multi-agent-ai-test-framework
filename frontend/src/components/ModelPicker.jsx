@@ -23,17 +23,23 @@ export default function ModelPicker({ onProviderChange }) {
       .then((data) => {
         setCatalog(data);
         let current = getModelSelection();
-        if (!current) {
+        // Reset a stale/invalid selection (e.g. a model the provider has since
+        // retired) to a valid, ready default — otherwise every run would keep
+        // failing against a dead model id.
+        const stillValid =
+          current &&
+          data.models.some(
+            (m) => m.provider === current.provider && m.model === current.model && m.ready
+          );
+        if (!stillValid) {
           const d = data.default;
           const match = data.models.find(
             (m) => m.provider === d.provider && m.model === d.model && m.ready
           );
           const first = match || data.models.find((m) => m.ready);
-          if (first) {
-            current = { provider: first.provider, model: first.model };
-            setModelSelection(current);
-            setSel(current);
-          }
+          current = first ? { provider: first.provider, model: first.model } : null;
+          setModelSelection(current);
+          setSel(current);
         }
         if (current) onProviderChange?.(current.provider);
       })
