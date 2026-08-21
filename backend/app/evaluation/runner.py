@@ -53,7 +53,8 @@ class ExperimentRunner:
 
     # -- cell-level ----------------------------------------------------------
     def _already_done(
-        self, db: Session, experiment_id: int, requirement_id: int, condition_key: str
+        self, db: Session, experiment_id: int, requirement_id: int,
+        condition_key: str, repetition: int,
     ) -> bool:
         run_id = db.scalar(
             select(PipelineRun.id)
@@ -61,6 +62,7 @@ class ExperimentRunner:
                 PipelineRun.experiment_id == experiment_id,
                 PipelineRun.requirement_id == requirement_id,
                 PipelineRun.experiment_condition == condition_key,
+                PipelineRun.repetition == repetition,
                 PipelineRun.status == RunStatus.completed,
             )
             .order_by(PipelineRun.id.desc())
@@ -83,6 +85,7 @@ class ExperimentRunner:
         item: BenchmarkItem,
         condition: Condition,
         base_config: RunConfig,
+        repetition: int,
     ) -> dict:
         requirement = item.requirement
         cfg = condition.apply(base_config)
@@ -91,6 +94,7 @@ class ExperimentRunner:
             requirement_id=requirement.id,
             experiment_id=experiment.id,
             experiment_condition=condition.key,
+            repetition=repetition,
             mode=condition.mode,
             input_mode="requirement",
             current_stage=PipelineStage.test_generation,
@@ -117,8 +121,8 @@ class ExperimentRunner:
             run.completed_at = utcnow()
             db.commit()
             logger.info(
-                "cell done: exp=%s item=%s cond=%s mutation_score=%.3f",
-                experiment.id, item.slug, condition.key,
+                "cell done: exp=%s rep=%s item=%s cond=%s mutation_score=%.3f",
+                experiment.id, repetition, item.slug, condition.key,
                 metrics.get(MUTATION_SCORE, 0.0),
             )
             return {"ok": True, "metrics": metrics}
@@ -129,8 +133,8 @@ class ExperimentRunner:
                 run.status = RunStatus.failed
                 db.commit()
             logger.exception(
-                "cell FAILED: exp=%s item=%s cond=%s: %s",
-                experiment.id, item.slug, condition.key, exc,
+                "cell FAILED: exp=%s rep=%s item=%s cond=%s: %s",
+                experiment.id, repetition, item.slug, condition.key, exc,
             )
             return {"ok": False, "error": str(exc)}
 
@@ -151,29 +155,33 @@ class ExperimentRunner:
         base_config = RunConfig.defaults()
         base_config.model = self.model
 
+        repetitions = max(1, int(experiment.repetitions or 1))
         experiment.status = RunStatus.running
         experiment.completed_at = None
         db.commit()
 
-        total = len(items) * len(conditions)
+        total = len(items) * len(conditions) * repetitions
         done = skipped = failed = 0
         logger.info(
-            "experiment %s start: %d items x %d conditions = %d cells",
-            experiment_id, len(items), len(conditions), total,
+            "experiment %s start: %d items x %d conditions x %d reps = %d cells",
+            experiment_id, len(items), len(conditions), repetitions, total,
         )
 
-        for item in items:
-            for condition in conditions:
-                if self._already_done(
-                    db, experiment_id, item.requirement_id, condition.key
-                ):
-                    skipped += 1
-                    continue
-                outcome = self._run_cell(db, experiment, item, condition, base_config)
-                if outcome["ok"]:
-                    done += 1
-                else:
-                    failed += 1
+        for rep in range(1, repetitions + 1):
+            for item in items:
+                for condition in conditions:
+                    if self._already_done(
+                        db, experiment_id, item.requirement_id, condition.key, rep
+                    ):
+                        skipped += 1
+                        continue
+                    outcome = self._run_cell(
+                        db, experiment, item, condition, base_config, rep
+                    )
+                    if outcome["ok"]:
+                        done += 1
+                    else:
+                        failed += 1
 
         experiment.status = RunStatus.completed
         experiment.completed_at = utcnow()
@@ -234,15 +242,20 @@ def experiment_progress(db: Session, experiment_id: int) -> dict:
         return {"total": 0, "completed": 0, "failed": 0, "pct": 0.0}
 
     conditions = resolve_conditions(experiment.conditions)
+    repetitions = max(1, int(experiment.repetitions or 1))
     n_items = db.scalar(
         select(func.count(BenchmarkItem.id)).where(
             BenchmarkItem.dataset_id == experiment.dataset_id
         )
     ) or 0
-    total = n_items * len(conditions)
+    total = n_items * len(conditions) * repetitions
 
     completed_cells = db.execute(
-        select(PipelineRun.experiment_condition, PipelineRun.requirement_id)
+        select(
+            PipelineRun.experiment_condition,
+            PipelineRun.requirement_id,
+            PipelineRun.repetition,
+        )
         .where(
             PipelineRun.experiment_id == experiment_id,
             PipelineRun.status == RunStatus.completed,

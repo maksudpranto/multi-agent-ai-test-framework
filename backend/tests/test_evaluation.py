@@ -198,6 +198,42 @@ def test_ablation_no_debate_has_no_debate_turns(experiment):
     assert debate_turns_for("full_pipeline") is True
 
 
+def test_repetitions_run_full_grid_and_report_spread():
+    """A 2-repetition study runs the grid twice and reports a run-to-run spread.
+    On the deterministic mock every repetition is identical, so the spread is 0."""
+    engine_db = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
+    Base.metadata.create_all(engine_db)
+    db = sessionmaker(bind=engine_db)()
+    seed_prompts(db)
+    user = User(email="rep@e.com", hashed_password="h")
+    db.add(user)
+    db.commit()
+    info = seed_benchmark(db, user.id)
+    exp = Experiment(
+        owner_id=user.id, name="Rep", dataset_id=info["dataset_id"],
+        mode=ExperimentMode.multi_agent,
+        conditions=["single_llm", "full_pipeline"], repetitions=2,
+    )
+    db.add(exp)
+    db.commit()
+
+    engine = DefaultWorkflowEngine(
+        LLMService(MockProvider(responder=_dev_mock_responder))
+    )
+    summary = ExperimentRunner(engine, model="mock").run_experiment(db, exp.id)
+    assert summary["total_cells"] == info["n_items"] * 2 * 2  # items x conds x reps
+    assert summary["completed"] == summary["total_cells"]
+
+    agg = aggregate_experiment(db, exp.id)
+    assert agg["n_reps"] == 2
+    for c in agg["conditions"]:
+        assert c["n_reps"] == 2
+        assert c["run_to_run_std"] == 0.0  # deterministic mock => no spread
+    db.close()
+
+
 def test_aggregate_shape_and_pairwise(experiment):
     db = experiment["db"]
     agg = aggregate_experiment(db, experiment["exp_id"])

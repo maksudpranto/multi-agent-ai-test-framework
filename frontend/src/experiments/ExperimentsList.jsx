@@ -82,6 +82,7 @@ export default function ExperimentsList() {
   // Create form
   const [name, setName] = useState("");
   const [picked, setPicked] = useState({});
+  const [reps, setReps] = useState(1);
   const [launching, setLaunching] = useState(false);
   const nameRef = useRef(null);
 
@@ -128,7 +129,7 @@ export default function ExperimentsList() {
     if (!name.trim() || chosen.length === 0) return;
     setLaunching(true);
     try {
-      const exp = await api.createExperiment({ name: name.trim(), conditions: chosen });
+      const exp = await api.createExperiment({ name: name.trim(), conditions: chosen, repetitions: reps });
       await api.runExperiment(exp.id);
       navigate(`/experiments/${exp.id}`);
     } catch (err) {
@@ -220,6 +221,25 @@ export default function ExperimentsList() {
                   <span className="cp-label">{c.label}</span>
                   {c.is_baseline && <span className="cp-tag">baseline</span>}
                 </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="field">
+            <span className="field-label">
+              Repeat runs
+              <span className="field-hint"> — AI output varies run to run; repeating averages out the noise and reports the spread</span>
+            </span>
+            <div className="reps-pills">
+              {[1, 3, 5].map((n) => (
+                <button
+                  type="button"
+                  key={n}
+                  className={`reps-pill ${reps === n ? "on" : ""}`}
+                  onClick={() => setReps(n)}
+                >
+                  {n === 1 ? "1 run" : `${n} runs`}
+                </button>
               ))}
             </div>
           </div>

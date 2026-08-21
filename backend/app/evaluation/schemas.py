@@ -43,6 +43,9 @@ class ExperimentCreate(BaseModel):
     name: str
     dataset_id: int | None = None
     conditions: list[str] | None = None
+    # How many times to run the whole grid (averages out LLM run-to-run noise and
+    # yields a reproducibility spread). Clamped server-side to a sane range.
+    repetitions: int = 1
 
 
 class ExperimentOut(BaseModel):
@@ -52,6 +55,7 @@ class ExperimentOut(BaseModel):
     mode: str
     status: str
     conditions: list[str]
+    repetitions: int
     created_at: datetime
     completed_at: datetime | None
 

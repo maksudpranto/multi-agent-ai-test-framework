@@ -85,6 +85,7 @@ def _exp_out(experiment: Experiment) -> ExperimentOut:
         mode=experiment.mode.value if hasattr(experiment.mode, "value") else experiment.mode,
         status=experiment.status.value if hasattr(experiment.status, "value") else experiment.status,
         conditions=[c.key for c in resolve_conditions(experiment.conditions)],
+        repetitions=experiment.repetitions or 1,
         created_at=experiment.created_at,
         completed_at=experiment.completed_at,
     )
@@ -230,12 +231,14 @@ def create_experiment(
         )
 
     conditions = [c.key for c in resolve_conditions(payload.conditions)]
+    repetitions = max(1, min(10, int(payload.repetitions or 1)))
     experiment = Experiment(
         owner_id=user.id,
         name=name,
         dataset_id=dataset.id,
         mode=ExperimentMode.multi_agent,
         conditions=conditions,
+        repetitions=repetitions,
         status=RunStatus.pending,
     )
     db.add(experiment)

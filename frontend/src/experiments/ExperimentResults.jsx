@@ -197,6 +197,9 @@ export default function ExperimentResults() {
       <section className="section">
         <div className="section-head">
           <h2>Fault detection by condition <Info tip="How many of the seeded bugs each condition's suites caught, averaged over the benchmark. This is the thesis's core measure." /></h2>
+          {results.n_reps > 1 && (
+            <span className="muted">averaged over {results.n_reps} runs · ± = run-to-run spread</span>
+          )}
         </div>
         <div className="fd-tiles">
           {orderedConditions.map((c) => {
@@ -208,10 +211,17 @@ export default function ExperimentResults() {
                 <div className="fd-name" style={{ "--dot": conditionColor(c.key) }}>
                   <span className="fd-dot" /> {c.label}
                 </div>
-                <div className="fd-score">{s ? pct01(s.mean) : "—"}</div>
+                <div className="fd-score">
+                  {s ? pct01(s.mean) : "—"}
+                  {c.n_reps > 1 && c.run_to_run_std != null && (
+                    <span className="fd-spread" title="Run-to-run spread across repeated runs (± standard deviation)">
+                      ± {pct01(c.run_to_run_std)}
+                    </span>
+                  )}
+                </div>
                 <div className="fd-sub">
                   {c.is_baseline ? "baseline" : "of seeded faults caught"}
-                  {s && s.n > 0 ? ` · n=${s.n}` : ""}
+                  {s && s.n > 0 ? ` · ${s.n} programs` : ""}
                 </div>
               </div>
             );

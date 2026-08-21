@@ -252,6 +252,10 @@ class PipelineRun(Base):
     status: Mapped[RunStatus] = mapped_column(
         Enum(RunStatus), default=RunStatus.pending
     )
+    # Which repetition of a repeated experiment this run belongs to (1-based).
+    # LLM generation is not perfectly reproducible, so an experiment can be run
+    # several times; each cell (item x condition) then has one run per repetition.
+    repetition: Mapped[int] = mapped_column(Integer, default=1)
     # Fault-detection detail for an evaluation run: the harvested inputs and, per
     # seeded bug, whether this run's suite killed it and which input exposed it.
     # Persisted so the results drill-down can show the concrete bug/test/verdict
@@ -488,8 +492,11 @@ class Experiment(Base):
     # The experiment arms to run, e.g. ["single_llm", "full_pipeline",
     # "ablation_no_debate"]. `mode` is kept for back-compat / the legacy toggle;
     # `conditions` is the authoritative list the evaluation runner iterates over
-    # (one PipelineRun per benchmark item x condition).
+    # (one PipelineRun per benchmark item x condition x repetition).
     conditions: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # How many times to run the whole grid. >1 averages out LLM run-to-run
+    # noise and yields a reported reproducibility spread (std across repetitions).
+    repetitions: Mapped[int] = mapped_column(Integer, default=1)
     status: Mapped[RunStatus] = mapped_column(
         Enum(RunStatus), default=RunStatus.pending
     )

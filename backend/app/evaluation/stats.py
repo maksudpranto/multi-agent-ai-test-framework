@@ -150,8 +150,10 @@ _SUMMARY_METRICS = [
 ]
 
 
-def _cells(db: Session, experiment_id: int) -> dict[tuple[str, int], dict[str, float]]:
-    """Map (condition_key, requirement_id) -> {metric_name: value} for the
+def _cells(
+    db: Session, experiment_id: int
+) -> dict[tuple[str, int, int], dict[str, float]]:
+    """Map (condition_key, requirement_id, repetition) -> {metric: value} for the
     latest completed run of each cell."""
     runs = list(
         db.scalars(
@@ -164,10 +166,11 @@ def _cells(db: Session, experiment_id: int) -> dict[tuple[str, int], dict[str, f
             .order_by(PipelineRun.id)
         )
     )
-    # Latest run wins per cell (higher id).
-    run_by_cell: dict[tuple[str, int], PipelineRun] = {}
+    run_by_cell: dict[tuple[str, int, int], PipelineRun] = {}
     for run in runs:
-        run_by_cell[(run.experiment_condition, run.requirement_id)] = run
+        run_by_cell[
+            (run.experiment_condition, run.requirement_id, run.repetition or 1)
+        ] = run
 
     if not run_by_cell:
         return {}
@@ -184,9 +187,7 @@ def _cells(db: Session, experiment_id: int) -> dict[tuple[str, int], dict[str, f
     for row in metric_rows:
         by_run.setdefault(row.pipeline_run_id, {})[row.metric_name] = row.metric_value
 
-    return {
-        cell: by_run.get(run.id, {}) for cell, run in run_by_cell.items()
-    }
+    return {cell: by_run.get(run.id, {}) for cell, run in run_by_cell.items()}
 
 
 def _valid_score(values: dict[str, float]) -> bool:
@@ -195,47 +196,84 @@ def _valid_score(values: dict[str, float]) -> bool:
     return values.get(M.SUITE_VALID, 0.0) >= 1.0
 
 
+def _item_mean(
+    cells: dict, key: str, rid: int, reps: list[int], metric: str, valid_only: bool
+) -> float | None:
+    """Mean of a metric for one (condition, item) cell across its repetitions.
+    Averaging across repeats is what makes the comparison robust to LLM
+    run-to-run noise."""
+    vals = []
+    for rep in reps:
+        v = cells.get((key, rid, rep))
+        if v is None or metric not in v:
+            continue
+        if valid_only and not _valid_score(v):
+            continue
+        vals.append(v[metric])
+    return fmean(vals) if vals else None
+
+
 def aggregate_experiment(db: Session, experiment_id: int) -> dict[str, Any]:
-    """Per-condition summaries + pairwise significance vs the baseline.
+    """Per-condition summaries + pairwise significance vs the baseline, averaged
+    across repetitions with a reported run-to-run spread.
 
-    Fault-detection stats use only valid cells (the reference oracle ran).
-    Comparisons pair conditions by benchmark item, so the Wilcoxon test is a
-    genuine paired test on the same requirements."""
+    Each (condition, item) score is first averaged over the experiment's
+    repetitions (robust to LLM non-determinism); the paired Wilcoxon test then
+    runs on those per-item means. Per condition we also report the standard
+    deviation of the whole-suite score across repetitions — the reproducibility
+    measure."""
     cells = _cells(db, experiment_id)
-    conditions_present = sorted({key for (key, _rid) in cells})
-    requirement_ids = sorted({rid for (_key, rid) in cells})
+    conditions_present = sorted({key for (key, _r, _rep) in cells})
+    requirement_ids = sorted({rid for (_k, rid, _rep) in cells})
+    reps_present = sorted({rep for (_k, _r, rep) in cells})
 
-    # Per-condition metric summaries.
     condition_out: list[dict[str, Any]] = []
     for key in conditions_present:
         cond = CONDITIONS.get(key)
-        cell_values = [v for (k, _rid), v in cells.items() if k == key]
-        valid_scores = [
-            v[M.MUTATION_SCORE]
-            for v in cell_values
-            if _valid_score(v) and M.MUTATION_SCORE in v
+        # Per-item mean fault score across repetitions (valid cells only).
+        item_scores = [
+            m for rid in requirement_ids
+            if (m := _item_mean(cells, key, rid, reps_present, M.MUTATION_SCORE, True)) is not None
         ]
-        summary: dict[str, dict] = {}
+        summary: dict[str, dict] = {M.MUTATION_SCORE: describe(item_scores)}
         for name in _SUMMARY_METRICS:
             if name == M.MUTATION_SCORE:
-                summary[name] = describe(valid_scores)
-            else:
-                col = [v[name] for v in cell_values if name in v]
-                if col:
-                    summary[name] = describe(col)
-        condition_out.append(
-            {
-                "key": key,
-                "label": cond.label if cond else key,
-                "description": cond.description if cond else "",
-                "is_baseline": bool(cond and cond.is_baseline),
-                "n_runs": len(cell_values),
-                "n_valid": len(valid_scores),
-                "metrics": summary,
-            }
-        )
+                continue
+            col = [
+                m for rid in requirement_ids
+                if (m := _item_mean(cells, key, rid, reps_present, name, False)) is not None
+            ]
+            if col:
+                summary[name] = describe(col)
 
-    # Pairwise comparisons vs the baseline, on mutation score.
+        # Run-to-run spread: whole-suite mean per repetition, std across reps.
+        rep_means = []
+        for rep in reps_present:
+            per_rep = [
+                v[M.MUTATION_SCORE]
+                for rid in requirement_ids
+                if (v := cells.get((key, rid, rep))) is not None
+                and _valid_score(v) and M.MUTATION_SCORE in v
+            ]
+            if per_rep:
+                rep_means.append(fmean(per_rep))
+        run_to_run_std = round(stdev(rep_means), 4) if len(rep_means) > 1 else 0.0
+
+        n_runs = sum(1 for (k, _r, _rep) in cells if k == key)
+        condition_out.append({
+            "key": key,
+            "label": cond.label if cond else key,
+            "description": cond.description if cond else "",
+            "is_baseline": bool(cond and cond.is_baseline),
+            "n_runs": n_runs,
+            "n_valid": len(item_scores),
+            "n_reps": len(rep_means),
+            "run_to_run_std": run_to_run_std,
+            "rep_means": [round(x, 4) for x in rep_means],
+            "metrics": summary,
+        })
+
+    # Pairwise comparisons vs the baseline, on the per-item means.
     comparisons: list[dict[str, Any]] = []
     baseline_present = BASELINE_KEY in conditions_present
     for key in conditions_present:
@@ -243,11 +281,8 @@ def aggregate_experiment(db: Session, experiment_id: int) -> dict[str, Any]:
             continue
         paired_base, paired_cond, wins, losses, ties = [], [], 0, 0, 0
         for rid in requirement_ids:
-            b = cells.get((BASELINE_KEY, rid))
-            c = cells.get((key, rid))
-            if not b or not c or not _valid_score(b) or not _valid_score(c):
-                continue
-            bs, cs = b.get(M.MUTATION_SCORE), c.get(M.MUTATION_SCORE)
+            bs = _item_mean(cells, BASELINE_KEY, rid, reps_present, M.MUTATION_SCORE, True)
+            cs = _item_mean(cells, key, rid, reps_present, M.MUTATION_SCORE, True)
             if bs is None or cs is None:
                 continue
             paired_base.append(bs)
@@ -291,13 +326,12 @@ def aggregate_experiment(db: Session, experiment_id: int) -> dict[str, Any]:
             "rank_biserial": rank_biserial(paired_cond, paired_base),
         })
 
-    # Headline: the condition with the best mean mutation score, and how it
-    # compares to the baseline.
     headline = _headline(condition_out, comparisons)
 
     return {
         "experiment_id": experiment_id,
         "n_items": len(requirement_ids),
+        "n_reps": len(reps_present),
         "conditions": condition_out,
         "comparisons": comparisons,
         "headline": headline,
