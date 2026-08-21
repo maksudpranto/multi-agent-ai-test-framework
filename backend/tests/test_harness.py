@@ -50,11 +50,11 @@ def test_good_inputs_kill_every_mutant_across_corpus():
 def test_weak_inputs_let_boundary_mutant_survive():
     """A thin suite that omits the boundary case misses the boundary mutant.
 
-    ipv4_validator m4 rejects exactly 255 (off-by-one on the upper bound); only
-    an input whose octet is exactly 255 reveals it. A weak suite of one valid and
-    one obviously-invalid address does not."""
-    prog = _prog("ipv4_validator")
-    weak_inputs = [["1.2.3.4"], ["256.1.1.1"]]  # valid + over-256, no 255 boundary
+    atm_withdrawal m3 rejects hitting the daily limit *exactly* (off-by-one);
+    only an input where today's total lands exactly on the limit reveals it. A
+    weak suite of a normal withdrawal plus an insufficient-funds case does not."""
+    prog = _prog("atm_withdrawal")
+    weak_inputs = [[1000, 200, 0, 500], [100, 200, 0, 500]]  # normal + insufficient
     result = score_suite(
         reference_code=prog["reference"],
         mutants=_mutants(prog),
@@ -62,31 +62,30 @@ def test_weak_inputs_let_boundary_mutant_survive():
         inputs=weak_inputs,
     )
     survivors = {m["key"] for m in result.per_mutant if not m["killed"]}
-    assert "m4" in survivors  # the 255-boundary bug survives the weak suite
+    assert "m3" in survivors  # the exact-daily-limit bug survives the weak suite
     assert result.mutation_score < 1.0
-    # And adding the exact-255 boundary input flips it to killed.
+    # Adding the exact-limit boundary input (400 + 100 == 500) flips it to killed.
     strong = score_suite(
         reference_code=prog["reference"],
         mutants=_mutants(prog),
         entrypoint=prog["entrypoint"],
-        inputs=weak_inputs + [["255.255.255.255"]],
+        inputs=weak_inputs + [[1000, 100, 400, 500]],
     )
-    assert all(m["killed"] for m in strong.per_mutant if m["key"] == "m4")
+    assert all(m["killed"] for m in strong.per_mutant if m["key"] == "m3")
 
 
 # --- Sandbox behaviours ------------------------------------------------------
 
 
 def test_type_only_divergence_is_a_kill():
-    """rpn_calculator m4 truncates division to an int, where the reference
-    returns a float — a type-only difference the harness must catch."""
-    prog = _prog("rpn_calculator")
-    m4 = next(m for m in prog["mutants"] if m["key"] == "m4")
+    """A value that differs only by type (int 7 vs str '7') must count as a kill."""
+    ref = "def f(x):\n    return 7\n"
+    mutant = "def f(x):\n    return '7'\n"
     result = score_suite(
-        reference_code=prog["reference"],
-        mutants=[{"key": "m4", "code": m4["code"]}],
-        entrypoint=prog["entrypoint"],
-        inputs=[["8 2 /"]],
+        reference_code=ref,
+        mutants=[{"key": "t", "code": mutant}],
+        entrypoint="f",
+        inputs=[[0]],
     )
     assert result.killed == 1
 
@@ -119,7 +118,7 @@ def test_timeout_is_killed_and_reference_stays_usable():
 
 
 def test_identical_code_kills_nothing():
-    prog = _prog("version_compare")
+    prog = _prog("atm_withdrawal")
     result = score_suite(
         reference_code=prog["reference"],
         mutants=[{"key": "clone", "code": prog["reference"]}],
@@ -147,7 +146,7 @@ def test_suite_invalid_when_reference_never_runs():
 
 
 def test_empty_suite_scores_zero_and_is_invalid():
-    prog = _prog("ipv4_validator")
+    prog = _prog("atm_withdrawal")
     result = score_suite(
         reference_code=prog["reference"],
         mutants=_mutants(prog),
@@ -165,7 +164,7 @@ def test_empty_suite_scores_zero_and_is_invalid():
 def test_materializer_falls_back_to_canonical_on_bad_output():
     """The mock provider returns '{}' for the materializer prompt (no matching
     branch), which is unusable -> fall back to canonical inputs."""
-    prog = _prog("ipv4_validator")
+    prog = _prog("atm_withdrawal")
     llm = LLMService(MockProvider(response="{}"))
     inputs, materialized = materialize_inputs(
         llm,
@@ -180,8 +179,8 @@ def test_materializer_falls_back_to_canonical_on_bad_output():
 
 
 def test_materializer_accepts_wellformed_llm_inputs():
-    prog = _prog("ipv4_validator")
-    llm = LLMService(MockProvider(response='[["1.2.3.4"], ["256.1.1.1"], ["01.2.3.4"]]'))
+    prog = _prog("atm_withdrawal")
+    llm = LLMService(MockProvider(response="[[1000, 200, 0, 500], [100, 50, 0, 500]]"))
     inputs, materialized = materialize_inputs(
         llm,
         signature=prog["signature"],
@@ -191,13 +190,13 @@ def test_materializer_accepts_wellformed_llm_inputs():
         model="mock",
     )
     assert materialized is True
-    assert inputs == [["1.2.3.4"], ["256.1.1.1"], ["01.2.3.4"]]
+    assert inputs == [[1000, 200, 0, 500], [100, 50, 0, 500]]
 
 
 def test_materializer_rejects_wrong_arity():
-    """Two-arg tuples for a one-arg function are dropped; nothing usable
+    """Two-arg tuples for a four-arg function are dropped; nothing usable
     remains, so it falls back."""
-    prog = _prog("ipv4_validator")
+    prog = _prog("atm_withdrawal")
     llm = LLMService(MockProvider(response="[[1, 2], [3, 4]]"))
     inputs, materialized = materialize_inputs(
         llm,

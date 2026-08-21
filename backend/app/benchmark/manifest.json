@@ -1,503 +1,673 @@
 [
   {
-    "slug": "ipv4_validator",
-    "title": "IPv4 address validator",
-    "entrypoint": "is_valid_ipv4",
-    "signature": "is_valid_ipv4(s: str) -> bool",
+    "slug": "atm_withdrawal",
+    "title": "ATM cash withdrawal",
+    "entrypoint": "atm_withdraw",
+    "signature": "atm_withdraw(balance: int, amount: int, withdrawn_today: int, daily_limit: int) -> int | str",
     "params": [
       {
-        "name": "s",
-        "type": "str",
-        "note": "the string to validate"
-      }
-    ],
-    "requirement": "As a form-validation feature, I want is_valid_ipv4(s) to return True when a\nstring is a well-formed IPv4 address and False otherwise.\n\nA well-formed address is four decimal numbers separated by dots, and each\nnumber is in the range 0 to 255. For example \"192.168.0.1\" is valid and\n\"10.0.0.256\" is not. The function returns a boolean; it never raises.",
-    "canonical_inputs": [
-      [
-        "1.2.3.4"
-      ],
-      [
-        "0.0.0.0"
-      ],
-      [
-        "255.255.255.255"
-      ],
-      [
-        "256.1.1.1"
-      ],
-      [
-        "01.2.3.4"
-      ],
-      [
-        "1.2.3.4.5"
-      ],
-      [
-        "1.2.3"
-      ],
-      [
-        "1.300.1.1"
-      ],
-      [
-        "a.b.c.d"
-      ]
-    ],
-    "reference_file": "fixtures/ipv4_validator/reference.py",
-    "mutants": [
-      {
-        "key": "m1",
-        "description": "No upper-bound check, so octets above 255 are accepted.",
-        "file": "fixtures/ipv4_validator/mutants/m1.py"
-      },
-      {
-        "key": "m2",
-        "description": "Leading-zero octets (e.g. '01') are wrongly accepted.",
-        "file": "fixtures/ipv4_validator/mutants/m2.py"
-      },
-      {
-        "key": "m3",
-        "description": "Accepts 4 OR MORE parts (uses < instead of !=).",
-        "file": "fixtures/ipv4_validator/mutants/m3.py"
-      },
-      {
-        "key": "m4",
-        "description": "Boundary off-by-one: rejects exactly 255 (uses >= 255).",
-        "file": "fixtures/ipv4_validator/mutants/m4.py"
-      }
-    ]
-  },
-  {
-    "slug": "balanced_brackets",
-    "title": "Balanced-brackets checker",
-    "entrypoint": "is_balanced",
-    "signature": "is_balanced(s: str) -> bool",
-    "params": [
-      {
-        "name": "s",
-        "type": "str",
-        "note": "a string possibly containing brackets"
-      }
-    ],
-    "requirement": "As a code-editor helper, I want is_balanced(s) to check whether the brackets\nin a string are balanced. The three bracket kinds are (), [] and {}.\n\nBrackets are balanced when every opening bracket is closed by a matching\nclosing bracket in the correct order, e.g. \"(a[b]{c})\" is balanced. Any\ncharacters that are not brackets are ignored. Returns a boolean.",
-    "canonical_inputs": [
-      [
-        "()"
-      ],
-      [
-        "([])"
-      ],
-      [
-        "([)]"
-      ],
-      [
-        "("
-      ],
-      [
-        ")"
-      ],
-      [
-        "(]"
-      ],
-      [
-        ""
-      ],
-      [
-        "a(b)c"
-      ],
-      [
-        "())"
-      ]
-    ],
-    "reference_file": "fixtures/balanced_brackets/reference.py",
-    "mutants": [
-      {
-        "key": "m1",
-        "description": "Closing bracket type is not checked (pops without matching).",
-        "file": "fixtures/balanced_brackets/mutants/m1.py"
-      },
-      {
-        "key": "m2",
-        "description": "Leftover unclosed brackets are ignored (always returns True at end).",
-        "file": "fixtures/balanced_brackets/mutants/m2.py"
-      },
-      {
-        "key": "m3",
-        "description": "A closing bracket with nothing open is not treated as an error.",
-        "file": "fixtures/balanced_brackets/mutants/m3.py"
-      },
-      {
-        "key": "m4",
-        "description": "Only round brackets are recognised as openers.",
-        "file": "fixtures/balanced_brackets/mutants/m4.py"
-      }
-    ]
-  },
-  {
-    "slug": "slugify",
-    "title": "URL slug generator",
-    "entrypoint": "slugify",
-    "signature": "slugify(s: str) -> str",
-    "params": [
-      {
-        "name": "s",
-        "type": "str",
-        "note": "a title or phrase"
-      }
-    ],
-    "requirement": "As a blog CMS, I want slugify(s) to turn a title into a URL slug.\n\nThe slug is lowercase, with words separated by single hyphens. Letters and\ndigits are kept; spaces, hyphens and underscores become hyphens; other\npunctuation is dropped. For example \"Hello, World!\" becomes \"hello-world\".\nThe result has no leading or trailing hyphen and no doubled hyphens.",
-    "canonical_inputs": [
-      [
-        "Hello, World!"
-      ],
-      [
-        "  Spaced  "
-      ],
-      [
-        "Multiple   Spaces"
-      ],
-      [
-        "Trailing-"
-      ],
-      [
-        "ALL_CAPS"
-      ],
-      [
-        ""
-      ],
-      [
-        "a"
-      ]
-    ],
-    "reference_file": "fixtures/slugify/reference.py",
-    "mutants": [
-      {
-        "key": "m1",
-        "description": "Does not lowercase the input.",
-        "file": "fixtures/slugify/mutants/m1.py"
-      },
-      {
-        "key": "m2",
-        "description": "Does not collapse repeated hyphens.",
-        "file": "fixtures/slugify/mutants/m2.py"
-      },
-      {
-        "key": "m3",
-        "description": "Does not strip leading/trailing hyphens.",
-        "file": "fixtures/slugify/mutants/m3.py"
-      },
-      {
-        "key": "m4",
-        "description": "Underscores are dropped instead of becoming hyphens.",
-        "file": "fixtures/slugify/mutants/m4.py"
-      }
-    ]
-  },
-  {
-    "slug": "version_compare",
-    "title": "Semantic-version comparator",
-    "entrypoint": "compare_versions",
-    "signature": "compare_versions(a: str, b: str) -> int",
-    "params": [
-      {
-        "name": "a",
-        "type": "str",
-        "note": "a dotted version string, e.g. '1.2.0'"
-      },
-      {
-        "name": "b",
-        "type": "str",
-        "note": "a dotted version string"
-      }
-    ],
-    "requirement": "As a package manager, I want compare_versions(a, b) to compare two dotted\nversion strings and return -1 if a < b, 0 if they are equal, and 1 if a > b.\n\nEach component is compared numerically (so 1.10 is newer than 1.9). Missing\ntrailing components count as zero, so \"1.2\" and \"1.2.0\" are equal.",
-    "canonical_inputs": [
-      [
-        "1.0.0",
-        "1.0.0"
-      ],
-      [
-        "1.2.0",
-        "1.10.0"
-      ],
-      [
-        "1.2",
-        "1.2.0"
-      ],
-      [
-        "1.0",
-        "1.0.1"
-      ],
-      [
-        "1.0.1",
-        "1.0.2"
-      ],
-      [
-        "2.0",
-        "1.9"
-      ]
-    ],
-    "reference_file": "fixtures/version_compare/reference.py",
-    "mutants": [
-      {
-        "key": "m1",
-        "description": "Compares components as strings, so '2' > '10'.",
-        "file": "fixtures/version_compare/mutants/m1.py"
-      },
-      {
-        "key": "m2",
-        "description": "No zero-padding, so '1.0' and '1.0.1' compare equal.",
-        "file": "fixtures/version_compare/mutants/m2.py"
-      },
-      {
-        "key": "m3",
-        "description": "Sign inverted (returns 1 when a < b).",
-        "file": "fixtures/version_compare/mutants/m3.py"
-      },
-      {
-        "key": "m4",
-        "description": "Only the first two components are compared.",
-        "file": "fixtures/version_compare/mutants/m4.py"
-      }
-    ]
-  },
-  {
-    "slug": "caesar_cipher",
-    "title": "Caesar cipher",
-    "entrypoint": "caesar_cipher",
-    "signature": "caesar_cipher(text: str, shift: int) -> str",
-    "params": [
-      {
-        "name": "text",
-        "type": "str",
-        "note": "the text to encrypt"
-      },
-      {
-        "name": "shift",
+        "name": "balance",
         "type": "int",
-        "note": "how many letters to shift by"
+        "note": "current account balance"
+      },
+      {
+        "name": "amount",
+        "type": "int",
+        "note": "requested withdrawal amount"
+      },
+      {
+        "name": "withdrawn_today",
+        "type": "int",
+        "note": "already withdrawn today"
+      },
+      {
+        "name": "daily_limit",
+        "type": "int",
+        "note": "maximum allowed per day"
       }
     ],
-    "requirement": "As a puzzle app, I want caesar_cipher(text, shift) to shift each letter of\ntext forward through the alphabet by `shift` positions.\n\nLetters wrap around the end of the alphabet (z shifts to a), and the case of\neach letter is preserved. Characters that are not letters are left\nunchanged. For example caesar_cipher(\"Abc\", 1) returns \"Bcd\".",
+    "requirement": "As a bank customer at an ATM, I want to withdraw cash from my account.\n\nThe machine gives me the money and returns my new balance, as long as I\nhave enough in my account and I stay within my daily withdrawal limit.\nIf something is wrong it tells me why instead: \"invalid_amount\",\n\"insufficient_funds\", or \"over_daily_limit\".",
     "canonical_inputs": [
       [
-        "abc",
-        1
+        1000,
+        200,
+        0,
+        500
       ],
       [
-        "xyz",
+        1000,
+        0,
+        0,
+        500
+      ],
+      [
+        1000,
+        -50,
+        0,
+        500
+      ],
+      [
+        100,
+        200,
+        0,
+        500
+      ],
+      [
+        1000,
+        1000,
+        0,
+        5000
+      ],
+      [
+        1000,
+        300,
+        400,
+        500
+      ],
+      [
+        1000,
+        100,
+        400,
+        500
+      ]
+    ],
+    "reference_file": "fixtures/atm_withdrawal/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Allows a zero withdrawal (checks < 0 instead of <= 0).",
+        "file": "fixtures/atm_withdrawal/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Rejects withdrawing the exact balance (uses >= instead of >).",
+        "file": "fixtures/atm_withdrawal/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Rejects hitting the daily limit exactly (uses >= instead of >).",
+        "file": "fixtures/atm_withdrawal/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Skips the daily-limit check entirely.",
+        "file": "fixtures/atm_withdrawal/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "login_lockout",
+    "title": "Login with account lockout",
+    "entrypoint": "login_attempt",
+    "signature": "login_attempt(password_correct: bool, failed_attempts: int, max_attempts: int) -> str",
+    "params": [
+      {
+        "name": "password_correct",
+        "type": "bool",
+        "note": "whether the entered password matches"
+      },
+      {
+        "name": "failed_attempts",
+        "type": "int",
+        "note": "consecutive failures so far"
+      },
+      {
+        "name": "max_attempts",
+        "type": "int",
+        "note": "how many failures trigger a lock"
+      }
+    ],
+    "requirement": "As a security feature, I want a login check that locks an account after too\nmany failed attempts.\n\nGiven whether the password is correct and how many times it has already\nfailed, return \"success\" on a correct password, \"denied\" on a wrong one,\nand \"locked\" once the account has reached the maximum failed attempts.",
+    "canonical_inputs": [
+      [
+        true,
+        0,
         3
       ],
       [
-        "ABC",
-        1
+        false,
+        0,
+        3
       ],
       [
-        "Hello, World!",
-        5
+        true,
+        3,
+        3
       ],
       [
-        "abc",
-        0
+        false,
+        3,
+        3
       ],
       [
-        "abc",
-        27
+        true,
+        2,
+        3
+      ],
+      [
+        false,
+        4,
+        3
       ]
     ],
-    "reference_file": "fixtures/caesar_cipher/reference.py",
+    "reference_file": "fixtures/login_lockout/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "No wrap-around (drops the modulo), so 'z' overflows past 'z'.",
-        "file": "fixtures/caesar_cipher/mutants/m1.py"
+        "description": "Checks the password before the lock, so a correct password unlocks a locked account.",
+        "file": "fixtures/login_lockout/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "Uppercase letters are left unshifted (case not handled).",
-        "file": "fixtures/caesar_cipher/mutants/m2.py"
+        "description": "Off-by-one on the lock threshold (uses > instead of >=).",
+        "file": "fixtures/login_lockout/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "Non-letters are shifted too, corrupting punctuation/spaces.",
-        "file": "fixtures/caesar_cipher/mutants/m3.py"
+        "description": "A locked account returns 'denied' instead of 'locked'.",
+        "file": "fixtures/login_lockout/mutants/m3.py"
       },
       {
         "key": "m4",
-        "description": "Wrap modulus is 25, not 26 \u2014 mishandles large shifts.",
-        "file": "fixtures/caesar_cipher/mutants/m4.py"
+        "description": "Ignores the password and always reports success when not locked.",
+        "file": "fixtures/login_lockout/mutants/m4.py"
       }
     ]
   },
   {
-    "slug": "duration_parser",
-    "title": "Duration parser",
-    "entrypoint": "parse_duration",
-    "signature": "parse_duration(s: str) -> int",
+    "slug": "signup_validation",
+    "title": "Sign-up form validation",
+    "entrypoint": "validate_signup",
+    "signature": "validate_signup(email: str, password: str, confirm: str, age: int) -> str",
     "params": [
       {
-        "name": "s",
+        "name": "email",
         "type": "str",
-        "note": "a duration like '1h30m'"
+        "note": "the email address entered"
+      },
+      {
+        "name": "password",
+        "type": "str",
+        "note": "the chosen password"
+      },
+      {
+        "name": "confirm",
+        "type": "str",
+        "note": "the password typed again"
+      },
+      {
+        "name": "age",
+        "type": "int",
+        "note": "the user's age in years"
       }
     ],
-    "requirement": "As a scheduling tool, I want parse_duration(s) to turn a short duration\nstring into a total number of seconds.\n\nThe string is made of number+unit pieces, where the unit is h (hours),\nm (minutes) or s (seconds), e.g. \"1h30m\" is 5400 and \"45s\" is 45. Pieces may\nbe combined in any mix. An empty string is 0.",
+    "requirement": "As a sign-up form, I want to validate a new registration before creating the\naccount.\n\nThe email must look like an email, the password must be at least 8\ncharacters and match the confirmation, and the user must be at least 18.\nReturn \"ok\" if everything passes, otherwise the first problem found:\n\"invalid_email\", \"weak_password\", \"password_mismatch\", or \"underage\".",
     "canonical_inputs": [
       [
-        "1h"
+        "a@b.com",
+        "password1",
+        "password1",
+        25
       ],
       [
-        "30m"
+        "bad-email",
+        "password1",
+        "password1",
+        25
       ],
       [
-        "45s"
+        "a@bcom",
+        "password1",
+        "password1",
+        25
       ],
       [
-        "1h30m"
+        "a@b.com",
+        "short",
+        "short",
+        25
       ],
       [
-        "2h15m30s"
+        "a@b.com",
+        "1234567",
+        "1234567",
+        25
       ],
       [
-        ""
+        "a@b.com",
+        "password1",
+        "different",
+        25
       ],
       [
-        "90m"
+        "a@b.com",
+        "password1",
+        "password1",
+        16
+      ],
+      [
+        "a@b.com",
+        "password1",
+        "password1",
+        18
       ]
     ],
-    "reference_file": "fixtures/duration_parser/reference.py",
+    "reference_file": "fixtures/signup_validation/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "Hours use a 60x multiplier instead of 3600x.",
-        "file": "fixtures/duration_parser/mutants/m1.py"
+        "description": "Treats 18-year-olds as underage (uses <= 18).",
+        "file": "fixtures/signup_validation/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "Seconds are ignored.",
-        "file": "fixtures/duration_parser/mutants/m2.py"
+        "description": "Accepts 7-character passwords (uses < 7 instead of < 8).",
+        "file": "fixtures/signup_validation/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "Minutes are counted as seconds (no 60x).",
-        "file": "fixtures/duration_parser/mutants/m3.py"
+        "description": "Skips the password-confirmation check.",
+        "file": "fixtures/signup_validation/mutants/m3.py"
       },
       {
         "key": "m4",
-        "description": "Only the first piece is parsed; the rest is dropped.",
-        "file": "fixtures/duration_parser/mutants/m4.py"
+        "description": "Only checks for '@' in the email, not a dot.",
+        "file": "fixtures/signup_validation/mutants/m4.py"
       }
     ]
   },
   {
-    "slug": "rpn_calculator",
-    "title": "RPN calculator",
-    "entrypoint": "rpn_eval",
-    "signature": "rpn_eval(expr: str) -> float",
+    "slug": "discount_pricing",
+    "title": "Checkout discount pricing",
+    "entrypoint": "final_price",
+    "signature": "final_price(price: float, discount_percent: float, is_member: bool) -> float",
     "params": [
       {
-        "name": "expr",
-        "type": "str",
-        "note": "a space-separated RPN expression"
+        "name": "price",
+        "type": "float",
+        "note": "the pre-discount price"
+      },
+      {
+        "name": "discount_percent",
+        "type": "float",
+        "note": "percentage discount, 0-100"
+      },
+      {
+        "name": "is_member",
+        "type": "bool",
+        "note": "whether the shopper is a member"
       }
     ],
-    "requirement": "As a calculator engine, I want rpn_eval(expr) to evaluate a reverse-Polish\n(postfix) expression given as space-separated tokens and return the result\nas a float.\n\nTokens are numbers and the operators + - * /. Each operator pops the two\nmost recent values and applies itself, so \"10 2 -\" is 8 (the earlier value\nminus the later one) and \"3 4 +\" is 7. A lone number evaluates to itself.",
+    "requirement": "As a shopping cart, I want to compute the final price after a discount.\n\nApply the percentage discount to the price, and give members an extra 10%\noff on top. The discount percentage must be between 0 and 100 \u2014 if it is\nnot, return -1 to signal an invalid discount. Round the result to 2\ndecimals.",
     "canonical_inputs": [
       [
-        "3 4 +"
+        100,
+        20,
+        false
       ],
       [
-        "10 2 -"
+        100,
+        20,
+        true
       ],
       [
-        "2 3 *"
+        100,
+        0,
+        false
       ],
       [
-        "8 2 /"
+        100,
+        100,
+        false
       ],
       [
-        "5"
+        100,
+        150,
+        false
       ],
       [
-        "1 2 - 3 *"
+        100,
+        -10,
+        false
       ]
     ],
-    "reference_file": "fixtures/rpn_calculator/reference.py",
+    "reference_file": "fixtures/discount_pricing/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "Subtraction operands reversed (computes b - a).",
-        "file": "fixtures/rpn_calculator/mutants/m1.py"
+        "description": "No upper bound on the discount, so over-100% discounts go through.",
+        "file": "fixtures/discount_pricing/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "Division operands reversed (computes b / a).",
-        "file": "fixtures/rpn_calculator/mutants/m2.py"
+        "description": "Forgets the extra member discount.",
+        "file": "fixtures/discount_pricing/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "Multiplication is implemented as addition.",
-        "file": "fixtures/rpn_calculator/mutants/m3.py"
+        "description": "Adds the discount instead of subtracting it.",
+        "file": "fixtures/discount_pricing/mutants/m3.py"
       },
       {
         "key": "m4",
-        "description": "Division truncates to an int, losing the float result type.",
-        "file": "fixtures/rpn_calculator/mutants/m4.py"
+        "description": "No check for a negative discount.",
+        "file": "fixtures/discount_pricing/mutants/m4.py"
       }
     ]
   },
   {
-    "slug": "run_length_encode",
-    "title": "Run-length encoder",
-    "entrypoint": "rle_encode",
-    "signature": "rle_encode(s: str) -> str",
+    "slug": "bank_transfer",
+    "title": "Bank account transfer",
+    "entrypoint": "transfer",
+    "signature": "transfer(sender_balance: int, amount: int, is_frozen: bool) -> int | str",
     "params": [
       {
-        "name": "s",
-        "type": "str",
-        "note": "the string to encode"
+        "name": "sender_balance",
+        "type": "int",
+        "note": "the sender's balance"
+      },
+      {
+        "name": "amount",
+        "type": "int",
+        "note": "amount to transfer"
+      },
+      {
+        "name": "is_frozen",
+        "type": "bool",
+        "note": "whether the sender account is frozen"
       }
     ],
-    "requirement": "As a compression utility, I want rle_encode(s) to run-length encode a string:\neach run of the same character becomes that character followed by the count\nof how many times it repeats.\n\nFor example \"aaabbc\" encodes to \"a3b2c1\". A single character becomes that\ncharacter followed by 1. The empty string encodes to the empty string.",
+    "requirement": "As an online banking feature, I want to transfer money out of an account.\n\nA frozen account cannot transfer at all. Otherwise the amount must be\npositive and no more than the balance; on success return the sender's new\nbalance. Report problems as \"account_frozen\", \"invalid_amount\", or\n\"insufficient_funds\".",
     "canonical_inputs": [
       [
-        "aaabbc"
+        500,
+        100,
+        false
       ],
       [
-        "a"
+        500,
+        100,
+        true
       ],
       [
-        ""
+        500,
+        0,
+        false
       ],
       [
-        "abc"
+        500,
+        600,
+        false
       ],
       [
-        "aaaa"
+        500,
+        500,
+        false
       ],
       [
-        "aabbbba"
+        500,
+        0,
+        true
       ]
     ],
-    "reference_file": "fixtures/run_length_encode/reference.py",
+    "reference_file": "fixtures/bank_transfer/reference.py",
     "mutants": [
       {
         "key": "m1",
-        "description": "Forgets to emit the final run.",
-        "file": "fixtures/run_length_encode/mutants/m1.py"
+        "description": "Checks the amount before the freeze, so a frozen account can surface other errors.",
+        "file": "fixtures/bank_transfer/mutants/m1.py"
       },
       {
         "key": "m2",
-        "description": "Run count starts at 0, so every count is one too low.",
-        "file": "fixtures/run_length_encode/mutants/m2.py"
+        "description": "Allows a zero transfer (checks < 0 instead of <= 0).",
+        "file": "fixtures/bank_transfer/mutants/m2.py"
       },
       {
         "key": "m3",
-        "description": "Empty input is not special-cased and crashes.",
-        "file": "fixtures/run_length_encode/mutants/m3.py"
+        "description": "Rejects transferring the whole balance (uses >= instead of >).",
+        "file": "fixtures/bank_transfer/mutants/m3.py"
       },
       {
         "key": "m4",
-        "description": "Count is not reset after a run ends.",
-        "file": "fixtures/run_length_encode/mutants/m4.py"
+        "description": "Ignores the frozen flag entirely.",
+        "file": "fixtures/bank_transfer/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "ticket_booking",
+    "title": "Event ticket booking",
+    "entrypoint": "book_tickets",
+    "signature": "book_tickets(available: int, requested: int, max_per_booking: int) -> int | str",
+    "params": [
+      {
+        "name": "available",
+        "type": "int",
+        "note": "tickets still available"
+      },
+      {
+        "name": "requested",
+        "type": "int",
+        "note": "tickets the user wants"
+      },
+      {
+        "name": "max_per_booking",
+        "type": "int",
+        "note": "maximum tickets per booking"
+      }
+    ],
+    "requirement": "As a ticketing system, I want to book seats for an event.\n\nA booking must be for at least one ticket, no more than the per-booking\nlimit, and no more than the tickets still available. On success return how\nmany tickets remain; otherwise return \"invalid_quantity\", \"exceeds_limit\",\nor \"sold_out\".",
+    "canonical_inputs": [
+      [
+        100,
+        4,
+        6
+      ],
+      [
+        100,
+        0,
+        6
+      ],
+      [
+        100,
+        7,
+        6
+      ],
+      [
+        100,
+        6,
+        6
+      ],
+      [
+        3,
+        5,
+        10
+      ],
+      [
+        3,
+        3,
+        10
+      ]
+    ],
+    "reference_file": "fixtures/ticket_booking/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Allows booking zero tickets (checks < 0 instead of <= 0).",
+        "file": "fixtures/ticket_booking/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Rejects booking exactly the per-booking limit (uses >=).",
+        "file": "fixtures/ticket_booking/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Rejects booking exactly the remaining tickets (uses >=).",
+        "file": "fixtures/ticket_booking/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Skips the per-booking limit check.",
+        "file": "fixtures/ticket_booking/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "payroll_overtime",
+    "title": "Weekly payroll with overtime",
+    "entrypoint": "weekly_pay",
+    "signature": "weekly_pay(hours: float, hourly_rate: float) -> float",
+    "params": [
+      {
+        "name": "hours",
+        "type": "float",
+        "note": "hours worked this week"
+      },
+      {
+        "name": "hourly_rate",
+        "type": "float",
+        "note": "pay per hour"
+      }
+    ],
+    "requirement": "As a payroll system, I want to calculate weekly pay including overtime.\n\nHours up to 40 are paid at the normal rate. Any hours beyond 40 are\novertime, paid at 1.5x the normal rate. Negative hours or a negative rate\nare invalid and should return -1. Round the pay to 2 decimals.",
+    "canonical_inputs": [
+      [
+        40,
+        10
+      ],
+      [
+        45,
+        10
+      ],
+      [
+        20,
+        10
+      ],
+      [
+        -5,
+        10
+      ],
+      [
+        41,
+        10
+      ],
+      [
+        40,
+        -3
+      ]
+    ],
+    "reference_file": "fixtures/payroll_overtime/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Overtime starts after 45 hours, not 40.",
+        "file": "fixtures/payroll_overtime/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Overtime is paid at 2x instead of 1.5x.",
+        "file": "fixtures/payroll_overtime/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "No check for negative hours or rate.",
+        "file": "fixtures/payroll_overtime/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Overtime multiplier applies to ALL hours, not just the extra ones.",
+        "file": "fixtures/payroll_overtime/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "card_expiry",
+    "title": "Credit-card expiry check",
+    "entrypoint": "card_not_expired",
+    "signature": "card_not_expired(exp_month: int, exp_year: int, cur_month: int, cur_year: int) -> str",
+    "params": [
+      {
+        "name": "exp_month",
+        "type": "int",
+        "note": "card expiry month, 1-12"
+      },
+      {
+        "name": "exp_year",
+        "type": "int",
+        "note": "card expiry year"
+      },
+      {
+        "name": "cur_month",
+        "type": "int",
+        "note": "current month"
+      },
+      {
+        "name": "cur_year",
+        "type": "int",
+        "note": "current year"
+      }
+    ],
+    "requirement": "As a payment form, I want to check whether a credit card is still valid.\n\nA card is valid through the end of its expiry month. If the expiry month is\nnot a real month (1-12), it is \"invalid\". If the expiry date is before the\ncurrent month, it is \"expired\". Otherwise it is \"valid\".",
+    "canonical_inputs": [
+      [
+        6,
+        2027,
+        8,
+        2026
+      ],
+      [
+        8,
+        2026,
+        8,
+        2026
+      ],
+      [
+        7,
+        2026,
+        8,
+        2026
+      ],
+      [
+        6,
+        2025,
+        8,
+        2026
+      ],
+      [
+        13,
+        2027,
+        8,
+        2026
+      ],
+      [
+        0,
+        2027,
+        8,
+        2026
+      ]
+    ],
+    "reference_file": "fixtures/card_expiry/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Only checks the low end of the month, so month 13 is accepted.",
+        "file": "fixtures/card_expiry/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Treats a card expiring this year as already expired (uses <=).",
+        "file": "fixtures/card_expiry/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Expires a card during its own expiry month (uses <=).",
+        "file": "fixtures/card_expiry/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Ignores the month when the years match, so an earlier month this year still passes.",
+        "file": "fixtures/card_expiry/mutants/m4.py"
       }
     ]
   }
