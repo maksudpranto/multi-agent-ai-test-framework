@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import ModelPicker from "../components/ModelPicker";
+import UsagePanel from "../components/UsagePanel";
 
 const STATUS_CHIP = {
   pending: "chip-grey",
@@ -216,6 +217,7 @@ export default function ExperimentsList() {
   const [picked, setPicked] = useState({});
   const [reps, setReps] = useState(1);
   const [launching, setLaunching] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState(null);
   const nameRef = useRef(null);
 
   // List: search + pagination
@@ -394,7 +396,7 @@ export default function ExperimentsList() {
           </div>
 
           <div className="exp-create-foot">
-            <ModelPicker />
+            <ModelPicker onProviderChange={setSelectedProvider} />
             <button type="submit" disabled={launching || !name.trim() || nSelected === 0}>
               {launching ? (
                 <span className="busy-label"><span className="spinner" /> Launching…</span>
@@ -410,6 +412,9 @@ export default function ExperimentsList() {
           </p>
         </form>
       </section>
+
+      {/* Live quota for the model that will run the study */}
+      <UsagePanel providerFilter={selectedProvider} />
 
       {/* Experiments list */}
       <section className="section">
