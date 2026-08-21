@@ -98,15 +98,31 @@ Target submission ~2nd week of September 2026. Everything runs on **$0** (free t
   39 passed. Mock note: all conditions score 1.0 (every suite falls back to canonical inputs → p=1.0);
   differentiation only appears on a real provider — that's expected and correct.
 
+- **Phase 3 — DONE (2026-08-21).** Evaluation API in `backend/app/evaluation/routes.py` (+ `schemas.py`),
+  registered in `main.py`. 8 paths / 9 ops, all owner-scoped, mirroring the pipeline routes'
+  `Depends(get_db)`/`get_current_user`/`ModelSelection` patterns: `GET /evaluation/conditions`,
+  `POST /evaluation/benchmark/seed`, `GET …/datasets/{id}/items`, `GET|POST …/experiments`,
+  `POST …/experiments/{id}/run` (202, `BackgroundTasks`→`run_experiment_task`, resumable, 409 if already
+  running), `GET …/experiments/{id}` (status+progress), `GET …/experiments/{id}/results`
+  (`aggregate_experiment`, returned as free-form dict so the dashboard can add figures without a schema
+  change), `GET …/experiments/{id}/items/{requirement_id}` (per-condition drill-down + suites). Verified:
+  `pytest tests/test_evaluation_api.py` — full HTTP flow (seed→create→run→poll completed→results→drill)
+  on an isolated in-memory DB with the mock engine forced (StaticPool; runner SessionLocal +
+  `_resolve_engine_and_model` monkeypatched) + an ownership check. Full suite 41 passed. NB the dev `.env`
+  uses `LLM_PROVIDER=gemini`, so offline tests MUST force mock (real runs otherwise hit Gemini 429s).
+
 ## EXACT next action when resuming
-Phases 1 & 2 done. Next is **Phase 3** (API): new `backend/app/evaluation/routes.py` (register in
-`main.py`), mirroring existing `Depends(get_db)`/`get_current_user`/`ModelSelection` + ownership-check
-patterns: `POST /evaluation/benchmark/seed`, `GET …/datasets/{id}/items`, `POST …/experiments`,
-`POST …/experiments/{id}/run` (202, `BackgroundTasks` → `run_experiment_task`), `GET …/experiments/{id}`
-(status/progress via `experiment_progress`), `GET …/experiments/{id}/results` (`aggregate_experiment`),
-`GET …/experiments/{id}/items/{requirement_id}` (drill-down), `GET …/experiments` (list). Then Phase 4
-dashboard, Phase 5 verify (mock $0 dry-run → real Groq run). Do NOT start thesis writing until the build
-+ real experiment results exist (never fabricate numbers).
+Phases 1–3 done. Next is **Phase 4** (frontend dashboard): extract `ModelPicker` from
+`RequirementDetail.jsx` → `components/ModelPicker.jsx`; add `api/client.js` calls (listExperiments,
+createExperiment, getExperiment, getExperimentResults, seedBenchmark, exportExperiment); sidebar
+"Research › Experiments" in `AppShell.jsx` + routes `/experiments`, `/experiments/:id` in `App.jsx`;
+`experiments/ExperimentsList.jsx` (seed, pick conditions+model, run, polling table) and
+`experiments/ExperimentResults.jsx` (headline fault-detection tiles, hand-rolled SVG charts in
+`experiments/charts/`, significance callout, summary table, drill-down, CSV/PNG export). Must be
+HCI-friendly (Nielsen; examiner grasps it in seconds; tooltips for "mutation score"/"p-value"). Then
+Phase 5 verify (mock $0 dry-run → real Groq run). Do NOT start thesis writing until the build + real
+experiment results exist (never fabricate numbers). API shapes to build against: see
+`backend/app/evaluation/{routes.py,schemas.py}` and `stats.aggregate_experiment` return dict.
 
 ## On-disk artifacts to copy if moving to a new machine
 - `~/.claude/projects/-Volumes-Pranto-SELF-Self-Projects-trip-track-main/memory/` (all memories)

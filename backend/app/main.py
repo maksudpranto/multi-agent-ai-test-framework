@@ -8,6 +8,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.routes import router as auth_router
 from app.config import get_settings
 from app.database import SessionLocal, get_db
+from app.evaluation.routes import router as evaluation_router
 from app.export.routes import router as export_router
 from app.pipeline.routes import router as pipeline_router
 from app.projects.routes import router as projects_router
@@ -43,6 +44,7 @@ app.include_router(projects_router)
 app.include_router(requirements_router)
 app.include_router(pipeline_router)
 app.include_router(export_router)
+app.include_router(evaluation_router)
 
 
 @app.get("/health", tags=["health"])
