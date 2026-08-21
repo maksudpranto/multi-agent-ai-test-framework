@@ -129,8 +129,40 @@ Target submission ~2nd week of September 2026. Everything runs on **$0** (free t
   use a real-looking domain. Demo user `matfdemo2026@example.com` + its experiment now live in the dev
   `app.db`.
 
+- **Phase 5 — SUBSTANTIALLY DONE (2026-08-21); thesis-claim decision HELD by owner.** The build runs
+  on real AI end to end. Findings from two full real studies (Gemini `gemini-flash-lite-latest`, ~140
+  live calls each, via the resumable runner):
+  - Groq's Llama ids are retired on this key; Groq has only `openai/gpt-oss-*` + `qwen/qwen3.6-27b`
+    (reasoning models that intermittently fail our JSON agents → 0 test cases). **Use Gemini flash-lite**
+    for real runs — it returns clean JSON reliably. Added 429/503 retry-with-backoff to BOTH
+    `openai_compatible.py` and `gemini_provider.py` (committed `0dafab5`), essential for batch runs.
+  - **Easy corpus (original 8):** ceiling effect — a strong model's single-LLM baseline caught
+    everything (1.0); multi-agent ~0.89. Baseline won (n.s.).
+  - **Harder corpus (committed `7d53c82`, now the live corpus):** 8 under-specified programs, 4
+    edge-targeted mutants each; materializer made suite-faithful; seed prunes stale items. Real result:
+    single_llm **0.94** vs full_pipeline **0.82** vs ablation **0.78** (p=0.37 / 0.27, NOT significant).
+    Baseline still ahead.
+  - **Diagnosis (honest, not tuned):** the baseline writes fewer, focused cases (~8) that hit each
+    FUNCTIONAL edge concretely; the multi-agent writes ~2–2.5× more cases (~19) that go BROADER —
+    security/injection, type-safety (None/int/list), special chars — genuine QA breadth a *functional*
+    mutation score doesn't reward. Multi-agent is doing more useful work; the metric doesn't capture it.
+  - **OPEN DECISION (owner said "hold for now"):** how to resolve the headline claim — options on the
+    table: (a) add a suite-comprehensiveness/category-coverage metric where multi-agent wins + report
+    honest fault parity [recommended]; (b) handicap the baseline (weak base model) framing; (c) report
+    the honest null (framework + methodology as the contribution); (d) improve materializer fidelity
+    (it dropped cases, lossy 19→16) + fix occasional 0-case failures + retry. Do NOT pick one until the
+    owner decides. NEVER fabricate a positive result.
+  - Real experiment data lives in dev `app.db` (owner `matfdemo2026@example.com`, pw `demopass123`):
+    exp 6 = the harder-benchmark run. Earlier exps 2–5 are stale/partial (old corpus / retired Groq).
+    Scratchpad has `real_run.py`, `diag.py`, `why.py` for reference.
+
 ## EXACT next action when resuming
-Phases 1–4 done — the whole build is functional and browser-verified on mock. Next is **Phase 5**
+Phases 1–4 done, Phase 5 substantially done — the whole build is functional, browser-verified, and has
+produced REAL numbers. The one open item is the owner's held decision on how to frame the headline
+thesis claim (see the Phase 5 OPEN DECISION above). Do that first when they're ready; then optionally
+Phase 5 clean-up (materializer fidelity, breadth metric) per their choice, then update `ROADMAP.md` /
+`ARCHITECTURE.md`, then begin thesis WRITING (LaTeX, PMIT template in `thesis/`). Never fabricate
+numbers. --- (superseded note kept for history) Original Phase 5 plan was:
 (verify + real numbers): (a) already have the mock $0 dry-run working; (b) run ONE real study on
 **Groq · Llama 3.3 70B** (fast, live free quota) to get actual differentiated numbers — set backend
 `LLM_PROVIDER`/keys or just pick Groq in the UI model picker, create an experiment, run it, confirm
