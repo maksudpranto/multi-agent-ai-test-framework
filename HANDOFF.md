@@ -37,12 +37,20 @@ panel; export (JSON/CSV/MD/XLSX/PDF); "Clean SaaS light" UI. Backend FastAPI + S
 SQLite + Alembic; frontend React + Vite.
 
 ## What is PENDING — the Evaluation Engine + Experiments Dashboard (the thesis proof layer)
-Approved plan: `~/.claude/plans/linear-giggling-finch.md`. Nothing below is built yet EXCEPT one
-tiny edit: `experiment_condition` column added to `PipelineRun` in `backend/app/models.py`
-(uncommitted; fold into Phase 1).
-- **Phase 1** Benchmark corpus (~8 Python programs: requirement + reference code + seeded bugs) +
-  `BenchmarkItem`/`BenchmarkMutant` tables + sandboxed fault-detection harness (reference-as-oracle
-  differential testing → mutation score).
+Approved plan: `~/.claude/plans/linear-giggling-finch.md`.
+- **Phase 1 — DONE (2026-08-21, uncommitted).** Benchmark corpus of 8 Python programs, each with a
+  reference oracle + 3 seeded bugs, lives in `backend/app/benchmark/corpus.py` (authoritative) and is
+  also materialized to reviewable `backend/app/benchmark/fixtures/` + `manifest.json`.
+  `BenchmarkItem`/`BenchmarkMutant` tables + `Experiment.conditions` (JSON) added to `models.py`; one
+  Alembic revision `d4e5f6a7b8c9` (applied to dev `app.db`). `benchmark/seed.py::seed_benchmark`
+  (idempotent) creates a hidden "Benchmark Suite" project+dataset + one Requirement per item.
+  Sandboxed harness in `backend/app/evaluation/harness.py` (+ isolated `_runner.py` worker):
+  `materialize_inputs` (LLM → concrete arg-lists, canonical fallback) and `score_suite` →
+  `FaultDetectionResult{mutation_score, suite_valid, killed/total, n_usable_inputs, per_mutant}`.
+  Reference-as-oracle: a mutant is killed if it diverges (value, exception class, or timeout) on any
+  usable input. Verified: `pytest tests/test_harness.py` (12 tests) + full suite 28 passed. Canonical
+  inputs kill all mutants; the LLM materializer drives the real per-suite signal (do NOT merge
+  canonical into real suites — that would flatten every condition to the same score).
 - **Phase 2** `run_full_pipeline` sequencer (honor RunConfig ablation toggles) + experiment runner
   (loop items × conditions: single_llm / full_pipeline / ablation_no_debate) + metrics persisted to
   `ExperimentMetric` + stdlib stats (Wilcoxon + effect size) + one Alembic migration.
@@ -74,9 +82,13 @@ first. Effort estimate: ~2–3 focused build sessions.
 Target submission ~2nd week of September 2026. Everything runs on **$0** (free tiers + mock).
 
 ## EXACT next action when resuming
-The build is on hold pending the owner's go-ahead. When the owner says "start building", begin
-**Phase 1** of the plan. Do NOT start thesis writing until the build + real experiment results exist
-(never fabricate numbers).
+Phase 1 is done (uncommitted). Next is **Phase 2**: add `run_full_pipeline` (toggle-aware sequencer;
+guard `run_debate` with `consensus_enabled`) to `engine.py`; `evaluation/conditions.py` (CONDITIONS
+map); `evaluation/runner.py` (loop item × condition, each cell a `PipelineRun(experiment_condition=…)`,
+resumable); `evaluation/metrics.py` (→ `ExperimentMetric` rows incl. mutation score via the Phase 1
+harness); `evaluation/stats.py` (stdlib Wilcoxon + Cohen's dz + aggregate). Then Phase 3 API, Phase 4
+dashboard, Phase 5 verify (mock $0 dry-run → real Groq run). Do NOT start thesis writing until the
+build + real experiment results exist (never fabricate numbers).
 
 ## On-disk artifacts to copy if moving to a new machine
 - `~/.claude/projects/-Volumes-Pranto-SELF-Self-Projects-trip-track-main/memory/` (all memories)

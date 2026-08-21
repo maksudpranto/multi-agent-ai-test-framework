@@ -240,6 +240,12 @@ class PipelineRun(Base):
     # the Analyzer from a user story) or "acceptance_criteria" (supplied directly
     # by the user, skipping analysis). Lets a user generate from either input.
     input_mode: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Which experiment arm produced this run, e.g. "single_llm", "full_pipeline",
+    # "ablation_no_debate". Needed because full_pipeline and its ablations share
+    # mode=multi_agent; this is the key the evaluation aggregation groups by.
+    experiment_condition: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, index=True
+    )
     current_stage: Mapped[PipelineStage | None] = mapped_column(
         Enum(PipelineStage), nullable=True
     )
@@ -474,6 +480,11 @@ class Experiment(Base):
         ForeignKey("experiment_configs.id"), nullable=True
     )
     mode: Mapped[ExperimentMode] = mapped_column(Enum(ExperimentMode))
+    # The experiment arms to run, e.g. ["single_llm", "full_pipeline",
+    # "ablation_no_debate"]. `mode` is kept for back-compat / the legacy toggle;
+    # `conditions` is the authoritative list the evaluation runner iterates over
+    # (one PipelineRun per benchmark item x condition).
+    conditions: Mapped[list | None] = mapped_column(JSON, nullable=True)
     status: Mapped[RunStatus] = mapped_column(
         Enum(RunStatus), default=RunStatus.pending
     )
@@ -498,3 +509,68 @@ class ExperimentMetric(Base):
     metric_name: Mapped[str] = mapped_column(String(100), index=True)
     metric_value: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Benchmark tables: the executable micro-benchmark the fault-based evaluation
+# runs against. Each item is a small program with a natural-language
+# requirement (a real Requirement row, so the pipeline generates tests from it),
+# a reference implementation that acts as the test oracle, and a set of seeded
+# bug variants (mutants). "Mutation score" = fraction of mutants a generated
+# suite's inputs kill (make diverge from the reference). This is what turns the
+# app from a demo into a thesis: we RUN the tests against injected bugs.
+# ---------------------------------------------------------------------------
+
+
+class BenchmarkItem(Base):
+    """One executable program in the benchmark corpus. Bound to a Requirement
+    (so the pipeline generates tests from its NL description) and a Dataset (the
+    'Benchmark Suite'). Holds the reference implementation (the oracle) plus the
+    entrypoint and canonical inputs the fault-detection harness needs."""
+
+    __tablename__ = "benchmark_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    dataset_id: Mapped[int] = mapped_column(
+        ForeignKey("datasets.id"), index=True
+    )
+    requirement_id: Mapped[int] = mapped_column(
+        ForeignKey("requirements.id"), index=True
+    )
+    slug: Mapped[str] = mapped_column(String(100), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    entrypoint: Mapped[str] = mapped_column(String(100))
+    signature: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Positional-parameter descriptors [{name, type, note}], to help the
+    # materializer produce well-typed argument lists for the entrypoint.
+    params: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Deterministic fallback argument lists (list of positional-arg lists) used
+    # when the LLM materializer produces unusable output. Guarantees the harness
+    # always has valid inputs so a run never silently scores zero.
+    canonical_inputs: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    reference_code: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    requirement: Mapped["Requirement"] = relationship()
+    mutants: Mapped[list["BenchmarkMutant"]] = relationship(
+        back_populates="item", cascade="all, delete-orphan"
+    )
+
+
+class BenchmarkMutant(Base):
+    """A single seeded bug: the reference implementation with one deliberate
+    fault. The harness runs it on the harvested inputs; the mutant is 'killed'
+    if its behaviour diverges from the reference on any input."""
+
+    __tablename__ = "benchmark_mutants"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    benchmark_item_id: Mapped[int] = mapped_column(
+        ForeignKey("benchmark_items.id"), index=True
+    )
+    mutant_key: Mapped[str] = mapped_column(String(50))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    code: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    item: Mapped["BenchmarkItem"] = relationship(back_populates="mutants")
