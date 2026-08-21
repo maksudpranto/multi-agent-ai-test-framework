@@ -12,6 +12,36 @@ from app.llm.base import LLMMessage, LLMProvider, LLMResponse
 # there instead of burning a request on a guaranteed-413 first attempt.
 _MODEL_TOKEN_CEILING: dict[str, int] = {}
 
+# How many times to wait out a 429 before giving up, and the backoff cap. Free
+# tiers rate-limit aggressively (per-minute request AND token budgets); a batch
+# job like the experiment runner would otherwise fail most of its cells the
+# moment it gets ahead of the quota.
+_MAX_429_RETRIES = 6
+_BACKOFF_CAP_SECONDS = 30.0
+
+
+def _retry_after_seconds(headers) -> float | None:
+    """Seconds to wait from a 429 response, preferring the provider's own hint
+    (`retry-after`, or Groq/OpenRouter's `x-ratelimit-reset-*`)."""
+    ra = headers.get("retry-after")
+    if ra:
+        try:
+            return min(_BACKOFF_CAP_SECONDS, float(ra))
+        except ValueError:
+            pass
+    for key in ("x-ratelimit-reset-requests", "x-ratelimit-reset-tokens"):
+        val = headers.get(key)
+        if not val:
+            continue
+        try:
+            # These are often like "1.5s" or "2m59s"; parse the leading number.
+            num = float("".join(c for c in val if (c.isdigit() or c == ".")) or "0")
+            if num > 0:
+                return min(_BACKOFF_CAP_SECONDS, num)
+        except ValueError:
+            continue
+    return None
+
 
 class OpenAICompatibleProvider(LLMProvider):
     """One provider for every host that speaks the OpenAI /chat/completions API.
@@ -69,6 +99,7 @@ class OpenAICompatibleProvider(LLMProvider):
         ceiling = _MODEL_TOKEN_CEILING.get(model)
         if ceiling is not None:
             attempt_tokens = min(attempt_tokens, ceiling)
+        rate_retries = 0
         while True:
             payload["max_tokens"] = attempt_tokens
             response = httpx.post(
@@ -79,6 +110,16 @@ class OpenAICompatibleProvider(LLMProvider):
             )
             if response.status_code == 413 and attempt_tokens > 2048:
                 attempt_tokens = max(2048, attempt_tokens // 2)
+                continue
+            # Rate-limited: wait out the window (provider hint or exponential
+            # backoff) and retry, so a burst of calls paces itself instead of
+            # failing. Bounded, so a genuinely exhausted quota still surfaces.
+            if response.status_code == 429 and rate_retries < _MAX_429_RETRIES:
+                rate_retries += 1
+                wait = _retry_after_seconds(response.headers)
+                if wait is None:
+                    wait = min(_BACKOFF_CAP_SECONDS, 1.5 * (2 ** (rate_retries - 1)))
+                time.sleep(wait)
                 continue
             break
         # Remember what this model actually accepted, and capture the real

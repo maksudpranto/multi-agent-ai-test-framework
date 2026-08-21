@@ -6,6 +6,22 @@ import httpx
 
 from app.llm.base import LLMMessage, LLMProvider, LLMResponse
 
+# Wait out free-tier rate limits (429) and transient overload (503) instead of
+# failing the call — essential for a batch job like the experiment runner, which
+# otherwise races ahead of the per-minute quota.
+_MAX_RETRIES = 6
+_BACKOFF_CAP_SECONDS = 30.0
+
+
+def _retry_after_seconds(headers) -> float | None:
+    ra = headers.get("retry-after")
+    if ra:
+        try:
+            return min(_BACKOFF_CAP_SECONDS, float(ra))
+        except ValueError:
+            pass
+    return None
+
 
 class GeminiProvider(LLMProvider):
     """Gemini backend using Google's REST API, with no SDK dependency."""
@@ -42,12 +58,22 @@ class GeminiProvider(LLMProvider):
             payload["systemInstruction"] = {"parts": [{"text": system}]}
 
         start = time.monotonic()
-        response = httpx.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-            params={"key": self._api_key},
-            json=payload,
-            timeout=60.0,
-        )
+        retries = 0
+        while True:
+            response = httpx.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                params={"key": self._api_key},
+                json=payload,
+                timeout=60.0,
+            )
+            if response.status_code in (429, 503) and retries < _MAX_RETRIES:
+                retries += 1
+                wait = _retry_after_seconds(response.headers)
+                if wait is None:
+                    wait = min(_BACKOFF_CAP_SECONDS, 2.0 * (2 ** (retries - 1)))
+                time.sleep(wait)
+                continue
+            break
         response.raise_for_status()
         data = response.json()
         latency_ms = int((time.monotonic() - start) * 1000)
