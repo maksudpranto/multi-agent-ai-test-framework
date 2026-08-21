@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import BarChart from "./charts/BarChart";
 import GroupedBarChart from "./charts/GroupedBarChart";
@@ -59,6 +59,7 @@ function winnerKey(conditions, metric) {
 
 export default function ExperimentResults() {
   const { experimentId } = useParams();
+  const navigate = useNavigate();
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -174,10 +175,27 @@ export default function ExperimentResults() {
           </p>
         </div>
         <div className="exp-res-actions">
+          {running && (
+            <button className="ghost" onClick={async () => {
+              try { await api.stopExperiment(exp.id); fetchResults(); } catch (e) { alert(e.message); }
+            }}>Stop</button>
+          )}
+          <button className="ghost" onClick={async () => {
+            const name = prompt("Rename experiment:", exp.name);
+            if (name && name.trim()) {
+              try { await api.renameExperiment(exp.id, name.trim()); fetchResults(); } catch (e) { alert(e.message); }
+            }
+          }}>Rename</button>
           <button className="ghost" onClick={exportCsv}>Export CSV</button>
           <button className="ghost" onClick={() => svgToPng(barRef.current, `experiment-${exp.id}-fault-detection`)}>
             Export chart (PNG)
           </button>
+          <button className="ghost danger" disabled={running} title={running ? "Stop it first" : "Delete experiment"}
+            onClick={async () => {
+              if (confirm(`Delete "${exp.name}"? This removes the experiment and all its runs and results.`)) {
+                try { await api.deleteExperiment(exp.id); navigate("/experiments"); } catch (e) { alert(e.message); }
+              }
+            }}>Delete</button>
         </div>
       </div>
 

@@ -25,22 +25,31 @@ from app.evaluation.schemas import (
     ExperimentCreate,
     ExperimentOut,
     ExperimentProgress,
+    ExperimentRename,
     ExperimentStatusOut,
     RunAccepted,
 )
 from app.evaluation.stats import aggregate_experiment
 from app.llm import catalog
 from app.models import (
+    AcceptanceCriterion,
+    AgentExecution,
     BenchmarkItem,
+    CoverageReport,
     Dataset,
+    DebateTurn,
     Experiment,
     ExperimentMetric,
     ExperimentMode,
+    ExportLog,
     PipelineRun,
+    QualityReport,
+    RequirementAnalysis,
     RunStatus,
     TestCase,
     TestCaseStatus,
     User,
+    utcnow,
 )
 
 router = APIRouter(prefix="/evaluation", tags=["evaluation"])
@@ -280,6 +289,87 @@ def run_experiment_endpoint(
         status="accepted",
         detail=f"Experiment running on {provider} / {model}.",
     )
+
+
+@router.patch("/experiments/{experiment_id}", response_model=ExperimentOut)
+def rename_experiment(
+    experiment_id: int,
+    payload: ExperimentRename,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ExperimentOut:
+    experiment = _get_owned_experiment(experiment_id, user, db)
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Experiment name cannot be empty",
+        )
+    experiment.name = name
+    db.commit()
+    db.refresh(experiment)
+    return _exp_out(experiment)
+
+
+@router.post("/experiments/{experiment_id}/stop", response_model=ExperimentOut)
+def stop_experiment(
+    experiment_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ExperimentOut:
+    """Request cancellation. The background runner checks the status between
+    cells and stops; already-finished cells are kept, so the partial results
+    remain viewable."""
+    experiment = _get_owned_experiment(experiment_id, user, db)
+    if experiment.status not in (RunStatus.running, RunStatus.pending):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Experiment is not running.",
+        )
+    experiment.status = RunStatus.cancelled
+    experiment.completed_at = utcnow()
+    db.commit()
+    db.refresh(experiment)
+    return _exp_out(experiment)
+
+
+@router.delete("/experiments/{experiment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_experiment(
+    experiment_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    """Delete an experiment and everything under it (runs, metrics, and the
+    generated artifacts of those runs). Refuses while it is still running —
+    stop it first."""
+    experiment = _get_owned_experiment(experiment_id, user, db)
+    if experiment.status == RunStatus.running:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Stop the experiment before deleting it.",
+        )
+
+    run_ids = [
+        r for r in db.scalars(
+            select(PipelineRun.id).where(PipelineRun.experiment_id == experiment_id)
+        )
+    ]
+    if run_ids:
+        for model in (
+            QualityReport, CoverageReport, DebateTurn, RequirementAnalysis,
+            AgentExecution, ExportLog, TestCase, AcceptanceCriterion,
+        ):
+            db.query(model).filter(
+                model.pipeline_run_id.in_(run_ids)
+            ).delete(synchronize_session=False)
+    db.query(ExperimentMetric).filter(
+        ExperimentMetric.experiment_id == experiment_id
+    ).delete(synchronize_session=False)
+    db.query(PipelineRun).filter(
+        PipelineRun.experiment_id == experiment_id
+    ).delete(synchronize_session=False)
+    db.delete(experiment)
+    db.commit()
 
 
 @router.get("/experiments/{experiment_id}", response_model=ExperimentStatusOut)

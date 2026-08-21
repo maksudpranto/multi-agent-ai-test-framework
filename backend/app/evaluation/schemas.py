@@ -39,6 +39,10 @@ class BenchmarkItemOut(BaseModel):
     n_mutants: int
 
 
+class ExperimentRename(BaseModel):
+    name: str
+
+
 class ExperimentCreate(BaseModel):
     name: str
     dataset_id: int | None = None

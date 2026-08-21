@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import ModelPicker from "../components/ModelPicker";
 
@@ -23,9 +23,28 @@ function relTime(iso) {
   return then.toLocaleDateString();
 }
 
-// One experiment row: status chip + live progress bar while it runs.
-function ExperimentRow({ exp }) {
+const IconEdit = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11.5 2.2l2.3 2.3-8 8-3 .7.7-3z" /><path d="M10.5 3.2l2.3 2.3" />
+  </svg>
+);
+const IconStop = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="4" width="8" height="8" rx="1.5" /></svg>
+);
+const IconTrash = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2.8 4.2h10.4M6 4.2V2.9h4v1.3M5 4.2l.5 9h5l.5-9" /><path d="M6.7 6.6v4.2M9.3 6.6v4.2" />
+  </svg>
+);
+
+// One experiment row: status chip + live progress bar while it runs, plus
+// rename / stop / delete controls.
+function ExperimentRow({ exp, onChanged }) {
+  const navigate = useNavigate();
   const [live, setLive] = useState(exp);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(exp.name);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => setLive(exp), [exp]);
 
@@ -44,17 +63,64 @@ function ExperimentRow({ exp }) {
 
   const prog = live.progress;
   const pct = prog ? prog.pct : live.status === "completed" ? 100 : 0;
+  const running = live.status === "running" || live.status === "pending";
+
+  async function act(fn) {
+    setBusy(true);
+    try {
+      await fn();
+      onChanged?.();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSaveName(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const name = editName.trim();
+    if (!name) return;
+    await act(() => api.renameExperiment(live.id, name));
+    setEditing(false);
+  }
+
+  function stopClick(e, fn) {
+    e.preventDefault();
+    e.stopPropagation();
+    fn();
+  }
+
+  if (editing) {
+    return (
+      <form className="exp-row editing" onSubmit={onSaveName}>
+        <input
+          className="exp-rename-input"
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          autoFocus
+          onClick={(e) => e.stopPropagation()}
+        />
+        <div className="exp-row-acts">
+          <button type="submit" className="btn-sm" disabled={busy}>Save</button>
+          <button type="button" className="ghost btn-sm" onClick={() => { setEditing(false); setEditName(live.name); }}>Cancel</button>
+        </div>
+      </form>
+    );
+  }
 
   return (
-    <Link to={`/experiments/${live.id}`} className="exp-row">
+    <div className="exp-row" role="button" tabIndex={0} onClick={() => navigate(`/experiments/${live.id}`)}>
       <div className="exp-row-main">
         <div className="exp-row-name">{live.name}</div>
         <div className="exp-row-meta">
-          {live.conditions.length} conditions · created {relTime(live.created_at)}
+          {live.conditions.length} conditions
+          {live.repetitions > 1 ? ` · ${live.repetitions} runs` : ""} · created {relTime(live.created_at)}
         </div>
       </div>
       <div className="exp-row-prog">
-        {(live.status === "running" || (prog && prog.completed < prog.total)) && (
+        {running && prog && (
           <div className="exp-bar" title={`${prog?.completed || 0} / ${prog?.total || 0} cells`}>
             <span style={{ width: `${pct}%` }} />
           </div>
@@ -64,7 +130,27 @@ function ExperimentRow({ exp }) {
         {live.status === "running" && <span className="spinner sm" />}
         {live.status}
       </span>
-    </Link>
+      <div className="exp-row-acts" onClick={(e) => e.stopPropagation()}>
+        {running && (
+          <button className="icon-btn" title="Stop" aria-label="Stop experiment" disabled={busy}
+            onClick={(e) => stopClick(e, () => act(() => api.stopExperiment(live.id)))}>
+            <IconStop />
+          </button>
+        )}
+        <button className="icon-btn" title="Rename" aria-label="Rename experiment"
+          onClick={(e) => stopClick(e, () => { setEditName(live.name); setEditing(true); })}>
+          <IconEdit />
+        </button>
+        <button className="icon-btn danger" title="Delete" aria-label="Delete experiment" disabled={busy || live.status === "running"}
+          onClick={(e) => stopClick(e, () => {
+            if (confirm(`Delete "${live.name}"? This removes the experiment and all its runs and results.`)) {
+              act(() => api.deleteExperiment(live.id));
+            }
+          })}>
+          <IconTrash />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -172,8 +258,9 @@ export default function ExperimentsList() {
           </button>
         </div>
         <p className="muted exp-setup-copy">
-          Eight small programs, each with a plain-language requirement, a reference
-          implementation, and three deliberately seeded bugs. Seeding is safe to
+          Eight everyday features — ATM withdrawal, login lockout, sign-up validation,
+          bank transfer and more — each with a plain-language requirement, a reference
+          implementation, and four deliberately planted bugs. Seeding is safe to
           re-run — it never duplicates anything.
         </p>
         {seed && (
@@ -278,7 +365,7 @@ export default function ExperimentsList() {
         ) : (
           <div className="exp-list">
             {experiments.map((exp) => (
-              <ExperimentRow key={exp.id} exp={exp} />
+              <ExperimentRow key={exp.id} exp={exp} onChanged={load} />
             ))}
           </div>
         )}

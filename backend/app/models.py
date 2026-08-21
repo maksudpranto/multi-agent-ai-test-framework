@@ -37,6 +37,7 @@ class RunStatus(str, enum.Enum):
     running = "running"
     completed = "completed"
     failed = "failed"
+    cancelled = "cancelled"
 
 
 class ExperimentMode(str, enum.Enum):

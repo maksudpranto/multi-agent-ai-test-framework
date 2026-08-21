@@ -167,9 +167,15 @@ class ExperimentRunner:
             experiment_id, len(items), len(conditions), repetitions, total,
         )
 
+        cancelled = False
         for rep in range(1, repetitions + 1):
             for item in items:
                 for condition in conditions:
+                    # Cooperative cancellation: a stop request flips the
+                    # experiment's status in the DB; we check it between cells.
+                    if self._is_cancelled(db, experiment_id):
+                        cancelled = True
+                        break
                     if self._already_done(
                         db, experiment_id, item.requirement_id, condition.key, rep
                     ):
@@ -182,9 +188,13 @@ class ExperimentRunner:
                         done += 1
                     else:
                         failed += 1
+                if cancelled:
+                    break
+            if cancelled:
+                break
 
-        experiment.status = RunStatus.completed
         experiment.completed_at = utcnow()
+        experiment.status = RunStatus.cancelled if cancelled else RunStatus.completed
         db.commit()
         summary = {
             "experiment_id": experiment_id,
@@ -192,9 +202,17 @@ class ExperimentRunner:
             "completed": done,
             "skipped": skipped,
             "failed": failed,
+            "cancelled": cancelled,
         }
-        logger.info("experiment %s complete: %s", experiment_id, summary)
+        logger.info("experiment %s finished: %s", experiment_id, summary)
         return summary
+
+    def _is_cancelled(self, db: Session, experiment_id: int) -> bool:
+        """Fresh read of the experiment's status so a stop request made from
+        another session is seen mid-run."""
+        return db.scalar(
+            select(Experiment.status).where(Experiment.id == experiment_id)
+        ) == RunStatus.cancelled
 
 
 def _resolve_engine_and_model(

@@ -140,6 +140,54 @@ def test_full_evaluation_flow(client):
         assert "mutation_score" in cond["metrics"]
 
 
+def test_rename_and_delete_experiment(client):
+    client.post("/evaluation/benchmark/seed")
+    exp_id = client.post("/evaluation/experiments", json={"name": "Original"}).json()["id"]
+
+    # Rename.
+    r = client.patch(f"/evaluation/experiments/{exp_id}", json={"name": "Renamed study"})
+    assert r.status_code == 200
+    assert r.json()["name"] == "Renamed study"
+    assert client.get(f"/evaluation/experiments/{exp_id}").json()["experiment"]["name"] == "Renamed study"
+
+    # Empty name rejected.
+    assert client.patch(f"/evaluation/experiments/{exp_id}", json={"name": "  "}).status_code == 422
+
+    # A pending experiment can be cancelled; a second stop is then a 409.
+    assert client.post(f"/evaluation/experiments/{exp_id}/stop").status_code == 200
+    assert client.get(f"/evaluation/experiments/{exp_id}").json()["experiment"]["status"] == "cancelled"
+    assert client.post(f"/evaluation/experiments/{exp_id}/stop").status_code == 409
+
+    # Delete, then it's gone.
+    assert client.delete(f"/evaluation/experiments/{exp_id}").status_code == 204
+    assert client.get(f"/evaluation/experiments/{exp_id}").status_code == 404
+
+
+def test_delete_removes_runs_and_metrics(client):
+    """Deleting an experiment removes its runs and metrics too."""
+    from sqlalchemy import select
+    import app.evaluation.runner as rm
+    from app.models import ExperimentMetric, PipelineRun
+
+    client.post("/evaluation/benchmark/seed")
+    exp_id = client.post(
+        "/evaluation/experiments",
+        json={"name": "ToDelete", "conditions": ["single_llm"]},
+    ).json()["id"]
+    client.post(f"/evaluation/experiments/{exp_id}/run", json={})
+    # Runs + metrics now exist.
+    db = rm.SessionLocal()
+    assert db.scalar(select(PipelineRun).where(PipelineRun.experiment_id == exp_id)) is not None
+    db.close()
+
+    assert client.delete(f"/evaluation/experiments/{exp_id}").status_code == 204
+
+    db = rm.SessionLocal()
+    assert db.scalar(select(PipelineRun).where(PipelineRun.experiment_id == exp_id)) is None
+    assert db.scalar(select(ExperimentMetric).where(ExperimentMetric.experiment_id == exp_id)) is None
+    db.close()
+
+
 def test_results_requires_ownership(client):
     # A different user's token cannot read the experiment.
     r = client.post("/evaluation/benchmark/seed")

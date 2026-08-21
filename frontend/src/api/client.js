@@ -221,6 +221,12 @@ export const api = {
       })
     ),
   getExperiment: (experimentId) => request(`/evaluation/experiments/${experimentId}`),
+  renameExperiment: (experimentId, name) =>
+    request(`/evaluation/experiments/${experimentId}`, { method: "PATCH", body: { name } }),
+  stopExperiment: (experimentId) =>
+    request(`/evaluation/experiments/${experimentId}/stop`, { method: "POST" }),
+  deleteExperiment: (experimentId) =>
+    request(`/evaluation/experiments/${experimentId}`, { method: "DELETE" }),
   getExperimentResults: (experimentId) =>
     request(`/evaluation/experiments/${experimentId}/results`),
   getExperimentItem: (experimentId, requirementId) =>
