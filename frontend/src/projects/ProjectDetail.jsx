@@ -2,16 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import Modal from "../components/Modal";
-import {
-  PRIORITIES,
-  REQ_STATUSES,
-  REQ_TYPES,
-  REQ_TYPE_LABEL,
-  label,
-} from "../requirements/constants";
-
-const PRIORITY_CHIP = { high: "chip-red", medium: "chip-amber", low: "chip-grey" };
-const PRIORITY_DOT = { high: "#dc2626", medium: "#d97706", low: "#94a3b8" };
+import { REQ_TYPES, REQ_TYPE_LABEL } from "../requirements/constants";
 
 function relTime(iso) {
   if (!iso) return "";
@@ -45,8 +36,6 @@ export default function ProjectDetail() {
   const [title, setTitle] = useState("");
   const [rawText, setRawText] = useState("");
   const [reqType, setReqType] = useState("user_story");
-  const [priority, setPriority] = useState("medium");
-  const [status, setStatus] = useState("draft");
   const [saving, setSaving] = useState(false);
 
   // upload form
@@ -57,7 +46,6 @@ export default function ProjectDetail() {
 
   // list controls
   const [query, setQuery] = useState("");
-  const [prioFilter, setPrioFilter] = useState("all"); // all | high | medium | low
   const [confirmId, setConfirmId] = useState(null);
 
   async function load() {
@@ -94,8 +82,6 @@ export default function ProjectDetail() {
         title,
         raw_text: rawText,
         req_type: reqType,
-        priority,
-        status,
       });
       setTitle("");
       setRawText("");
@@ -144,22 +130,15 @@ export default function ProjectDetail() {
     }
   }
 
-  const highCount = requirements.filter((r) => r.priority === "high").length;
-  const readyCount = requirements.filter(
-    (r) => r.status === "ready" || r.status === "done"
-  ).length;
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return requirements.filter((r) => {
-      if (prioFilter !== "all" && r.priority !== prioFilter) return false;
-      if (!q) return true;
-      return (
+    if (!q) return requirements;
+    return requirements.filter(
+      (r) =>
         (r.title || "").toLowerCase().includes(q) ||
         (r.raw_text || "").toLowerCase().includes(q)
-      );
-    });
-  }, [requirements, query, prioFilter]);
+    );
+  }, [requirements, query]);
 
   if (loading)
     return (
@@ -192,21 +171,6 @@ export default function ProjectDetail() {
         </button>
       </header>
 
-      <section className="pd-stats">
-        <div className="pd-stat">
-          <span className="v">{requirements.length}</span>
-          <span className="k">Requirements</span>
-        </div>
-        <div className="pd-stat">
-          <span className="v">{highCount}</span>
-          <span className="k">High priority</span>
-        </div>
-        <div className="pd-stat">
-          <span className="v">{readyCount}</span>
-          <span className="k">Ready / done</span>
-        </div>
-      </section>
-
       {error && !modalOpen && <p className="error">{error}</p>}
 
       {requirements.length === 0 ? (
@@ -223,6 +187,9 @@ export default function ProjectDetail() {
       ) : (
         <>
           <div className="pd-toolbar">
+            <h2 className="pd-list-title">
+              Requirements <span className="pd-count">{requirements.length}</span>
+            </h2>
             <div className="pd-search">
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <circle cx="7" cy="7" r="4.2" />
@@ -233,17 +200,6 @@ export default function ProjectDetail() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-            </div>
-            <div className="pd-filters">
-              {["all", "high", "medium", "low"].map((p) => (
-                <button
-                  key={p}
-                  className={`pd-filter ${prioFilter === p ? "active" : ""}`}
-                  onClick={() => setPrioFilter(p)}
-                >
-                  {p === "all" ? "All" : p[0].toUpperCase() + p.slice(1)}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -265,21 +221,12 @@ export default function ProjectDetail() {
                       navigate(`/projects/${projectId}/requirements/${r.id}`);
                   }}
                 >
-                  <span
-                    className="req-dot"
-                    style={{ background: PRIORITY_DOT[r.priority] || "#94a3b8" }}
-                    title={`${r.priority} priority`}
-                  />
                   <div className="req-main">
                     <div className="req-title-line">
                       <span className="req-title">{r.title}</span>
                       <span className="chip chip-accent">
                         {REQ_TYPE_LABEL[r.req_type] || r.req_type}
                       </span>
-                      <span className={`chip ${PRIORITY_CHIP[r.priority] || "chip-grey"}`}>
-                        {r.priority}
-                      </span>
-                      <span className="chip chip-grey">{label({}, r.status)}</span>
                       {r.source_filename && (
                         <span className="chip chip-grey" title={r.source_filename}>
                           📎 file
@@ -386,24 +333,6 @@ export default function ProjectDetail() {
                 required
               />
             </label>
-            <div className="field-row">
-              <label className="field">
-                Priority
-                <select value={priority} onChange={(e) => setPriority(e.target.value)}>
-                  {PRIORITIES.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                Status
-                <select value={status} onChange={(e) => setStatus(e.target.value)}>
-                  {REQ_STATUSES.map((s) => (
-                    <option key={s} value={s}>{label({}, s)}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
             {error && <p className="error">{error}</p>}
             <div className="modal-actions">
               <button type="button" className="ghost" onClick={() => setModalOpen(false)}>

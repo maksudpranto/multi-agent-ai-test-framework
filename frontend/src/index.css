@@ -4300,35 +4300,31 @@ input[type="file"]::file-selector-button:hover {
 /* ============================================================
    Project detail — projects/ProjectDetail.jsx
    ============================================================ */
+.proj-detail .crumb { margin-bottom: 18px; }
 .pd-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 20px;
   flex-wrap: wrap;
+  margin-bottom: 8px;
 }
-.pd-head-main h1 { font-size: 24px; font-weight: 720; margin: 2px 0 6px; letter-spacing: -0.01em; }
-.pd-head-main .sub { margin: 0; color: var(--text-secondary); max-width: 72ch; line-height: 1.5; }
-.pd-head .btn-primary { flex-shrink: 0; }
-
-.pd-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 18px 0 6px;
+.pd-head-main { flex: 1; min-width: 260px; }
+.pd-head-main h1 {
+  font-size: 28px;
+  font-weight: 730;
+  margin: 0 0 10px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
 }
-.pd-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 120px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+.pd-head-main .sub {
+  margin: 0;
+  color: var(--text-secondary);
+  max-width: 68ch;
+  font-size: 15px;
+  line-height: 1.6;
 }
-.pd-stat .v { font-size: 22px; font-weight: 740; line-height: 1; letter-spacing: -0.02em; }
-.pd-stat .k { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.pd-head .btn-primary { flex-shrink: 0; margin-top: 4px; }
 
 .pd-toolbar {
   display: flex;
@@ -4336,7 +4332,25 @@ input[type="file"]::file-selector-button:hover {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin: 18px 0 12px;
+  margin: 26px 0 14px;
+}
+.pd-list-title {
+  font-size: 16px;
+  font-weight: 660;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.pd-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  line-height: 1.4;
 }
 .pd-search {
   display: flex;
@@ -4357,21 +4371,6 @@ input[type="file"]::file-selector-button:hover {
   border: none; outline: none; background: transparent;
   width: 100%; font-size: 14px; color: var(--text);
 }
-.pd-filters { display: flex; gap: 6px; }
-.pd-filter {
-  padding: 7px 13px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
-  font-size: 13px; font-weight: 550;
-  cursor: pointer;
-}
-.pd-filter:hover { border-color: var(--border-strong); color: var(--text); }
-.pd-filter.active {
-  background: var(--text); color: #fff; border-color: var(--text);
-}
-
 .req-list { display: flex; flex-direction: column; gap: 8px; }
 .req-row {
   display: flex;
@@ -4387,12 +4386,6 @@ input[type="file"]::file-selector-button:hover {
 .req-row:hover {
   border-color: var(--accent-border);
   box-shadow: 0 3px 12px -6px rgba(20, 22, 40, 0.2);
-}
-.req-dot {
-  flex-shrink: 0;
-  width: 9px; height: 9px;
-  border-radius: 50%;
-  margin-top: 6px;
 }
 .req-main { flex: 1; min-width: 0; }
 .req-title-line {
