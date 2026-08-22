@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import Modal from "../components/Modal";
-import { REQ_TYPES, REQ_TYPE_LABEL } from "../requirements/constants";
+import { REQ_TYPES_BASIC, REQ_TYPE_LABEL } from "../requirements/constants";
 
 function relTime(iso) {
   if (!iso) return "";
@@ -284,7 +284,7 @@ export default function ProjectDetail() {
         onClose={() => setModalOpen(false)}
         title="New requirement"
         subtitle="Write it directly, or upload a document — then open it to run the AI pipeline."
-        width={600}
+        width={680}
       >
         <div className="seg" role="tablist">
           <button
@@ -318,7 +318,7 @@ export default function ProjectDetail() {
             <label className="field">
               Type
               <select value={reqType} onChange={(e) => setReqType(e.target.value)}>
-                {REQ_TYPES.map((t) => (
+                {REQ_TYPES_BASIC.map((t) => (
                   <option key={t} value={t}>{REQ_TYPE_LABEL[t]}</option>
                 ))}
               </select>
@@ -346,9 +346,17 @@ export default function ProjectDetail() {
         ) : (
           <form className="form-v" onSubmit={onUpload}>
             <p className="form-hint">
-              Upload a requirement document. Text files (.txt/.md/.csv) are extracted
-              automatically; other formats are attached for you to edit.
+              Upload a requirement document. Text files (.txt/.md) are read directly —
+              the whole file becomes the requirement text. Other formats are attached
+              for you to edit.
             </p>
+            <a className="tpl-download" href="/requirement-template.md" download>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 2v8m0 0 3-3M8 10 5 7" />
+                <path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" />
+              </svg>
+              Download the template (.md)
+            </a>
             <label className="field">
               Title <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
               <input
@@ -360,7 +368,7 @@ export default function ProjectDetail() {
             <label className="field">
               Type
               <select value={uploadType} onChange={(e) => setUploadType(e.target.value)}>
-                {REQ_TYPES.map((t) => (
+                {REQ_TYPES_BASIC.map((t) => (
                   <option key={t} value={t}>{REQ_TYPE_LABEL[t]}</option>
                 ))}
               </select>

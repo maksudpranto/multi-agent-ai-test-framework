@@ -21,6 +21,16 @@ export const REQ_TYPE_LABEL = {
   feature_description: "Feature Description",
 };
 
+// The types offered in the New-requirement form. `req_type` is only a label —
+// the pipeline reads the requirement text regardless of type — so we surface the
+// three that users actually reach for and keep the form uncluttered. (The full
+// REQ_TYPES list still drives display labels for any legacy value.)
+export const REQ_TYPES_BASIC = [
+  "user_story",
+  "acceptance_criteria",
+  "feature_description",
+];
+
 export const PRIORITIES = ["high", "medium", "low"];
 
 export const REQ_STATUSES = ["draft", "ready", "in_progress", "done", "archived"];
