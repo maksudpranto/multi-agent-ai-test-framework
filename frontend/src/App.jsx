@@ -4,6 +4,7 @@ import AppShell from "./components/AppShell";
 import Login from "./auth/Login";
 import Register from "./auth/Register";
 import Dashboard from "./projects/Dashboard";
+import ProjectsList from "./projects/ProjectsList";
 import ProjectDetail from "./projects/ProjectDetail";
 import RequirementDetail from "./requirements/RequirementDetail";
 import ExperimentsList from "./experiments/ExperimentsList";
@@ -52,6 +53,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects"
+        element={
+          <ProtectedRoute>
+            <ProjectsList />
           </ProtectedRoute>
         }
       />

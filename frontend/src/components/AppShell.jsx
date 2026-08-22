@@ -70,7 +70,7 @@ export default function AppShell({ children }) {
             {icons.home}
             Home
           </Link>
-          <Link to="/" className={`${inProject ? "active" : ""}`}>
+          <Link to="/projects" className={`${inProject ? "active" : ""}`}>
             {icons.projects}
             Projects
           </Link>

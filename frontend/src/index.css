@@ -2179,6 +2179,54 @@ select:focus {
   gap: 10px;
 }
 
+.projects-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.projects-page-head h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.projects-page-head p.muted {
+  margin: 0;
+  max-width: 60ch;
+}
+.projects-page-head .btn-primary {
+  flex-shrink: 0;
+}
+
+.proj-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.proj-stat {
+  min-width: 108px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e6e8ee);
+}
+.proj-stat b {
+  display: block;
+  font-size: 24px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text, #111);
+}
+.proj-stat span {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
 .projects-head {
   display: flex;
   align-items: center;
