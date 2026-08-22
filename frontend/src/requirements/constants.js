@@ -31,6 +31,17 @@ export const REQ_TYPES_BASIC = [
   "feature_description",
 ];
 
+// Placeholder for the "Requirement text" box, matched to the chosen type so the
+// hint shows the shape of input the AI reads best.
+export const REQ_TEXT_PLACEHOLDER = {
+  user_story:
+    "As a <role>, I want <goal> so that <benefit>.\n\nRules / edge cases:\n- …",
+  acceptance_criteria:
+    "Given <starting state>, when <action>, then <expected result>.\nGiven <starting state>, when <action>, then <expected result>.",
+  feature_description:
+    "Describe the feature: what it does, the rules it must follow, and the edge cases the tests should check…",
+};
+
 export const PRIORITIES = ["high", "medium", "low"];
 
 export const REQ_STATUSES = ["draft", "ready", "in_progress", "done", "archived"];

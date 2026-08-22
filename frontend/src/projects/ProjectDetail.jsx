@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import Modal from "../components/Modal";
-import { REQ_TYPES_BASIC, REQ_TYPE_LABEL } from "../requirements/constants";
+import {
+  REQ_TEXT_PLACEHOLDER,
+  REQ_TYPES_BASIC,
+  REQ_TYPE_LABEL,
+} from "../requirements/constants";
 
 function relTime(iso) {
   if (!iso) return "";
@@ -326,7 +330,7 @@ export default function ProjectDetail() {
             <label className="field">
               Requirement text
               <textarea
-                placeholder="As a user, I want to… / BRD / PRD / use case text…"
+                placeholder={REQ_TEXT_PLACEHOLDER[reqType]}
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
                 rows={6}
