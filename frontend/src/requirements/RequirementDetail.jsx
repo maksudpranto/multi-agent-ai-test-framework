@@ -141,16 +141,16 @@ function StageHeader({ meta, status, action }) {
     <div className="stage-head">
       <div className="stage-num">{meta.num}</div>
       <div className="stage-info">
-        <div className="stage-agent">{meta.agent}</div>
+        <div className="stage-agent">
+          <span>{meta.agent}</span>
+          {status}
+        </div>
         <p className="stage-what">{meta.what}</p>
         <p className="stage-why">
           <b>Why it matters:</b> {meta.why}
         </p>
       </div>
-      <div className="stage-actions">
-        {status}
-        {action}
-      </div>
+      <div className="stage-actions">{action}</div>
     </div>
   );
 }
@@ -159,7 +159,10 @@ function StatusPill({ done, label }) {
   return done ? (
     <span className="stpill done">✓ {label}</span>
   ) : (
-    <span className="stpill idle">Not run yet</span>
+    <span className="stpill idle">
+      <span className="stpill-dot" aria-hidden />
+      Not run yet
+    </span>
   );
 }
 

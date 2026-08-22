@@ -4620,22 +4620,48 @@ input[type="file"]::file-selector-button:hover {
   font-size: 15px; font-weight: 700;
 }
 .stage-info { min-width: 0; }
-.stage-agent { font-size: 16px; font-weight: 680; color: var(--text); margin-bottom: 4px; }
+.stage-agent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 16px;
+  font-weight: 680;
+  color: var(--text);
+  margin-bottom: 4px;
+}
 .stage-what { margin: 0 0 4px; font-size: 14px; line-height: 1.5; color: var(--text); }
 .stage-why { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
 .stage-why b { color: var(--text); font-weight: 620; }
 .stage-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  align-items: flex-start;
 }
 .stpill {
-  font-size: 12px; font-weight: 600; white-space: nowrap;
-  padding: 4px 10px; border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 3px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
 }
 .stpill.done { color: var(--green); background: rgba(22, 163, 74, 0.1); border: 1px solid rgba(22, 163, 74, 0.25); }
-.stpill.idle { color: var(--text-muted); background: var(--surface-soft); border: 1px solid var(--border); }
+.stpill.idle {
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+}
+.stpill-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-muted);
+}
 
 /* AI-driven action button — every agent trigger shares this look */
 .ai-btn {
