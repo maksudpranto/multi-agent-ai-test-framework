@@ -522,8 +522,61 @@ export default function RequirementDetail() {
               </div>
             )}
           </div>
-          <ModelPicker onProviderChange={setSelectedProvider} />
+          <div className="rq-head-aside">
+            <ModelPicker onProviderChange={setSelectedProvider} />
+            <UsagePanel providerFilter={selectedProvider} />
+          </div>
         </header>
+
+        <div className="run-bar">
+          <div className="run-bar-main">
+            <button className="btn-primary run-btn" onClick={onRunAll} disabled={runningAll}>
+              {runningAll ? (
+                <><span className="spinner" /> Working…</>
+              ) : generation ? (
+                "▶ Re-run full pipeline"
+              ) : (
+                "▶ Run full pipeline"
+              )}
+            </button>
+            <span className="run-bar-hint">
+              One click runs all five agents in order — Analyze → Generate → Review →
+              Coverage → Quality — turning this requirement into a proven test suite.
+            </span>
+          </div>
+          {runningAll &&
+            (() => {
+              const total = plSteps.length;
+              const done = Math.min(pipelineIdx, total);
+              const pct = Math.round((Math.min(pipelineIdx + 1, total) / total) * 100);
+              const current = plSteps[pipelineIdx];
+              return (
+                <div className="pl-progress">
+                  <div className="pl-head">
+                    <span className="step">
+                      {current ? `Step ${done + 1} of ${total} · ${current}` : "Finishing up"}
+                    </span>
+                    <span className="pct">{pct}%</span>
+                  </div>
+                  <div className="pl-track">
+                    <div className="pl-fill" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="pipeline-progress">
+                    {plSteps.map((s, i) => (
+                      <div
+                        key={s}
+                        className={`pp-step ${
+                          i < pipelineIdx ? "done" : i === pipelineIdx ? "active" : ""
+                        }`}
+                      >
+                        <span className="pp-dot" /> {s}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+        </div>
 
         <PipelineStepper
           tabs={REQ_TABS}
@@ -538,70 +591,9 @@ export default function RequirementDetail() {
         {/* ---------- Start: requirement + one-click run ---------- */}
         {activeTab === "overview" && (
           <>
-            <section className="section">
+            <section className="section req-section">
               <h2>Requirement</h2>
               <p className="story-text">{story?.raw_text}</p>
-            </section>
-
-            <section className="run-hero">
-              <div className="run-hero-main">
-                <h3>Run the full pipeline</h3>
-                <p>
-                  Five AI agents work in sequence to turn this requirement into a
-                  proven test suite. Watch it happen here, or open any stage in the
-                  bar above to run and inspect it yourself.
-                </p>
-                <div className="run-flow">
-                  <span>1 Analyze</span><i>→</i>
-                  <span>2 Generate</span><i>→</i>
-                  <span>3 Review</span><i>→</i>
-                  <span>4 Coverage</span><i>→</i>
-                  <span>5 Quality</span>
-                </div>
-              </div>
-              <div className="run-hero-cta">
-                <button className="btn-primary" onClick={onRunAll} disabled={runningAll}>
-                  {runningAll ? (
-                    <><span className="spinner" /> Working…</>
-                  ) : generation ? (
-                    "Re-run full pipeline"
-                  ) : (
-                    "Run full pipeline"
-                  )}
-                </button>
-              </div>
-              {runningAll &&
-                (() => {
-                  const total = plSteps.length;
-                  const done = Math.min(pipelineIdx, total);
-                  const pct = Math.round((Math.min(pipelineIdx + 1, total) / total) * 100);
-                  const current = plSteps[pipelineIdx];
-                  return (
-                    <div className="pl-progress">
-                      <div className="pl-head">
-                        <span className="step">
-                          {current ? `Step ${done + 1} of ${total} · ${current}` : "Finishing up"}
-                        </span>
-                        <span className="pct">{pct}%</span>
-                      </div>
-                      <div className="pl-track">
-                        <div className="pl-fill" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="pipeline-progress">
-                        {plSteps.map((s, i) => (
-                          <div
-                            key={s}
-                            className={`pp-step ${
-                              i < pipelineIdx ? "done" : i === pipelineIdx ? "active" : ""
-                            }`}
-                          >
-                            <span className="pp-dot" /> {s}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
             </section>
 
             <details className="adv-orch">
@@ -942,9 +934,6 @@ export default function RequirementDetail() {
           </section>
         )}
 
-        <div className="rq-usage">
-          <UsagePanel providerFilter={selectedProvider} />
-        </div>
       </div>
     </div>
   );

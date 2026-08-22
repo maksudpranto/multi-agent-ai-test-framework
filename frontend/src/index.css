@@ -4469,6 +4469,19 @@ input[type="file"]::file-selector-button:hover {
 .rq-head-main h1 { font-size: 26px; font-weight: 730; margin: 0 0 10px; line-height: 1.2; letter-spacing: -0.015em; }
 .rq-head-main .case-badges { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* Right column: model dropdown with its usage dashboard fixed directly beneath. */
+.rq-head-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 360px;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+.rq-head-aside .model-picker { width: 100%; }
+.rq-head-aside .model-picker select { width: 100%; }
+.rq-head-aside .usage-card { margin: 0; width: 100%; }
+
 /* ---- Pipeline stepper (tabs) ---- */
 .stepper {
   display: flex;
@@ -4487,17 +4500,21 @@ input[type="file"]::file-selector-button:hover {
   flex: 1 0 auto;
   padding: 9px 13px;
   border-radius: 10px;
-  border: 1px solid transparent;
-  background: transparent;
+  border: 1px solid var(--border);
+  background: var(--surface);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s;
+  box-shadow: 0 1px 2px rgba(20, 22, 40, 0.04);
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
-.stepper .step:hover { background: var(--surface); }
+.stepper .step:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 6px rgba(20, 22, 40, 0.08);
+}
 .stepper .step.active {
-  background: var(--surface);
-  border-color: var(--accent-border);
-  box-shadow: 0 1px 4px rgba(20, 22, 40, 0.06);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.16);
 }
 .step-badge {
   flex-shrink: 0;
@@ -4516,36 +4533,37 @@ input[type="file"]::file-selector-button:hover {
 .step-label { font-size: 13.5px; font-weight: 600; color: var(--text); }
 .step-result { font-size: 11px; color: var(--text-muted); font-weight: 500; }
 
-/* ---- Run hero (Start tab) ---- */
-.run-hero {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 16px 20px;
-  align-items: center;
-  padding: 20px 22px;
-  border-radius: 16px;
-  color: #fff;
-  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 60%, #3730a3 100%);
-  box-shadow: 0 12px 30px -12px rgba(67, 56, 202, 0.55);
+/* ---- Run bar (always-on primary action, top of page) ---- */
+.run-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eef0ff 0%, #f5f3ff 100%);
+  border: 1px solid var(--accent-border);
 }
-.run-hero-main h3 { font-size: 18px; font-weight: 680; margin: 0 0 6px; }
-.run-hero-main p { margin: 0 0 12px; font-size: 14px; line-height: 1.55; color: rgba(255, 255, 255, 0.86); max-width: 62ch; }
-.run-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; font-weight: 600; }
-.run-flow span { background: rgba(255, 255, 255, 0.16); border-radius: 999px; padding: 4px 11px; }
-.run-flow i { color: rgba(255, 255, 255, 0.6); font-style: normal; }
-.run-hero-cta .btn-primary {
-  background: #fff; color: var(--accent);
-  border: none; font-weight: 650; white-space: nowrap;
+.run-bar-main { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.run-btn {
+  font-size: 15px;
+  font-weight: 640;
+  padding: 12px 22px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
-.run-hero-cta .btn-primary:hover:not(:disabled) { background: #f1f0ff; }
-.run-hero-cta .btn-primary:disabled { opacity: 0.75; }
-.run-hero .pl-progress { grid-column: 1 / -1; }
-.run-hero .pl-head, .run-hero .pl-head .step { color: #fff; }
-.run-hero .pl-track { background: rgba(255, 255, 255, 0.25); }
-.run-hero .pl-fill { background: #fff; }
-.run-hero .pipeline-progress .pp-step { color: rgba(255, 255, 255, 0.8); }
-.run-hero .pp-dot { border-color: rgba(255, 255, 255, 0.6); }
-.run-hero .pp-step.done .pp-dot, .run-hero .pp-step.active .pp-dot { background: #fff; border-color: #fff; }
+.run-bar-hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 200px;
+}
+.run-bar .pl-progress { width: 100%; }
+
+@media (max-width: 640px) {
+  .run-btn { width: 100%; }
+}
 
 /* ---- Advanced orchestrator disclosure ---- */
 .adv-orch {
