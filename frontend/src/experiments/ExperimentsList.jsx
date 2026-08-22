@@ -27,6 +27,15 @@ function relTime(iso) {
   return then.toLocaleDateString();
 }
 
+function fmtEta(secs) {
+  if (secs == null || !isFinite(secs)) return null;
+  if (secs < 45) return "~<1m left";
+  const m = Math.round(secs / 60);
+  if (m < 60) return `~${m}m left`;
+  const h = Math.floor(m / 60);
+  return `~${h}h ${m % 60}m left`;
+}
+
 const IconPlay = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 3.2v9.6l8-4.8z" /></svg>
 );
@@ -56,15 +65,31 @@ function ExperimentRow({ exp, onChanged }) {
   const [editName, setEditName] = useState(exp.name);
   const [confirm, setConfirm] = useState(null); // {label, action}
   const [busy, setBusy] = useState(false);
+  const [eta, setEta] = useState(null);
+  const etaRef = useRef(null); // {t, completed} of the first running sample
 
   useEffect(() => setLive(exp), [exp]);
 
   useEffect(() => {
-    if (live.status !== "running") return undefined;
+    if (live.status !== "running") {
+      etaRef.current = null;
+      setEta(null);
+      return undefined;
+    }
     const id = setInterval(async () => {
       try {
         const s = await api.getExperiment(live.id);
-        setLive({ ...s.experiment, progress: s.progress });
+        const p = s.progress;
+        // Estimate time remaining from the rate of cells completed since we
+        // first saw this run, projected over the cells left.
+        if (p && p.total > 0) {
+          const now = Date.now();
+          if (!etaRef.current) etaRef.current = { t: now, c: p.completed };
+          const dc = p.completed - etaRef.current.c;
+          const dt = (now - etaRef.current.t) / 1000;
+          if (dc > 0 && dt > 2) setEta(((p.total - p.completed) * dt) / dc);
+        }
+        setLive({ ...s.experiment, progress: p });
       } catch {
         /* keep last known */
       }
@@ -75,6 +100,7 @@ function ExperimentRow({ exp, onChanged }) {
   const prog = live.progress;
   const pct = prog ? prog.pct : live.status === "completed" ? 100 : 0;
   const isRunning = live.status === "running";
+  const etaLabel = isRunning ? fmtEta(eta) : null;
 
   async function act(fn) {
     setBusy(true);
@@ -156,6 +182,7 @@ function ExperimentRow({ exp, onChanged }) {
               <span style={{ width: `${pct}%` }} />
             </div>
             <span className="exp-prog-pct">{Math.round(pct)}%</span>
+            <span className="exp-prog-eta">{etaLabel || "estimating…"}</span>
           </>
         )}
       </div>
@@ -322,10 +349,9 @@ export default function ExperimentsList() {
           </button>
         </div>
         <p className="muted exp-setup-copy">
-          Studies run against the benchmark — eight everyday features (ATM withdrawal,
-          login lockout, sign-up validation, bank transfer and more), each with four
-          deliberately planted bugs. Seed once (safe to re-run), then configure and
-          launch below. It runs on the model chosen in section 2.
+          Name your study, pick which approaches to compare, and how many times to
+          repeat it. Each runs against a benchmark of eight everyday features (ATM
+          withdrawal, login, sign-up, bank transfer…) with planted bugs.
         </p>
         {seed && (
           <div className="exp-seed-note">
@@ -337,7 +363,7 @@ export default function ExperimentsList() {
 
         <form className="exp-create" onSubmit={onLaunch}>
           <label className="field">
-            <span className="field-label">Name</span>
+            <span className="field-label">Study name</span>
             <input
               ref={nameRef}
               placeholder="e.g. Multi-agent vs baseline — run 1"
@@ -348,7 +374,8 @@ export default function ExperimentsList() {
           </label>
 
           <div className="field">
-            <span className="field-label">Conditions to compare</span>
+            <span className="field-label">Approaches to compare</span>
+            <span className="field-sub">Each becomes a column in the results. Keep the baseline plus at least one multi-agent arm.</span>
             <div className="cond-pills">
               {conditions.map((c) => (
                 <label
@@ -369,10 +396,8 @@ export default function ExperimentsList() {
           </div>
 
           <div className="field">
-            <span className="field-label">
-              Repeat runs
-              <span className="field-hint"> — AI output varies run to run; repeating averages out the noise and reports the spread</span>
-            </span>
+            <span className="field-label">Repeat runs</span>
+            <span className="field-sub">AI output varies run to run — repeating averages out the noise and reports the spread (±).</span>
             <div className="reps-pills">
               {[1, 3, 5].map((n) => (
                 <button
@@ -388,15 +413,14 @@ export default function ExperimentsList() {
           </div>
 
           <div className="exp-create-foot">
-            <p className="muted exp-hint" style={{ margin: 0, maxWidth: "48ch" }}>
-              Runs in the background across every program × condition, on the model
-              selected in section 2. The offline mock runs for free.
+            <p className="muted exp-foot-note">
+              Runs in the background on the model chosen in section 2 · offline mock is free.
             </p>
-            <button type="submit" disabled={launching || !name.trim() || nSelected === 0}>
+            <button type="submit" className="exp-run-btn" disabled={launching || !name.trim() || nSelected === 0}>
               {launching ? (
                 <span className="busy-label"><span className="spinner" /> Launching…</span>
               ) : (
-                "Run experiment"
+                "▶  Run experiment"
               )}
             </button>
           </div>

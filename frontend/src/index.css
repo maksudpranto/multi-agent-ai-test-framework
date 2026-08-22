@@ -3841,7 +3841,7 @@ input[type="file"]::file-selector-button:hover {
 /* Experiment list */
 .exp-list { display: flex; flex-direction: column; gap: 10px; }
 .exp-row {
-  display: grid; grid-template-columns: 1fr minmax(70px, 140px) auto auto; align-items: center; gap: 14px;
+  display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 14px;
   padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg);
   background: var(--surface); box-shadow: var(--shadow-sm); text-decoration: none; color: var(--text);
   cursor: pointer; transition: border-color 0.14s, box-shadow 0.14s, transform 0.14s;
@@ -3856,8 +3856,9 @@ input[type="file"]::file-selector-button:hover {
 .exp-row-acts .icon-btn { opacity: 0.6; }
 .exp-row:hover .exp-row-acts .icon-btn { opacity: 1; }
 .exp-row-prog { display: flex; align-items: center; gap: 8px; }
-.exp-row-prog .exp-bar { flex: 1; }
-.exp-prog-pct { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 32px; text-align: right; }
+.exp-row-prog:empty { display: none; }
+.exp-row-prog .exp-bar { width: 90px; flex: none; }
+.exp-prog-pct { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 30px; text-align: right; }
 
 /* Inline confirm (delete / re-run) — no native dialog */
 .row-confirm { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
@@ -3875,11 +3876,53 @@ input[type="file"]::file-selector-button:hover {
 .exp-pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
 .exp-pager-info { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
 
-/* Model selection row (section 2) */
+/* Model selection row (section 2) — make it unmistakably a dropdown to choose. */
 .exp-model-row { margin: 2px 0 16px; }
-.exp-model-row .model-picker { width: 100%; }
-.exp-model-row .model-picker select { flex: 1; }
+.exp-model-row .model-picker {
+  display: flex; flex-direction: column; align-items: stretch; gap: 7px; width: 100%;
+}
+.exp-model-row .model-picker .mp-label {
+  font-size: 12.5px; font-weight: 700; color: var(--text); text-transform: none; letter-spacing: 0;
+}
+.exp-model-row .model-picker .mp-label::after {
+  content: " — choose which model runs your study";
+  font-weight: 400; color: var(--text-muted);
+}
+.exp-model-row .model-picker select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  width: 100%; padding: 13px 42px 13px 14px; font-size: 15px; font-weight: 600;
+  border: 1.5px solid var(--accent); border-radius: var(--radius);
+  background-color: var(--surface); color: var(--text); cursor: pointer;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%234f46e5' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 7l5 5 5-5'/></svg>");
+  background-repeat: no-repeat; background-position: right 13px center;
+}
+.exp-model-row .model-picker select:hover { background-color: var(--accent-soft); }
+.exp-model-row .model-picker select:focus { outline: none; box-shadow: 0 0 0 4px var(--accent-soft); }
 .section > .usage-card { margin-top: 0; box-shadow: none; border: 1px solid var(--border); }
+
+/* Experiments page spacing + readable hero (the hero-sub was white, meant for the
+   dashboard's purple hero — on this light page it looked like an empty gap). */
+.exp-page .exp-hero { margin-bottom: 0; }
+.exp-page .hero-sub { color: var(--text-secondary); margin: 8px 0 0; max-width: 70ch; }
+.exp-page .section { margin: 14px 0; }
+.exp-page .section:first-of-type { margin-top: 8px; }
+
+/* Field sub-hint under a label */
+.field-sub { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; margin: 0 0 2px; }
+
+/* Run button + foot */
+.exp-create-foot { gap: 16px; }
+.exp-foot-note { margin: 0; font-size: 12.5px; max-width: 44ch; }
+.exp-run-btn { font-size: 14px; padding: 10px 20px; }
+
+/* Section 3 head: keep the search clearly separated from the title */
+.exp-page .section-head { margin-bottom: 12px; row-gap: 10px; }
+.exp-list-tools { gap: 14px; }
+.exp-search input { width: 170px; }
+
+/* Running-row ETA */
+.exp-prog-eta { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .exp-row-name { font-weight: 650; font-size: 14.5px; }
 .exp-row-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .exp-bar { height: 7px; border-radius: 999px; background: var(--surface-mist); overflow: hidden; }
