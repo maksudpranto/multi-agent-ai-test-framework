@@ -603,28 +603,28 @@ export default function RequirementDetail() {
               </div>
             </section>
 
-            <details className="adv-orch">
-              <summary>
-                <span className="adv-badge">Advanced</span>
-                Let the agents decide the order — autonomous orchestrator
-              </summary>
-              <div className="adv-body">
-                <p>
-                  Instead of the fixed sequence above, the Orchestrator's planner
-                  <strong> decides which agent to run next</strong> from the live
-                  state, under guardrails — and logs every decision. This is the
-                  framework's agentic control loop.
-                </p>
+            <section className="section auto-run">
+              <div className="auto-run-head">
+                <span className="auto-run-ic" aria-hidden>⚡</span>
+                <div className="auto-run-txt">
+                  <h2>Watch the AI run itself</h2>
+                  <p>
+                    The button above runs the five agents in a fixed order. Here,
+                    the AI decides the order on its own — picking which agent to run
+                    next, step by step, and showing you the reason for each choice.
+                    You get the same test suite, produced the autonomous way.
+                  </p>
+                </div>
                 <button
-                  className="btn-primary"
+                  className="auto-run-btn"
                   onClick={onOrchestrate}
                   disabled={orchestrating || runningAll}
                 >
-                  {orchestrating ? <Busy>Orchestrating…</Busy> : "Run agentic orchestrator"}
+                  {orchestrating ? <Busy>Working…</Busy> : "Let the AI drive ▶"}
                 </button>
-                {orchestration && <OrchestrationTrace data={orchestration} />}
               </div>
-            </details>
+              {orchestration && <OrchestrationTrace data={orchestration} />}
+            </section>
           </>
         )}
 

@@ -4553,39 +4553,42 @@ input[type="file"]::file-selector-button:hover {
   .run-btn { width: 100%; }
 }
 
-/* ---- Advanced orchestrator disclosure ---- */
-.adv-orch {
-  margin-top: 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  overflow: hidden;
+/* ---- "Watch the AI run itself" — autonomous orchestrator card ---- */
+.auto-run {
+  border: 1px solid var(--accent-border);
+  background: linear-gradient(180deg, var(--accent-soft), transparent 70%);
 }
-.adv-orch > summary {
+.auto-run-head {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 13px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  list-style: none;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
 }
-.adv-orch > summary::-webkit-details-marker { display: none; }
-.adv-orch > summary::before {
-  content: "▸";
-  color: var(--text-muted);
-  transition: transform 0.12s;
+.auto-run-ic {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--accent-border);
+  font-size: 19px;
 }
-.adv-orch[open] > summary::before { transform: rotate(90deg); }
-.adv-badge {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
-  color: var(--accent); background: var(--accent-soft);
-  border: 1px solid var(--accent-border); border-radius: 6px; padding: 2px 7px;
+.auto-run-txt { flex: 1; min-width: 220px; }
+.auto-run-txt h2 { margin: 0 0 5px; font-size: 16px; font-weight: 680; }
+.auto-run-txt p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary); max-width: 72ch; }
+.auto-run-btn {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fff; color: var(--accent);
+  border: 1.5px solid var(--accent); border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 14px; font-weight: 640; cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
 }
-.adv-body { padding: 4px 16px 16px; }
-.adv-body p { margin: 0 0 12px; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary); }
+.auto-run-btn:hover:not(:disabled) { background: var(--accent-soft); }
+.auto-run-btn:disabled { opacity: 0.6; cursor: default; }
+.auto-run .orch { margin-top: 16px; }
 
 /* ---- Stage header (what / why / status / action) ---- */
 .section.stage { }
