@@ -592,7 +592,15 @@ export default function RequirementDetail() {
           <>
             <section className="section req-section">
               <h2>Requirement</h2>
-              <p className="story-text">{story?.raw_text}</p>
+              <div className="req-body">
+                {(story?.raw_text || "")
+                  .split(/\n\s*\n/)
+                  .map((para) => para.replace(/\s*\n\s*/g, " ").trim())
+                  .filter(Boolean)
+                  .map((para, i) => (
+                    <p key={i} className="story-text">{para}</p>
+                  ))}
+              </div>
             </section>
 
             <details className="adv-orch">

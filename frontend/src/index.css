@@ -2860,13 +2860,14 @@ input[type="file"]::file-selector-button:hover {
   margin: 10px 0 14px;
   max-width: 74ch;
 }
-.story-text {
-  white-space: pre-wrap;
-  font-size: 14px;
-  line-height: 1.6;
+.req-body .story-text {
+  white-space: normal;
+  font-size: 15px;
+  line-height: 1.65;
   color: var(--text);
-  margin: 0;
+  margin: 0 0 12px;
 }
+.req-body .story-text:last-child { margin-bottom: 0; }
 
 /* Segmented mode toggles */
 .mode-toggle {
