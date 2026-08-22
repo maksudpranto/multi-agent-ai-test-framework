@@ -183,12 +183,9 @@ export default function RequirementDetail() {
   const [quality, setQuality] = useState(null);
   const [baseline, setBaseline] = useState(null);
   const [mode, setMode] = useState("multi"); // "multi" | "baseline"
-  const [inputMode, setInputMode] = useState("requirement"); // "requirement" | "criteria"
-  const [acText, setAcText] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
-  const [submittingAc, setSubmittingAc] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [prioritizing, setPrioritizing] = useState(false);
@@ -226,11 +223,6 @@ export default function RequirementDetail() {
         setCoverage(cov);
         setQuality(q);
         setBaseline(b);
-        // Reflect how the latest run was seeded: criteria supplied directly
-        // (no analysis) vs derived from the requirement.
-        if (r && !r.analysis && r.acceptance_criteria?.length) {
-          setInputMode("criteria");
-        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -245,27 +237,6 @@ export default function RequirementDetail() {
       setError(err.message);
     } finally {
       setRunning(false);
-    }
-  }
-
-  async function onSubmitCriteria() {
-    const criteria = acText
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (criteria.length === 0) return;
-    setSubmittingAc(true);
-    setError("");
-    try {
-      // A fresh criteria set means any previously generated cases / debate are
-      // stale — clear them so the UI reflects the new run.
-      setResult(await pace(api.submitAcceptanceCriteria(projectId, requirementId, criteria)));
-      setGeneration(null);
-      setDebate(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSubmittingAc(false);
     }
   }
 
@@ -372,25 +343,9 @@ export default function RequirementDetail() {
       let crit = criteria;
       if (willAnalyze) {
         setPipelineIdx(i);
-        if (inputMode === "criteria") {
-          const lines = acText
-            .split("\n")
-            .map((l) => l.trim())
-            .filter(Boolean);
-          if (lines.length === 0)
-            throw new Error(
-              "Add acceptance criteria (one per line), or switch Input to “From Requirement”."
-            );
-          const res = await paced(
-            api.submitAcceptanceCriteria(projectId, requirementId, lines)
-          );
-          setResult(res);
-          crit = res?.acceptance_criteria || [];
-        } else {
-          const res = await paced(api.runRequirementAnalysis(projectId, requirementId));
-          setResult(res);
-          crit = res?.acceptance_criteria || [];
-        }
+        const res = await paced(api.runRequirementAnalysis(projectId, requirementId));
+        setResult(res);
+        crit = res?.acceptance_criteria || [];
         i++;
       }
       if (crit.length === 0)
@@ -635,54 +590,11 @@ export default function RequirementDetail() {
                 <StatusPill done={stageDone.analyze} label={stageResult.analyze} />
               }
               action={
-                inputMode === "requirement" ? (
-                  <button onClick={onAnalyze} disabled={running || runningAll}>
-                    {running ? <Busy>Analyzing…</Busy> : analysis ? "Re-run analysis" : "Run analysis"}
-                  </button>
-                ) : null
+                <button onClick={onAnalyze} disabled={running || runningAll}>
+                  {running ? <Busy>Analyzing…</Busy> : analysis ? "Re-run analysis" : "Run analysis"}
+                </button>
               }
             />
-
-            <div className="mode-toggle sub" role="tablist">
-              <button
-                className={`mode-btn ${inputMode === "requirement" ? "active" : ""}`}
-                onClick={() => setInputMode("requirement")}
-              >
-                From requirement
-              </button>
-              <button
-                className={`mode-btn ${inputMode === "criteria" ? "active" : ""}`}
-                onClick={() => setInputMode("criteria")}
-              >
-                Paste criteria
-              </button>
-            </div>
-
-            {inputMode === "requirement" ? (
-              <p className="muted sub-note">
-                The Analyst reads the requirement above and derives the acceptance
-                criteria automatically.
-              </p>
-            ) : (
-              <>
-                <p className="muted sub-note">
-                  Already have acceptance criteria? Paste them — one per line — to
-                  skip analysis and feed generation directly.
-                </p>
-                <textarea
-                  className="ac-input"
-                  rows={6}
-                  placeholder={"User can log in with valid credentials\nInvalid credentials are rejected with an error\nAccount locks after 5 failed attempts"}
-                  value={acText}
-                  onChange={(e) => setAcText(e.target.value)}
-                />
-                <div className="inline-actions">
-                  <button onClick={onSubmitCriteria} disabled={submittingAc || !acText.trim()}>
-                    {submittingAc ? <Busy>Saving…</Busy> : "Use these criteria"}
-                  </button>
-                </div>
-              </>
-            )}
 
             {result?.error && <p className="error">{result.error}</p>}
 
