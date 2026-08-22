@@ -522,11 +522,10 @@ export default function RequirementDetail() {
               </div>
             )}
           </div>
-          <div className="rq-head-aside">
-            <ModelPicker onProviderChange={setSelectedProvider} />
-            <UsagePanel providerFilter={selectedProvider} />
-          </div>
+          <ModelPicker onProviderChange={setSelectedProvider} />
         </header>
+
+        <UsagePanel providerFilter={selectedProvider} />
 
         <div className="run-bar">
           <div className="run-bar-main">

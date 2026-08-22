@@ -4469,19 +4469,6 @@ input[type="file"]::file-selector-button:hover {
 .rq-head-main h1 { font-size: 26px; font-weight: 730; margin: 0 0 10px; line-height: 1.2; letter-spacing: -0.015em; }
 .rq-head-main .case-badges { display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* Right column: model dropdown with its usage dashboard fixed directly beneath. */
-.rq-head-aside {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 360px;
-  max-width: 100%;
-  flex-shrink: 0;
-}
-.rq-head-aside .model-picker { width: 100%; }
-.rq-head-aside .model-picker select { width: 100%; }
-.rq-head-aside .usage-card { margin: 0; width: 100%; }
-
 /* ---- Pipeline stepper (tabs) ---- */
 .stepper {
   display: flex;
