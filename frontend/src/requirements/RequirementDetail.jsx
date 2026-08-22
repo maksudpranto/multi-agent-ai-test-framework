@@ -609,10 +609,8 @@ export default function RequirementDetail() {
                 <div className="auto-run-txt">
                   <h2>Watch the AI run itself</h2>
                   <p>
-                    The button above runs the five agents in a fixed order. Here,
-                    the AI decides the order on its own — picking which agent to run
-                    next, step by step, and showing you the reason for each choice.
-                    You get the same test suite, produced the autonomous way.
+                    Same agents, same test suite — but the AI chooses which one runs
+                    next at each step, and shows why.
                   </p>
                 </div>
                 <button
