@@ -18,6 +18,30 @@ function Busy({ children }) {
   );
 }
 
+const SparkIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+    <path d="M8 1l1.35 3.65L13 6l-3.65 1.35L8 11 6.65 7.35 3 6l3.65-1.35z" />
+    <path d="M13 10.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z" opacity="0.75" />
+  </svg>
+);
+
+// Every agent trigger looks the same: a gradient, spark-marked "AI-driven"
+// button — so running a stage always reads as "the AI does this".
+function AiRunButton({ onClick, disabled, busy, busyLabel, children }) {
+  return (
+    <button className="ai-btn" onClick={onClick} disabled={disabled}>
+      {busy ? (
+        <Busy>{busyLabel}</Busy>
+      ) : (
+        <>
+          <SparkIcon />
+          {children}
+        </>
+      )}
+    </button>
+  );
+}
+
 const AGENT_LABEL = {
   analyze: "Analyst",
   generate: "Generator",
@@ -82,32 +106,32 @@ const STAGE_META = {
   analyze: {
     num: 1,
     agent: "Analyst agent",
-    what: "Reads your requirement and rewrites it as a structured spec with clear, testable acceptance criteria.",
-    why: "Every test below is generated from these criteria — get them right and the whole suite improves.",
+    what: "Turns your requirement into clear, testable acceptance criteria.",
+    why: "Every test is built from these — sharper criteria, stronger suite.",
   },
   test: {
     num: 2,
     agent: "Generator agent",
-    what: "Writes a full test suite from the acceptance criteria — each case linked back to the criterion it checks.",
-    why: "This is the suite you'd actually ship. It's the multi-agent output the whole framework exists to improve.",
+    what: "Writes the test suite from the criteria — each case traced to one.",
+    why: "The shippable suite, and the multi-agent output the framework improves.",
   },
   review: {
     num: 3,
     agent: "Reviewer ⇄ Consensus agents",
-    what: "Two agents debate the suite — one critiques weak or missing cases, the other rebuts, revises, or adds them.",
-    why: "This back-and-forth is the heart of the approach: it catches gaps a single AI pass misses.",
+    what: "Two agents debate the suite: one critiques, the other revises or adds cases.",
+    why: "The core idea — it catches gaps a single AI pass misses.",
   },
   coverage: {
     num: 4,
     agent: "Validator agent",
-    what: "Maps every acceptance criterion to the tests that verify it, and flags any left uncovered.",
-    why: "Proves nothing in the requirement slips through untested.",
+    what: "Matches every criterion to the tests that verify it, and flags the gaps.",
+    why: "Proves nothing in the requirement goes untested.",
   },
   quality: {
     num: 5,
     agent: "Quality agent",
-    what: "Scores each test on clarity, atomicity and traceability, and flags duplicates.",
-    why: "Tells you how good the suite really is — the pipeline's final report card.",
+    what: "Scores each test on clarity, atomicity and traceability; flags duplicates.",
+    why: "The final verdict on how good the suite really is.",
   },
 };
 
@@ -590,9 +614,14 @@ export default function RequirementDetail() {
                 <StatusPill done={stageDone.analyze} label={stageResult.analyze} />
               }
               action={
-                <button onClick={onAnalyze} disabled={running || runningAll}>
-                  {running ? <Busy>Analyzing…</Busy> : analysis ? "Re-run analysis" : "Run analysis"}
-                </button>
+                <AiRunButton
+                  onClick={onAnalyze}
+                  disabled={running || runningAll}
+                  busy={running}
+                  busyLabel="Analyzing…"
+                >
+                  {analysis ? "Re-run analysis" : "Run analysis"}
+                </AiRunButton>
               }
             />
 
@@ -655,13 +684,23 @@ export default function RequirementDetail() {
                 status={<StatusPill done={stageDone.test} label={stageResult.test} />}
                 action={
                   mode === "multi" ? (
-                    <button onClick={onGenerate} disabled={criteria.length === 0 || generating || runningAll}>
-                      {generating ? <Busy>Generating…</Busy> : multiCases.length ? "Re-generate" : "Generate test cases"}
-                    </button>
+                    <AiRunButton
+                      onClick={onGenerate}
+                      disabled={criteria.length === 0 || generating || runningAll}
+                      busy={generating}
+                      busyLabel="Generating…"
+                    >
+                      {multiCases.length ? "Re-generate" : "Generate test cases"}
+                    </AiRunButton>
                   ) : (
-                    <button onClick={onBaseline} disabled={baselining}>
-                      {baselining ? <Busy>Running…</Busy> : "Run baseline"}
-                    </button>
+                    <AiRunButton
+                      onClick={onBaseline}
+                      disabled={baselining}
+                      busy={baselining}
+                      busyLabel="Running…"
+                    >
+                      Run baseline
+                    </AiRunButton>
                   )
                 }
               />
@@ -717,9 +756,14 @@ export default function RequirementDetail() {
               <section className="section optional-card">
                 <div className="section-head">
                   <h2>Optional · Prioritize the suite</h2>
-                  <button onClick={onPrioritize} disabled={prioritizing}>
-                    {prioritizing ? <Busy>Prioritizing…</Busy> : "Prioritize suite"}
-                  </button>
+                  <AiRunButton
+                    onClick={onPrioritize}
+                    disabled={prioritizing}
+                    busy={prioritizing}
+                    busyLabel="Prioritizing…"
+                  >
+                    Prioritize suite
+                  </AiRunButton>
                 </div>
                 <p className="muted mode-note">
                   The Prioritizer ranks cases by business importance and assigns a
@@ -743,12 +787,14 @@ export default function RequirementDetail() {
               meta={STAGE_META.review}
               status={<StatusPill done={stageDone.review} label={stageResult.review} />}
               action={
-                <button
+                <AiRunButton
                   onClick={onReviewConsensus}
                   disabled={multiCases.length === 0 || reviewing || runningAll}
+                  busy={reviewing}
+                  busyLabel="Debating…"
                 >
-                  {reviewing ? <Busy>Debating…</Busy> : debate ? "Re-run debate" : "Run review & consensus"}
-                </button>
+                  {debate ? "Re-run debate" : "Run review & consensus"}
+                </AiRunButton>
               }
             />
             {debate?.error && <p className="error">{debate.error}</p>}
@@ -773,9 +819,14 @@ export default function RequirementDetail() {
               meta={STAGE_META.coverage}
               status={<StatusPill done={stageDone.coverage} label={stageResult.coverage ? `${coverage.covered_count}/${coverage.total} covered` : ""} />}
               action={
-                <button onClick={onCoverage} disabled={multiCases.length === 0 || analysingCoverage || runningAll}>
-                  {analysingCoverage ? <Busy>Analysing…</Busy> : coverage ? "Re-run coverage" : "Analyse coverage"}
-                </button>
+                <AiRunButton
+                  onClick={onCoverage}
+                  disabled={multiCases.length === 0 || analysingCoverage || runningAll}
+                  busy={analysingCoverage}
+                  busyLabel="Analysing…"
+                >
+                  {coverage ? "Re-run coverage" : "Analyse coverage"}
+                </AiRunButton>
               }
             />
             {coverage?.error && <p className="error">{coverage.error}</p>}
@@ -800,9 +851,14 @@ export default function RequirementDetail() {
               meta={STAGE_META.quality}
               status={<StatusPill done={stageDone.quality} label={qualityPct != null ? `${qualityPct}% overall` : ""} />}
               action={
-                <button onClick={onQuality} disabled={multiCases.length === 0 || evaluatingQuality || runningAll}>
-                  {evaluatingQuality ? <Busy>Evaluating…</Busy> : quality ? "Re-run quality" : "Evaluate quality"}
-                </button>
+                <AiRunButton
+                  onClick={onQuality}
+                  disabled={multiCases.length === 0 || evaluatingQuality || runningAll}
+                  busy={evaluatingQuality}
+                  busyLabel="Evaluating…"
+                >
+                  {quality ? "Re-run quality" : "Evaluate quality"}
+                </AiRunButton>
               }
             />
             {quality?.error && <p className="error">{quality.error}</p>}
