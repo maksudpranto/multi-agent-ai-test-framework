@@ -4453,3 +4453,179 @@ input[type="file"]::file-selector-button:hover {
   .req-time { display: none; }
   .req-del { opacity: 1; }
 }
+
+/* ============================================================
+   Requirement detail — the pipeline page (RequirementDetail.jsx)
+   ============================================================ */
+.page.rq .rq-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.rq-head-main { flex: 1; min-width: 240px; }
+.rq-head-main h1 { font-size: 26px; font-weight: 730; margin: 0 0 10px; line-height: 1.2; letter-spacing: -0.015em; }
+.rq-head-main .case-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---- Pipeline stepper (tabs) ---- */
+.stepper {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px;
+  margin-bottom: 20px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.stepper .step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 0 auto;
+  padding: 9px 13px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+.stepper .step:hover { background: var(--surface); }
+.stepper .step.active {
+  background: var(--surface);
+  border-color: var(--accent-border);
+  box-shadow: 0 1px 4px rgba(20, 22, 40, 0.06);
+}
+.step-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--surface-mist);
+  color: var(--text-secondary);
+  font-size: 12px; font-weight: 700;
+}
+.stepper .step.active .step-badge { background: var(--accent); color: #fff; }
+.stepper .step.done .step-badge { background: var(--green); color: #fff; }
+.step-txt { display: flex; flex-direction: column; line-height: 1.2; }
+.step-label { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.step-result { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+/* ---- Run hero (Start tab) ---- */
+.run-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px 20px;
+  align-items: center;
+  padding: 20px 22px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 60%, #3730a3 100%);
+  box-shadow: 0 12px 30px -12px rgba(67, 56, 202, 0.55);
+}
+.run-hero-main h3 { font-size: 18px; font-weight: 680; margin: 0 0 6px; }
+.run-hero-main p { margin: 0 0 12px; font-size: 14px; line-height: 1.55; color: rgba(255, 255, 255, 0.86); max-width: 62ch; }
+.run-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; font-weight: 600; }
+.run-flow span { background: rgba(255, 255, 255, 0.16); border-radius: 999px; padding: 4px 11px; }
+.run-flow i { color: rgba(255, 255, 255, 0.6); font-style: normal; }
+.run-hero-cta .btn-primary {
+  background: #fff; color: var(--accent);
+  border: none; font-weight: 650; white-space: nowrap;
+}
+.run-hero-cta .btn-primary:hover:not(:disabled) { background: #f1f0ff; }
+.run-hero-cta .btn-primary:disabled { opacity: 0.75; }
+.run-hero .pl-progress { grid-column: 1 / -1; }
+.run-hero .pl-head, .run-hero .pl-head .step { color: #fff; }
+.run-hero .pl-track { background: rgba(255, 255, 255, 0.25); }
+.run-hero .pl-fill { background: #fff; }
+.run-hero .pipeline-progress .pp-step { color: rgba(255, 255, 255, 0.8); }
+.run-hero .pp-dot { border-color: rgba(255, 255, 255, 0.6); }
+.run-hero .pp-step.done .pp-dot, .run-hero .pp-step.active .pp-dot { background: #fff; border-color: #fff; }
+
+/* ---- Advanced orchestrator disclosure ---- */
+.adv-orch {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.adv-orch > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  list-style: none;
+}
+.adv-orch > summary::-webkit-details-marker { display: none; }
+.adv-orch > summary::before {
+  content: "▸";
+  color: var(--text-muted);
+  transition: transform 0.12s;
+}
+.adv-orch[open] > summary::before { transform: rotate(90deg); }
+.adv-badge {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  color: var(--accent); background: var(--accent-soft);
+  border: 1px solid var(--accent-border); border-radius: 6px; padding: 2px 7px;
+}
+.adv-body { padding: 4px 16px 16px; }
+.adv-body p { margin: 0 0 12px; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary); }
+
+/* ---- Stage header (what / why / status / action) ---- */
+.section.stage { }
+.stage-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 4px 16px;
+  align-items: start;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--divider);
+}
+.stage-num {
+  grid-row: 1 / span 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: 15px; font-weight: 700;
+}
+.stage-info { min-width: 0; }
+.stage-agent { font-size: 16px; font-weight: 680; color: var(--text); margin-bottom: 4px; }
+.stage-what { margin: 0 0 4px; font-size: 14px; line-height: 1.5; color: var(--text); }
+.stage-why { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.stage-why b { color: var(--text); font-weight: 620; }
+.stage-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.stpill {
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  padding: 4px 10px; border-radius: 999px;
+}
+.stpill.done { color: var(--green); background: rgba(22, 163, 74, 0.1); border: 1px solid rgba(22, 163, 74, 0.25); }
+.stpill.idle { color: var(--text-muted); background: var(--surface-soft); border: 1px solid var(--border); }
+
+/* Sub-controls inside a stage (toggles, hints) */
+.mode-toggle.sub { margin-bottom: 12px; }
+.sub-note { margin: 0 0 12px; font-size: 13px; }
+.optional-card { margin-top: 12px; }
+
+@media (max-width: 640px) {
+  .run-hero { grid-template-columns: 1fr; }
+  .run-hero-cta .btn-primary { width: 100%; }
+  .stage-head { grid-template-columns: auto 1fr; }
+  .stage-actions { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; margin-top: 4px; }
+}

@@ -63,14 +63,110 @@ function OrchestrationTrace({ data }) {
   );
 }
 
+// The page is a pipeline. Each tab is a stage the user can open; the numbered
+// ones are the five agents that run in order. "Start" is the launch pad and
+// "Export" is the takeaway.
 export const REQ_TABS = [
-  { key: "overview", label: "Overview" },
-  { key: "test", label: "Test Cases" },
-  { key: "review", label: "Review" },
-  { key: "coverage", label: "Coverage" },
-  { key: "quality", label: "Quality" },
+  { key: "overview", label: "Start" },
+  { key: "analyze", label: "Analyze", num: 1 },
+  { key: "test", label: "Generate", num: 2 },
+  { key: "review", label: "Review", num: 3 },
+  { key: "coverage", label: "Coverage", num: 4 },
+  { key: "quality", label: "Quality", num: 5 },
   { key: "export", label: "Export" },
 ];
+
+// Plain-language "what it does / why it matters" for each agent stage — shown in
+// a consistent header so the user always knows what a section is for.
+const STAGE_META = {
+  analyze: {
+    num: 1,
+    agent: "Analyst agent",
+    what: "Reads your requirement and rewrites it as a structured spec with clear, testable acceptance criteria.",
+    why: "Every test below is generated from these criteria — get them right and the whole suite improves.",
+  },
+  test: {
+    num: 2,
+    agent: "Generator agent",
+    what: "Writes a full test suite from the acceptance criteria — each case linked back to the criterion it checks.",
+    why: "This is the suite you'd actually ship. It's the multi-agent output the whole framework exists to improve.",
+  },
+  review: {
+    num: 3,
+    agent: "Reviewer ⇄ Consensus agents",
+    what: "Two agents debate the suite — one critiques weak or missing cases, the other rebuts, revises, or adds them.",
+    why: "This back-and-forth is the heart of the approach: it catches gaps a single AI pass misses.",
+  },
+  coverage: {
+    num: 4,
+    agent: "Validator agent",
+    what: "Maps every acceptance criterion to the tests that verify it, and flags any left uncovered.",
+    why: "Proves nothing in the requirement slips through untested.",
+  },
+  quality: {
+    num: 5,
+    agent: "Quality agent",
+    what: "Scores each test on clarity, atomicity and traceability, and flags duplicates.",
+    why: "Tells you how good the suite really is — the pipeline's final report card.",
+  },
+};
+
+// Consistent stage header: number badge, agent name, what/why, status + action.
+function StageHeader({ meta, status, action }) {
+  return (
+    <div className="stage-head">
+      <div className="stage-num">{meta.num}</div>
+      <div className="stage-info">
+        <div className="stage-agent">{meta.agent}</div>
+        <p className="stage-what">{meta.what}</p>
+        <p className="stage-why">
+          <b>Why it matters:</b> {meta.why}
+        </p>
+      </div>
+      <div className="stage-actions">
+        {status}
+        {action}
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ done, label }) {
+  return done ? (
+    <span className="stpill done">✓ {label}</span>
+  ) : (
+    <span className="stpill idle">Not run yet</span>
+  );
+}
+
+// The pipeline stepper across the top: order + status + key result, doubles as
+// the tab navigation.
+function PipelineStepper({ tabs, active, onPick, stageDone, stageResult }) {
+  return (
+    <div className="stepper" role="tablist">
+      {tabs.map((t) => {
+        const done = !!stageDone[t.key];
+        return (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={active === t.key}
+            className={`step ${active === t.key ? "active" : ""} ${done ? "done" : ""}`}
+            onClick={() => onPick(t.key)}
+          >
+            <span className="step-badge">{done ? "✓" : t.num || "•"}</span>
+            <span className="step-txt">
+              <span className="step-label">{t.label}</span>
+              {stageResult[t.key] && (
+                <span className="step-result">{stageResult[t.key]}</span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function RequirementDetail() {
   const { projectId, requirementId } = useParams();
@@ -385,25 +481,41 @@ export default function RequirementDetail() {
   const criteria = result?.acceptance_criteria || [];
   const multiCases = generation?.test_cases || [];
   const baselineCases = baseline?.test_cases || [];
+  const qualityPct = quality ? Math.round((quality.overall_score || 0) * 100) : null;
+
+  const stageDone = {
+    analyze: !!(analysis || criteria.length),
+    test: multiCases.length > 0,
+    review: !!debate,
+    coverage: !!coverage,
+    quality: !!quality,
+  };
+  const stageResult = {
+    analyze: criteria.length ? `${criteria.length} criteria` : "",
+    test: multiCases.length ? `${multiCases.length} cases` : "",
+    review: debate ? (debate.consensus_reached ? "consensus" : `${debate.rounds_used} rounds`) : "",
+    coverage: coverage ? `${coverage.coverage_pct}%` : "",
+    quality: qualityPct != null ? `${qualityPct}%` : "",
+  };
 
   return (
     <div className="content">
-      <div className="page">
+      <div className="page rq">
         <p className="crumb">
-          <Link to="/">Home</Link>
+          <Link to="/projects">Projects</Link>
           <span className="sep">/</span>
-          <Link to={`/projects/${projectId}`}>Project</Link>
+          <Link to={`/projects/${projectId}`}>Requirements</Link>
           <span className="sep">/</span>
           <span>{story?.title}</span>
         </p>
-        <header className="page-head">
-          <div>
+        <header className="rq-head">
+          <div className="rq-head-main">
             <h1>{story?.title}</h1>
             {story && (
-              <div className="case-badges" style={{ marginTop: 10 }}>
-                <span className="chip chip-accent">{REQ_TYPE_LABEL[story.req_type] || story.req_type}</span>
-                <span className="chip chip-grey">priority: {story.priority}</span>
-                <span className="chip chip-grey">status: {story.status}</span>
+              <div className="case-badges">
+                <span className="chip chip-accent">
+                  {REQ_TYPE_LABEL[story.req_type] || story.req_type}
+                </span>
                 {story.source_filename && (
                   <span className="chip chip-grey">📎 {story.source_filename}</span>
                 )}
@@ -413,172 +525,198 @@ export default function RequirementDetail() {
           <ModelPicker onProviderChange={setSelectedProvider} />
         </header>
 
-        <UsagePanel providerFilter={selectedProvider} />
-
-        <div className="tabbar">
-          {REQ_TABS.map((t) => (
-            <button
-              key={t.key}
-              className={activeTab === t.key ? "active" : ""}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <PipelineStepper
+          tabs={REQ_TABS}
+          active={activeTab}
+          onPick={setTab}
+          stageDone={stageDone}
+          stageResult={stageResult}
+        />
 
         {error && <p className="error" style={{ margin: "0 0 4px" }}>{error}</p>}
 
+        {/* ---------- Start: requirement + one-click run ---------- */}
         {activeTab === "overview" && (
           <>
-        <section className="section">
-          <h2>Requirement</h2>
-          <p className="story-text">{story?.raw_text}</p>
-        </section>
+            <section className="section">
+              <h2>Requirement</h2>
+              <p className="story-text">{story?.raw_text}</p>
+            </section>
 
-        <section className="runall-bar">
-          <div className="txt">
-            <h3>Generate the full test design in one go</h3>
-            <p>
-              Runs the whole multi-agent pipeline — analysis → generation →
-              review &amp; consensus → coverage → quality — end to end. You can
-              still run any stage individually below.
-            </p>
-          </div>
-          <button className="btn-primary" onClick={onRunAll} disabled={runningAll}>
-            {runningAll ? (
-              <>
-                <span className="spinner" /> Working…
-              </>
-            ) : generation ? (
-              "Re-run full pipeline"
-            ) : (
-              "Run full pipeline"
-            )}
-          </button>
-          {runningAll &&
-            (() => {
-              const total = plSteps.length;
-              const done = Math.min(pipelineIdx, total);
-              const pct = Math.round((Math.min(pipelineIdx + 1, total) / total) * 100);
-              const current = plSteps[pipelineIdx];
-              return (
-                <div className="pl-progress">
-                  <div className="pl-head">
-                    <span className="step">
-                      {current
-                        ? `Step ${done + 1} of ${total} · ${current}`
-                        : "Finishing up"}
-                    </span>
-                    <span className="pct">{pct}%</span>
-                  </div>
-                  <div className="pl-track">
-                    <div className="pl-fill" style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className="pipeline-progress">
-                    {plSteps.map((s, i) => (
-                      <div
-                        key={s}
-                        className={`pp-step ${
-                          i < pipelineIdx ? "done" : i === pipelineIdx ? "active" : ""
-                        }`}
-                      >
-                        <span className="pp-dot" /> {s}
-                      </div>
-                    ))}
-                  </div>
+            <section className="run-hero">
+              <div className="run-hero-main">
+                <h3>Run the full pipeline</h3>
+                <p>
+                  Five AI agents work in sequence to turn this requirement into a
+                  proven test suite. Watch it happen here, or open any stage in the
+                  bar above to run and inspect it yourself.
+                </p>
+                <div className="run-flow">
+                  <span>1 Analyze</span><i>→</i>
+                  <span>2 Generate</span><i>→</i>
+                  <span>3 Review</span><i>→</i>
+                  <span>4 Coverage</span><i>→</i>
+                  <span>5 Quality</span>
                 </div>
-              );
-            })()}
-        </section>
+              </div>
+              <div className="run-hero-cta">
+                <button className="btn-primary" onClick={onRunAll} disabled={runningAll}>
+                  {runningAll ? (
+                    <><span className="spinner" /> Working…</>
+                  ) : generation ? (
+                    "Re-run full pipeline"
+                  ) : (
+                    "Run full pipeline"
+                  )}
+                </button>
+              </div>
+              {runningAll &&
+                (() => {
+                  const total = plSteps.length;
+                  const done = Math.min(pipelineIdx, total);
+                  const pct = Math.round((Math.min(pipelineIdx + 1, total) / total) * 100);
+                  const current = plSteps[pipelineIdx];
+                  return (
+                    <div className="pl-progress">
+                      <div className="pl-head">
+                        <span className="step">
+                          {current ? `Step ${done + 1} of ${total} · ${current}` : "Finishing up"}
+                        </span>
+                        <span className="pct">{pct}%</span>
+                      </div>
+                      <div className="pl-track">
+                        <div className="pl-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="pipeline-progress">
+                        {plSteps.map((s, i) => (
+                          <div
+                            key={s}
+                            className={`pp-step ${
+                              i < pipelineIdx ? "done" : i === pipelineIdx ? "active" : ""
+                            }`}
+                          >
+                            <span className="pp-dot" /> {s}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+            </section>
 
-        <section className="section orch-card">
-          <div className="section-head">
-            <h2>Autonomous agent · Orchestrator</h2>
-            <button className="btn-primary" onClick={onOrchestrate} disabled={orchestrating || runningAll}>
-              {orchestrating ? <Busy>Orchestrating…</Busy> : "Run agentic orchestrator"}
-            </button>
-          </div>
-          <p className="mode-note">
-            Unlike “Run full pipeline” (a fixed sequence), the Orchestrator’s
-            planner <strong>decides which agent to run next</strong> from the
-            live state, under guardrails — and logs every decision. This is the
-            framework’s agentic control loop.
-          </p>
-          {orchestration && <OrchestrationTrace data={orchestration} />}
-        </section>
+            <details className="adv-orch">
+              <summary>
+                <span className="adv-badge">Advanced</span>
+                Let the agents decide the order — autonomous orchestrator
+              </summary>
+              <div className="adv-body">
+                <p>
+                  Instead of the fixed sequence above, the Orchestrator's planner
+                  <strong> decides which agent to run next</strong> from the live
+                  state, under guardrails — and logs every decision. This is the
+                  framework's agentic control loop.
+                </p>
+                <button
+                  className="btn-primary"
+                  onClick={onOrchestrate}
+                  disabled={orchestrating || runningAll}
+                >
+                  {orchestrating ? <Busy>Orchestrating…</Busy> : "Run agentic orchestrator"}
+                </button>
+                {orchestration && <OrchestrationTrace data={orchestration} />}
+              </div>
+            </details>
+          </>
+        )}
 
-        <section className="section">
-          <div className="section-head">
-            <h2>Input</h2>
-            <div className="mode-toggle" role="tablist">
+        {/* ---------- 1 · Analyze ---------- */}
+        {activeTab === "analyze" && (
+          <section className="section stage">
+            <StageHeader
+              meta={STAGE_META.analyze}
+              status={
+                <StatusPill done={stageDone.analyze} label={stageResult.analyze} />
+              }
+              action={
+                inputMode === "requirement" ? (
+                  <button onClick={onAnalyze} disabled={running || runningAll}>
+                    {running ? <Busy>Analyzing…</Busy> : analysis ? "Re-run analysis" : "Run analysis"}
+                  </button>
+                ) : null
+              }
+            />
+
+            <div className="mode-toggle sub" role="tablist">
               <button
                 className={`mode-btn ${inputMode === "requirement" ? "active" : ""}`}
                 onClick={() => setInputMode("requirement")}
               >
-                From Requirement
+                From requirement
               </button>
               <button
                 className={`mode-btn ${inputMode === "criteria" ? "active" : ""}`}
                 onClick={() => setInputMode("criteria")}
               >
-                From Acceptance Criteria
+                Paste criteria
               </button>
             </div>
-          </div>
 
-          {inputMode === "requirement" ? (
-            <>
-              <p className="muted mode-note">
-                The Analyzer breaks the user story above into a structured,
-                testable specification and derives acceptance criteria.
+            {inputMode === "requirement" ? (
+              <p className="muted sub-note">
+                The Analyst reads the requirement above and derives the acceptance
+                criteria automatically.
               </p>
-              <div className="inline-actions">
-                <button onClick={onAnalyze} disabled={running || runningAll}>
-                  {running ? (
-                    <Busy>Analyzing…</Busy>
-                  ) : analysis ? (
-                    "Re-run analysis"
+            ) : (
+              <>
+                <p className="muted sub-note">
+                  Already have acceptance criteria? Paste them — one per line — to
+                  skip analysis and feed generation directly.
+                </p>
+                <textarea
+                  className="ac-input"
+                  rows={6}
+                  placeholder={"User can log in with valid credentials\nInvalid credentials are rejected with an error\nAccount locks after 5 failed attempts"}
+                  value={acText}
+                  onChange={(e) => setAcText(e.target.value)}
+                />
+                <div className="inline-actions">
+                  <button onClick={onSubmitCriteria} disabled={submittingAc || !acText.trim()}>
+                    {submittingAc ? <Busy>Saving…</Busy> : "Use these criteria"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {result?.error && <p className="error">{result.error}</p>}
+
+            {analysis && (
+              <div className="analysis">
+                <AnalysisList title="Actors" items={analysis.actors} />
+                <AnalysisList title="Preconditions" items={analysis.preconditions} />
+                <AnalysisList title="Main flow" items={analysis.main_flow} ordered />
+                <AnalysisList title="Alternative flows" items={analysis.alt_flows} />
+                <div className="analysis-block">
+                  <h3>Acceptance criteria</h3>
+                  {criteria.length === 0 ? (
+                    <p className="muted">None extracted.</p>
                   ) : (
-                    "Run analysis"
+                    <ul>
+                      {criteria.map((c) => (
+                        <li key={c.id}>
+                          <code>AC{c.order + 1}</code> {c.text}
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </button>
+                </div>
+                <AnalysisList title="Ambiguities" items={analysis.ambiguities} />
               </div>
-            </>
-          ) : (
-            <>
-              <p className="muted mode-note">
-                Paste acceptance criteria directly — one per line. Test generation
-                and the debate run straight from these, skipping analysis.
-              </p>
-              <textarea
-                className="ac-input"
-                rows={6}
-                placeholder={"User can log in with valid credentials\nInvalid credentials are rejected with an error\nAccount locks after 5 failed attempts"}
-                value={acText}
-                onChange={(e) => setAcText(e.target.value)}
-              />
-              <div className="inline-actions">
-                <button onClick={onSubmitCriteria} disabled={submittingAc || !acText.trim()}>
-                  {submittingAc ? <Busy>Saving…</Busy> : "Use these criteria"}
-                </button>
-              </div>
-            </>
-          )}
+            )}
 
-          {result?.error && <p className="error">{result.error}</p>}
-
-          {analysis && (
-            <div className="analysis">
-              <AnalysisList title="Actors" items={analysis.actors} />
-              <AnalysisList title="Preconditions" items={analysis.preconditions} />
-              <AnalysisList title="Main flow" items={analysis.main_flow} ordered />
-              <AnalysisList title="Alternative flows" items={analysis.alt_flows} />
-              <div className="analysis-block">
-                <h3>Acceptance criteria</h3>
-                {criteria.length === 0 ? (
-                  <p className="muted">None extracted.</p>
-                ) : (
+            {!analysis && criteria.length > 0 && (
+              <div className="analysis">
+                <div className="analysis-block">
+                  <h3>Acceptance criteria (supplied)</h3>
                   <ul>
                     {criteria.map((c) => (
                       <li key={c.id}>
@@ -586,129 +724,132 @@ export default function RequirementDetail() {
                       </li>
                     ))}
                   </ul>
-                )}
+                </div>
               </div>
-              <AnalysisList title="Ambiguities" items={analysis.ambiguities} />
-            </div>
-          )}
+            )}
 
-          {/* AC-direct: no analysis object, but criteria exist — show them. */}
-          {!analysis && criteria.length > 0 && (
-            <div className="analysis">
-              <div className="analysis-block">
-                <h3>Acceptance criteria (supplied)</h3>
-                <ul>
-                  {criteria.map((c) => (
-                    <li key={c.id}>
-                      <code>AC{c.order + 1}</code> {c.text}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-        </section>
-
-          </>
+            {!stageDone.analyze && (
+              <p className="muted">
+                Run analysis to turn the requirement into testable acceptance
+                criteria — the input for every stage that follows.
+              </p>
+            )}
+          </section>
         )}
 
+        {/* ---------- 2 · Generate ---------- */}
         {activeTab === "test" && (
           <>
-        {/* Mode toggle: the two research arms compared side by side. */}
-        <section className="section">
-          <div className="section-head">
-            <h2>Test generation</h2>
-            <div className="mode-toggle" role="tablist">
-              <button
-                className={`mode-btn ${mode === "multi" ? "active" : ""}`}
-                onClick={() => setMode("multi")}
-              >
-                Multi-agent
-              </button>
-              <button
-                className={`mode-btn ${mode === "baseline" ? "active" : ""}`}
-                onClick={() => setMode("baseline")}
-              >
-                Single-LLM baseline
-              </button>
-            </div>
-          </div>
+            <section className="section stage">
+              <StageHeader
+                meta={STAGE_META.test}
+                status={<StatusPill done={stageDone.test} label={stageResult.test} />}
+                action={
+                  mode === "multi" ? (
+                    <button onClick={onGenerate} disabled={criteria.length === 0 || generating || runningAll}>
+                      {generating ? <Busy>Generating…</Busy> : multiCases.length ? "Re-generate" : "Generate test cases"}
+                    </button>
+                  ) : (
+                    <button onClick={onBaseline} disabled={baselining}>
+                      {baselining ? <Busy>Running…</Busy> : "Run baseline"}
+                    </button>
+                  )
+                }
+              />
 
-          {mode === "multi" ? (
-            <>
-              <p className="muted mode-note">
-                Requirement Analysis → Test Generation → the Reviewer ⇄ Consensus
-                debate. Test cases are traced to acceptance criteria and revised
-                collaboratively.
-              </p>
-              <div className="inline-actions">
-                <button onClick={onGenerate} disabled={criteria.length === 0 || generating || runningAll}>
-                  {generating ? <Busy>Generating…</Busy> : "Generate test cases"}
+              <div className="mode-toggle sub" role="tablist">
+                <button
+                  className={`mode-btn ${mode === "multi" ? "active" : ""}`}
+                  onClick={() => setMode("multi")}
+                >
+                  Multi-agent suite
+                </button>
+                <button
+                  className={`mode-btn ${mode === "baseline" ? "active" : ""}`}
+                  onClick={() => setMode("baseline")}
+                >
+                  Single-AI baseline (compare)
                 </button>
               </div>
-              {multiCases.length === 0 ? (
-                <p className="muted">
-                  Provide acceptance criteria (analyse a requirement or paste them
-                  directly), then generate a full, traceable test suite.
-                </p>
-              ) : (
-                <TestCaseTable cases={multiCases} showTrace />
-              )}
-            </>
-          ) : (
-            <>
-              <p className="muted mode-note">
-                The control arm: one LLM call turns the story straight into test
-                cases — no analysis, no reviewer, no consensus. Its cases carry no
-                acceptance-criterion traceability, which is exactly what the
-                multi-agent pipeline is measured against.
-              </p>
-              <div className="inline-actions">
-                <button onClick={onBaseline} disabled={baselining}>
-                  {baselining ? <Busy>Running…</Busy> : "Run single-LLM baseline"}
-                </button>
-              </div>
-              {baselineCases.length === 0 ? (
-                <p className="muted">
-                  Run the baseline to generate test cases from the story in one step.
-                </p>
-              ) : (
-                <TestCaseTable cases={baselineCases} />
-              )}
-            </>
-          )}
-        </section>
 
+              {mode === "multi" ? (
+                <>
+                  {criteria.length === 0 && (
+                    <p className="muted sub-note">
+                      Needs acceptance criteria first — run <b>1 · Analyze</b> (or paste
+                      criteria there).
+                    </p>
+                  )}
+                  {multiCases.length === 0 ? (
+                    <p className="muted">
+                      Generate a full, traceable test suite from the acceptance criteria.
+                    </p>
+                  ) : (
+                    <TestCaseTable cases={multiCases} showTrace />
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="muted sub-note">
+                    The control arm: one AI call turns the story straight into tests —
+                    no analysis, no debate, no traceability. This is exactly what the
+                    multi-agent suite is measured against.
+                  </p>
+                  {baselineCases.length === 0 ? (
+                    <p className="muted">Run the baseline to generate tests in one step.</p>
+                  ) : (
+                    <TestCaseTable cases={baselineCases} />
+                  )}
+                </>
+              )}
+            </section>
+
+            {mode === "multi" && multiCases.length > 0 && (
+              <section className="section optional-card">
+                <div className="section-head">
+                  <h2>Optional · Prioritize the suite</h2>
+                  <button onClick={onPrioritize} disabled={prioritizing}>
+                    {prioritizing ? <Busy>Prioritizing…</Busy> : "Prioritize suite"}
+                  </button>
+                </div>
+                <p className="muted mode-note">
+                  The Prioritizer ranks cases by business importance and assigns a
+                  production-impact severity, so a time-pressed team knows what to run
+                  first. Ranked cases sort to the top of the table above.
+                </p>
+                {multiCases.some((tc) => tc.rank != null) && (
+                  <p className="muted">
+                    Ranked {multiCases.filter((tc) => tc.rank != null).length} case(s).
+                  </p>
+                )}
+              </section>
+            )}
           </>
         )}
 
+        {/* ---------- 3 · Review ---------- */}
         {activeTab === "review" && (
-          <section className="section">
-            <div className="section-head">
-              <h2>Review &amp; Consensus — multi-agent debate</h2>
-              <button
-                onClick={onReviewConsensus}
-                disabled={multiCases.length === 0 || reviewing || runningAll}
-              >
-                {reviewing ? (
-                  <Busy>Debating…</Busy>
-                ) : debate ? (
-                  "Re-run debate"
-                ) : (
-                  "Run review & consensus"
-                )}
-              </button>
-            </div>
-            <p className="muted mode-note">
-              The Reviewer critiques the test cases; the Consensus agent rebuts,
-              revises, or adds. They iterate in bounded rounds until the Reviewer
-              is satisfied. This exchange is the collaborative core of the framework.
-            </p>
+          <section className="section stage">
+            <StageHeader
+              meta={STAGE_META.review}
+              status={<StatusPill done={stageDone.review} label={stageResult.review} />}
+              action={
+                <button
+                  onClick={onReviewConsensus}
+                  disabled={multiCases.length === 0 || reviewing || runningAll}
+                >
+                  {reviewing ? <Busy>Debating…</Busy> : debate ? "Re-run debate" : "Run review & consensus"}
+                </button>
+              }
+            />
             {debate?.error && <p className="error">{debate.error}</p>}
-            {!debate ? (
+            {multiCases.length === 0 ? (
               <p className="muted">
-                Generate test cases first, then run the debate to see the agents
-                critique and revise them.
+                Needs a test suite first — run <b>2 · Generate</b>, then run the debate.
+              </p>
+            ) : !debate ? (
+              <p className="muted">
+                Run the debate to watch the agents critique and revise the suite.
               </p>
             ) : (
               <DebateTranscript debate={debate} />
@@ -716,58 +857,26 @@ export default function RequirementDetail() {
           </section>
         )}
 
-        {activeTab === "test" && (
-          <section className="section">
-            <div className="section-head">
-              <h2>Prioritization</h2>
-              <button onClick={onPrioritize} disabled={multiCases.length === 0 || prioritizing}>
-                {prioritizing ? <Busy>Prioritizing…</Busy> : "Prioritize suite"}
-              </button>
-            </div>
-            <p className="muted mode-note">
-              The Prioritizer agent ranks the whole suite by business importance
-              and assigns a production-impact severity — so a team under time
-              pressure knows what to run first. Cases below are ordered by rank.
-            </p>
-            {multiCases.some((tc) => tc.rank != null) ? (
-              <p className="muted">
-                Ranked {multiCases.filter((tc) => tc.rank != null).length} case(s).
-                Highest-priority cases appear first in the suite above.
-              </p>
-            ) : (
-              <p className="muted">
-                Generate (and optionally debate) test cases, then prioritize to
-                rank and assign severity.
-              </p>
-            )}
-          </section>
-        )}
-
+        {/* ---------- 4 · Coverage ---------- */}
         {activeTab === "coverage" && (
-          <section className="section">
-            <div className="section-head">
-              <h2>Coverage &amp; Validation</h2>
-              <button onClick={onCoverage} disabled={multiCases.length === 0 || analysingCoverage || runningAll}>
-                {analysingCoverage ? (
-                  <Busy>Analysing…</Busy>
-                ) : coverage ? (
-                  "Re-run coverage"
-                ) : (
-                  "Analyse coverage"
-                )}
-              </button>
-            </div>
-            <p className="muted mode-note">
-              The Validator builds a traceability matrix — which acceptance
-              criterion is verified by which test case — and judges whether each
-              is adequately covered or only superficially. Gaps are the untested
-              requirements.
-            </p>
+          <section className="section stage">
+            <StageHeader
+              meta={STAGE_META.coverage}
+              status={<StatusPill done={stageDone.coverage} label={stageResult.coverage ? `${coverage.covered_count}/${coverage.total} covered` : ""} />}
+              action={
+                <button onClick={onCoverage} disabled={multiCases.length === 0 || analysingCoverage || runningAll}>
+                  {analysingCoverage ? <Busy>Analysing…</Busy> : coverage ? "Re-run coverage" : "Analyse coverage"}
+                </button>
+              }
+            />
             {coverage?.error && <p className="error">{coverage.error}</p>}
-            {!coverage ? (
+            {multiCases.length === 0 ? (
               <p className="muted">
-                Generate test cases, then analyse coverage to see the
-                requirement-to-test traceability matrix and any gaps.
+                Needs a test suite first — run <b>2 · Generate</b>, then analyse coverage.
+              </p>
+            ) : !coverage ? (
+              <p className="muted">
+                Analyse coverage to see the requirement-to-test matrix and any gaps.
               </p>
             ) : (
               <CoverageMatrix coverage={coverage} />
@@ -775,30 +884,26 @@ export default function RequirementDetail() {
           </section>
         )}
 
+        {/* ---------- 5 · Quality ---------- */}
         {activeTab === "quality" && (
-          <section className="section">
-            <div className="section-head">
-              <h2>Quality Report</h2>
-              <button onClick={onQuality} disabled={multiCases.length === 0 || evaluatingQuality || runningAll}>
-                {evaluatingQuality ? (
-                  <Busy>Evaluating…</Busy>
-                ) : quality ? (
-                  "Re-run quality"
-                ) : (
-                  "Evaluate quality"
-                )}
-              </button>
-            </div>
-            <p className="muted mode-note">
-              The Quality agent scores every test case on clarity, atomicity, and
-              traceability, and flags duplicates — the thesis's Quality Report and
-              the final evaluated output of the pipeline.
-            </p>
+          <section className="section stage">
+            <StageHeader
+              meta={STAGE_META.quality}
+              status={<StatusPill done={stageDone.quality} label={qualityPct != null ? `${qualityPct}% overall` : ""} />}
+              action={
+                <button onClick={onQuality} disabled={multiCases.length === 0 || evaluatingQuality || runningAll}>
+                  {evaluatingQuality ? <Busy>Evaluating…</Busy> : quality ? "Re-run quality" : "Evaluate quality"}
+                </button>
+              }
+            />
             {quality?.error && <p className="error">{quality.error}</p>}
-            {!quality ? (
+            {multiCases.length === 0 ? (
               <p className="muted">
-                Generate test cases, then evaluate quality to score the suite and
-                detect duplicates.
+                Needs a test suite first — run <b>2 · Generate</b>, then evaluate quality.
+              </p>
+            ) : !quality ? (
+              <p className="muted">
+                Evaluate quality to score the suite and detect duplicates.
               </p>
             ) : (
               <QualityMatrix quality={quality} />
@@ -806,35 +911,40 @@ export default function RequirementDetail() {
           </section>
         )}
 
+        {/* ---------- Export ---------- */}
         {activeTab === "export" && (
-        <section className="section">
-          <h2>Export test design package</h2>
-          <p className="mode-note">
-            Download the complete package — requirement, acceptance criteria,
-            test cases with quality scores, and the coverage matrix — for the
-            latest multi-agent run.
-          </p>
-          {multiCases.length === 0 ? (
-            <p className="muted">
-              Generate a multi-agent test suite first, then export it in any format.
+          <section className="section">
+            <h2>Export test design package</h2>
+            <p className="mode-note">
+              Download the complete package — requirement, acceptance criteria, test
+              cases with quality scores, and the coverage matrix — for the latest
+              multi-agent run.
             </p>
-          ) : (
-            <div className="export-bar">
-              <span className="lbl">Download as</span>
-              {EXPORT_FORMATS.map((f) => (
-                <button
-                  key={f.fmt}
-                  className="export-btn"
-                  onClick={() => onExport(f.fmt)}
-                  disabled={exporting !== ""}
-                >
-                  {exporting === f.fmt ? "Preparing…" : f.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
+            {multiCases.length === 0 ? (
+              <p className="muted">
+                Generate a multi-agent test suite first, then export it in any format.
+              </p>
+            ) : (
+              <div className="export-bar">
+                <span className="lbl">Download as</span>
+                {EXPORT_FORMATS.map((f) => (
+                  <button
+                    key={f.fmt}
+                    className="export-btn"
+                    onClick={() => onExport(f.fmt)}
+                    disabled={exporting !== ""}
+                  >
+                    {exporting === f.fmt ? "Preparing…" : f.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
         )}
+
+        <div className="rq-usage">
+          <UsagePanel providerFilter={selectedProvider} />
+        </div>
       </div>
     </div>
   );
