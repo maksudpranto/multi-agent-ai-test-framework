@@ -1418,13 +1418,10 @@ function QualityMatrix({ quality, cases = [] }) {
   const flaggedRows = rows.filter((r) => r.flagged);
   const cleanRows = rows.filter((r) => !r.flagged);
 
-  const qTabs = [];
+  const qTabs = [["all", "All", items.length]];
   if (flaggedRows.length) qTabs.push(["flagged", "Needs a look", flaggedRows.length]);
   if (cleanRows.length) qTabs.push(["clean", "Passed", cleanRows.length]);
-  qTabs.push(["all", "All", items.length]);
-  const [qf, setQf] = useState(flaggedRows.length ? "flagged" : "clean");
-  const showFlagged = (qf === "flagged" || qf === "all") && flaggedRows.length > 0;
-  const showClean = (qf === "clean" || qf === "all") && cleanRows.length > 0;
+  const [qf, setQf] = useState("all");
 
   return (
     <div className="coverage">
@@ -1460,46 +1457,62 @@ function QualityMatrix({ quality, cases = [] }) {
         ))}
       </div>
 
-      {showFlagged && (
-        <>
-          {qf === "all" && <p className="debate-intro">Needs a look — {flaggedRows.length}</p>}
-          <ul className="ql-list">
-            {flaggedRows.map((r) => (
-              <li className={`ql-item ${r.it.duplicate_flag ? "dup" : ""}`} key={r.it.test_case_id}>
-                <div className="ql-main">
-                  <div className="ql-title-line">
-                    <span className="ql-title">{r.it.title}</span>
-                    {r.it.duplicate_flag && <span className="ql-dup">possible duplicate</span>}
-                  </div>
-                  {r.note && <div className="ql-note">{r.note}</div>}
+      {/* All — every case as a full scorecard (the original detailed view) */}
+      {qf === "all" && (
+        <ul className="ql-list">
+          {rows.map((r) => (
+            <li className={`ql-item ${r.it.duplicate_flag ? "dup" : ""}`} key={r.it.test_case_id}>
+              <div className="ql-main">
+                <div className="ql-title-line">
+                  <span className="ql-title">{r.it.title}</span>
+                  {r.it.duplicate_flag && <span className="ql-dup">possible duplicate</span>}
                 </div>
-                {r.imperfect && (
-                  <div className="ql-scores">
-                    <QScore label="Clarity" pct={r.clarity} />
-                    <QScore label="Atomicity" pct={r.atomicity} />
-                    <QScore label="Traceability" pct={r.traceability} />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </>
+                {r.note && <div className="ql-note">{r.note}</div>}
+              </div>
+              <div className="ql-scores">
+                <QScore label="Clarity" pct={r.clarity} />
+                <QScore label="Atomicity" pct={r.atomicity} />
+                <QScore label="Traceability" pct={r.traceability} />
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
 
-      {showClean && (
-        <>
-          {qf === "all" && (
-            <p className="debate-intro">Passed cleanly — {cleanRows.length} with no issues flagged</p>
-          )}
-          <ul className="ql-clean">
-            {cleanRows.map((r) => (
-              <li className="ql-crow" key={r.it.test_case_id}>
-                <span className="ql-crow-ic" aria-hidden>✓</span>
-                <span className="ql-crow-title">{r.it.title}</span>
-              </li>
-            ))}
-          </ul>
-        </>
+      {/* Needs a look — flagged cases only (chips only when actually imperfect) */}
+      {qf === "flagged" && (
+        <ul className="ql-list">
+          {flaggedRows.map((r) => (
+            <li className={`ql-item ${r.it.duplicate_flag ? "dup" : ""}`} key={r.it.test_case_id}>
+              <div className="ql-main">
+                <div className="ql-title-line">
+                  <span className="ql-title">{r.it.title}</span>
+                  {r.it.duplicate_flag && <span className="ql-dup">possible duplicate</span>}
+                </div>
+                {r.note && <div className="ql-note">{r.note}</div>}
+              </div>
+              {r.imperfect && (
+                <div className="ql-scores">
+                  <QScore label="Clarity" pct={r.clarity} />
+                  <QScore label="Atomicity" pct={r.atomicity} />
+                  <QScore label="Traceability" pct={r.traceability} />
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Passed — compact one-line checklist */}
+      {qf === "clean" && (
+        <ul className="ql-clean">
+          {cleanRows.map((r) => (
+            <li className="ql-crow" key={r.it.test_case_id}>
+              <span className="ql-crow-ic" aria-hidden>✓</span>
+              <span className="ql-crow-title">{r.it.title}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
