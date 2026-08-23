@@ -1284,46 +1284,68 @@ function DebateTurn({ turn }) {
 
 function CoverageMatrix({ coverage }) {
   const items = coverage.items || [];
+  const covered = coverage.covered_count;
+  const total = coverage.total;
+  const gaps = total - covered;
+  const full = gaps === 0;
+  const headline = full
+    ? "Every acceptance criterion is verified by at least one test — the suite fully covers the requirement, with no gaps."
+    : `${covered} of ${total} criteria are verified by tests. ${gaps} ${
+        gaps === 1 ? "criterion has" : "criteria have"
+      } no test yet — ${gaps === 1 ? "that's the gap" : "those are the gaps"} to fill.`;
+
   return (
     <div className="coverage">
-      <div className="debate-summary">
-        <span
-          className={`badge ${
-            coverage.coverage_pct === 100 ? "badge-green" : "badge-red"
-          }`}
-        >
-          {coverage.coverage_pct}% covered
-        </span>
-        <span className="badge badge-grey">
-          {coverage.covered_count}/{coverage.total} criteria
-        </span>
+      <div className={`debate-outcome ${full ? "ok" : "warn"}`}>
+        <span className="dbo-ic">{full ? "✓" : "!"}</span>
+        <p>{headline}</p>
       </div>
+
+      <div className="debate-tiles">
+        <div className="dbt">
+          <b>{coverage.coverage_pct}%</b>
+          <span>of the requirement covered</span>
+        </div>
+        <div className="dbt">
+          <b>{covered}/{total}</b>
+          <span>criteria with a test</span>
+        </div>
+        <div className="dbt">
+          <b>{gaps}</b>
+          <span>gap{gaps === 1 ? "" : "s"} — untested criteria</span>
+        </div>
+      </div>
+
+      <p className="debate-intro">Which tests verify each acceptance criterion:</p>
       <table className="coverage-table">
         <thead>
           <tr>
             <th>Acceptance criterion</th>
             <th>Status</th>
-            <th>Covering tests</th>
-            <th>Notes</th>
+            <th>Verified by</th>
           </tr>
         </thead>
         <tbody>
-          {items.map((it) => (
-            <tr key={it.acceptance_criterion_id}>
-              <td>{it.criterion_text}</td>
-              <td>
-                <span className={`badge ${it.covered ? "badge-green" : "badge-red"}`}>
-                  {it.covered ? "covered" : "gap"}
-                </span>
-              </td>
-              <td>
-                {it.covering_test_case_ids.length
-                  ? it.covering_test_case_ids.map((id) => `#${id}`).join(", ")
-                  : "—"}
-              </td>
-              <td className="muted">{it.gap_notes}</td>
-            </tr>
-          ))}
+          {items.map((it) => {
+            const n = it.covering_test_case_ids.length;
+            return (
+              <tr key={it.acceptance_criterion_id} className={it.covered ? "" : "cov-gap"}>
+                <td>{it.criterion_text}</td>
+                <td>
+                  <span className={`badge ${it.covered ? "badge-green" : "badge-red"}`}>
+                    {it.covered ? "covered" : "gap"}
+                  </span>
+                </td>
+                <td>
+                  {n ? (
+                    `${n} test${n === 1 ? "" : "s"}`
+                  ) : (
+                    <span className="muted">{it.gap_notes || "no test yet"}</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -3106,6 +3106,8 @@ input[type="file"]::file-selector-button:hover {
 .debate-clean p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary); max-width: 72ch; }
 
 .debate-intro { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.coverage-table tr.cov-gap td { background: rgba(220, 38, 38, 0.05); }
+.coverage-table tr.cov-gap td:first-child { font-weight: 560; }
 .turn-role {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--accent); background: var(--accent-soft);
