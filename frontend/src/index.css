@@ -3187,24 +3187,11 @@ input[type="file"]::file-selector-button:hover {
   border-radius: 11px;
   background: var(--surface);
 }
-.ql-item.dup { border-color: rgba(217, 119, 6, 0.35); background: rgba(217, 119, 6, 0.04); }
-
-/* Premium "Needs a look" cards — refined rose, soft accent + elevation */
+/* Clean white cards; duplicates are marked by the pill, not a card tint.
+   "Premium" here comes from soft elevation, not colour. */
+.ql-item.dup { border-color: var(--border); }
 .ql-list.needs .ql-item {
-  border-color: rgba(244, 63, 94, 0.22);
-  border-left: 3px solid #f43f5e;
-  background: linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(244, 63, 94, 0.015) 55%, var(--surface) 100%);
-  box-shadow: 0 10px 26px -18px rgba(190, 30, 70, 0.55);
-}
-.ql-list.needs .ql-item.dup {
-  border-color: rgba(244, 63, 94, 0.3);
-  background: linear-gradient(135deg, rgba(244, 63, 94, 0.13) 0%, rgba(244, 63, 94, 0.03) 60%, var(--surface) 100%);
-}
-.ql-list.needs .ql-dup {
-  color: #fff;
-  background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
-  border: 1px solid transparent;
-  box-shadow: 0 4px 10px -3px rgba(225, 29, 72, 0.5);
+  box-shadow: 0 8px 22px -16px rgba(20, 22, 40, 0.26);
 }
 
 .ql-main { flex: 1; min-width: 220px; }
