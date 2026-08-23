@@ -706,7 +706,762 @@ PROGRAMS: list[dict] = [
                 ''')},
         ],
     },
+    {
+        "slug": "shipping_fee",
+        "title": "Parcel shipping fee",
+        "entrypoint": "shipping_fee",
+        "signature": "shipping_fee(weight_kg: float, distance_km: int, is_express: bool) -> float",
+        "params": [
+            {"name": "weight_kg", "type": "float", "note": "parcel weight in kg"},
+            {"name": "distance_km", "type": "int", "note": "shipping distance in km"},
+            {"name": "is_express", "type": "bool", "note": "whether express delivery was chosen"},
+        ],
+        "requirement": dedent(
+            """\
+            As a shipping calculator, I want to price a parcel delivery.
+
+            The fee is a $5 base, plus $2 per kg, plus $1 for every full 100 km of
+            distance. Express delivery doubles the whole fee. A parcel must weigh more
+            than 0 and at most 30 kg, otherwise return -1 for an invalid parcel. Round
+            the fee to 2 decimals."""
+        ),
+        "canonical_inputs": [
+            [10, 250, False], [30, 100, False], [0, 100, False],
+            [10, 100, True], [10, 150, False], [31, 100, False],
+        ],
+        "reference": dedent(
+            '''\
+            def shipping_fee(weight_kg, distance_km, is_express):
+                if weight_kg <= 0 or weight_kg > 30:
+                    return -1.0
+                fee = 5.0 + 2.0 * weight_kg + 1.0 * (distance_km // 100)
+                if is_express:
+                    fee = fee * 2
+                return round(fee, 2)
+            '''
+        ),
+        "mutants": [
+            {"key": "m1", "description": "Rejects a parcel of exactly 30 kg (uses >= instead of >).",
+             "code": dedent(
+                '''\
+                def shipping_fee(weight_kg, distance_km, is_express):
+                    if weight_kg <= 0 or weight_kg >= 30:
+                        return -1.0
+                    fee = 5.0 + 2.0 * weight_kg + 1.0 * (distance_km // 100)
+                    if is_express:
+                        fee = fee * 2
+                    return round(fee, 2)
+                ''')},
+            {"key": "m2", "description": "Allows a zero-weight parcel (uses < 0 instead of <= 0).",
+             "code": dedent(
+                '''\
+                def shipping_fee(weight_kg, distance_km, is_express):
+                    if weight_kg < 0 or weight_kg > 30:
+                        return -1.0
+                    fee = 5.0 + 2.0 * weight_kg + 1.0 * (distance_km // 100)
+                    if is_express:
+                        fee = fee * 2
+                    return round(fee, 2)
+                ''')},
+            {"key": "m3", "description": "Forgets to double the fee for express delivery.",
+             "code": dedent(
+                '''\
+                def shipping_fee(weight_kg, distance_km, is_express):
+                    if weight_kg <= 0 or weight_kg > 30:
+                        return -1.0
+                    fee = 5.0 + 2.0 * weight_kg + 1.0 * (distance_km // 100)
+                    return round(fee, 2)
+                ''')},
+            {"key": "m4", "description": "Charges per 200 km instead of per 100 km.",
+             "code": dedent(
+                '''\
+                def shipping_fee(weight_kg, distance_km, is_express):
+                    if weight_kg <= 0 or weight_kg > 30:
+                        return -1.0
+                    fee = 5.0 + 2.0 * weight_kg + 1.0 * (distance_km // 200)
+                    if is_express:
+                        fee = fee * 2
+                    return round(fee, 2)
+                ''')},
+        ],
+    },
+    {
+        "slug": "loan_approval",
+        "title": "Loan application decision",
+        "entrypoint": "loan_approval",
+        "signature": "loan_approval(credit_score: int, annual_income: int, loan_amount: int) -> str",
+        "params": [
+            {"name": "credit_score", "type": "int", "note": "applicant credit score"},
+            {"name": "annual_income", "type": "int", "note": "applicant yearly income"},
+            {"name": "loan_amount", "type": "int", "note": "amount requested"},
+        ],
+        "requirement": dedent(
+            """\
+            As a lending system, I want to decide a loan application.
+
+            Anyone with a credit score below 600 is declined. A loan larger than five
+            times the applicant's yearly income is also declined. A score of 750 or
+            above is approved automatically; everyone else in between is sent for manual
+            review. Return "denied", "approved", or "refer"."""
+        ),
+        "canonical_inputs": [
+            [800, 10000, 20000], [600, 10000, 20000], [750, 10000, 20000],
+            [800, 10000, 40000], [800, 10000, 60000], [550, 10000, 20000],
+        ],
+        "reference": dedent(
+            '''\
+            def loan_approval(credit_score, annual_income, loan_amount):
+                if credit_score < 600:
+                    return "denied"
+                if loan_amount > 5 * annual_income:
+                    return "denied"
+                if credit_score >= 750:
+                    return "approved"
+                return "refer"
+            '''
+        ),
+        "mutants": [
+            {"key": "m1", "description": "Declines a score of exactly 600 (uses <= instead of <).",
+             "code": dedent(
+                '''\
+                def loan_approval(credit_score, annual_income, loan_amount):
+                    if credit_score <= 600:
+                        return "denied"
+                    if loan_amount > 5 * annual_income:
+                        return "denied"
+                    if credit_score >= 750:
+                        return "approved"
+                    return "refer"
+                ''')},
+            {"key": "m2", "description": "Requires a score above 750 to auto-approve (uses > instead of >=).",
+             "code": dedent(
+                '''\
+                def loan_approval(credit_score, annual_income, loan_amount):
+                    if credit_score < 600:
+                        return "denied"
+                    if loan_amount > 5 * annual_income:
+                        return "denied"
+                    if credit_score > 750:
+                        return "approved"
+                    return "refer"
+                ''')},
+            {"key": "m3", "description": "Caps the loan at 3x income instead of 5x.",
+             "code": dedent(
+                '''\
+                def loan_approval(credit_score, annual_income, loan_amount):
+                    if credit_score < 600:
+                        return "denied"
+                    if loan_amount > 3 * annual_income:
+                        return "denied"
+                    if credit_score >= 750:
+                        return "approved"
+                    return "refer"
+                ''')},
+            {"key": "m4", "description": "Skips the loan-to-income check entirely.",
+             "code": dedent(
+                '''\
+                def loan_approval(credit_score, annual_income, loan_amount):
+                    if credit_score < 600:
+                        return "denied"
+                    if credit_score >= 750:
+                        return "approved"
+                    return "refer"
+                ''')},
+        ],
+    },
+    {
+        "slug": "grade_letter",
+        "title": "Exam grade letter",
+        "entrypoint": "grade_letter",
+        "signature": "grade_letter(score: int) -> str",
+        "params": [
+            {"name": "score", "type": "int", "note": "exam score, 0-100"},
+        ],
+        "requirement": dedent(
+            """\
+            As a grading tool, I want to turn an exam score into a letter grade.
+
+            90 and above is an A, the 80s a B, the 70s a C, the 60s a D, and anything
+            below 60 is an F. A score outside 0-100 is not a real score and should
+            return "invalid"."""
+        ),
+        "canonical_inputs": [
+            [90], [60], [82], [150], [-5], [75],
+        ],
+        "reference": dedent(
+            '''\
+            def grade_letter(score):
+                if score < 0 or score > 100:
+                    return "invalid"
+                if score >= 90:
+                    return "A"
+                if score >= 80:
+                    return "B"
+                if score >= 70:
+                    return "C"
+                if score >= 60:
+                    return "D"
+                return "F"
+            '''
+        ),
+        "mutants": [
+            {"key": "m1", "description": "A 90 falls short of an A (uses > instead of >=).",
+             "code": dedent(
+                '''\
+                def grade_letter(score):
+                    if score < 0 or score > 100:
+                        return "invalid"
+                    if score > 90:
+                        return "A"
+                    if score >= 80:
+                        return "B"
+                    if score >= 70:
+                        return "C"
+                    if score >= 60:
+                        return "D"
+                    return "F"
+                ''')},
+            {"key": "m2", "description": "A 60 falls short of a D (uses > instead of >=).",
+             "code": dedent(
+                '''\
+                def grade_letter(score):
+                    if score < 0 or score > 100:
+                        return "invalid"
+                    if score >= 90:
+                        return "A"
+                    if score >= 80:
+                        return "B"
+                    if score >= 70:
+                        return "C"
+                    if score > 60:
+                        return "D"
+                    return "F"
+                ''')},
+            {"key": "m3", "description": "The B cutoff is 85 instead of 80.",
+             "code": dedent(
+                '''\
+                def grade_letter(score):
+                    if score < 0 or score > 100:
+                        return "invalid"
+                    if score >= 90:
+                        return "A"
+                    if score >= 85:
+                        return "B"
+                    if score >= 70:
+                        return "C"
+                    if score >= 60:
+                        return "D"
+                    return "F"
+                ''')},
+            {"key": "m4", "description": "Never rejects a score above 100.",
+             "code": dedent(
+                '''\
+                def grade_letter(score):
+                    if score < 0:
+                        return "invalid"
+                    if score >= 90:
+                        return "A"
+                    if score >= 80:
+                        return "B"
+                    if score >= 70:
+                        return "C"
+                    if score >= 60:
+                        return "D"
+                    return "F"
+                ''')},
+        ],
+    },
+    {
+        "slug": "parking_fee",
+        "title": "Car park pricing",
+        "entrypoint": "parking_fee",
+        "signature": "parking_fee(minutes: int) -> int",
+        "params": [
+            {"name": "minutes", "type": "int", "note": "minutes parked"},
+        ],
+        "requirement": dedent(
+            """\
+            As a car park, I want to price a stay by the minute.
+
+            The first 30 minutes are free. After that the charge is $3 for every hour
+            or part of an hour of the whole stay. A negative duration is invalid and
+            returns -1."""
+        ),
+        "canonical_inputs": [
+            [10], [30], [45], [120], [-10], [90],
+        ],
+        "reference": dedent(
+            '''\
+            def parking_fee(minutes):
+                if minutes < 0:
+                    return -1
+                if minutes <= 30:
+                    return 0
+                hours = (minutes + 59) // 60
+                return 3 * hours
+            '''
+        ),
+        "mutants": [
+            {"key": "m1", "description": "Charges for exactly 30 minutes (uses < instead of <=).",
+             "code": dedent(
+                '''\
+                def parking_fee(minutes):
+                    if minutes < 0:
+                        return -1
+                    if minutes < 30:
+                        return 0
+                    hours = (minutes + 59) // 60
+                    return 3 * hours
+                ''')},
+            {"key": "m2", "description": "Adds the hours to $3 instead of multiplying.",
+             "code": dedent(
+                '''\
+                def parking_fee(minutes):
+                    if minutes < 0:
+                        return -1
+                    if minutes <= 30:
+                        return 0
+                    hours = (minutes + 59) // 60
+                    return 3 + hours
+                ''')},
+            {"key": "m3", "description": "Gives a 60-minute free period instead of 30.",
+             "code": dedent(
+                '''\
+                def parking_fee(minutes):
+                    if minutes < 0:
+                        return -1
+                    if minutes <= 60:
+                        return 0
+                    hours = (minutes + 59) // 60
+                    return 3 * hours
+                ''')},
+            {"key": "m4", "description": "Never rejects a negative duration.",
+             "code": dedent(
+                '''\
+                def parking_fee(minutes):
+                    if minutes <= 30:
+                        return 0
+                    hours = (minutes + 59) // 60
+                    return 3 * hours
+                ''')},
+        ],
+    },
+    {
+        "slug": "bmi_category",
+        "title": "BMI health category",
+        "entrypoint": "bmi_category",
+        "signature": "bmi_category(weight_kg: float, height_m: float) -> str",
+        "params": [
+            {"name": "weight_kg", "type": "float", "note": "body weight in kg"},
+            {"name": "height_m", "type": "float", "note": "height in metres"},
+        ],
+        "requirement": dedent(
+            """\
+            As a health tool, I want to classify a body-mass index.
+
+            BMI is weight divided by height squared. Below 18.5 is "underweight", below
+            25 is "normal", below 30 is "overweight", and 30 or more is "obese". A
+            weight or height that is zero or negative is invalid and returns
+            "invalid"."""
+        ),
+        "canonical_inputs": [
+            [100, 2], [74, 2], [45, 1.5], [0, 2], [70, 1.75], [60, -1],
+        ],
+        "reference": dedent(
+            '''\
+            def bmi_category(weight_kg, height_m):
+                if weight_kg <= 0 or height_m <= 0:
+                    return "invalid"
+                bmi = weight_kg / (height_m * height_m)
+                if bmi < 18.5:
+                    return "underweight"
+                if bmi < 25:
+                    return "normal"
+                if bmi < 30:
+                    return "overweight"
+                return "obese"
+            '''
+        ),
+        "mutants": [
+            {"key": "m1", "description": "A BMI of exactly 25 counts as normal (uses <= instead of <).",
+             "code": dedent(
+                '''\
+                def bmi_category(weight_kg, height_m):
+                    if weight_kg <= 0 or height_m <= 0:
+                        return "invalid"
+                    bmi = weight_kg / (height_m * height_m)
+                    if bmi < 18.5:
+                        return "underweight"
+                    if bmi <= 25:
+                        return "normal"
+                    if bmi < 30:
+                        return "overweight"
+                    return "obese"
+                ''')},
+            {"key": "m2", "description": "A BMI of exactly 18.5 counts as underweight (uses <=).",
+             "code": dedent(
+                '''\
+                def bmi_category(weight_kg, height_m):
+                    if weight_kg <= 0 or height_m <= 0:
+                        return "invalid"
+                    bmi = weight_kg / (height_m * height_m)
+                    if bmi <= 18.5:
+                        return "underweight"
+                    if bmi < 25:
+                        return "normal"
+                    if bmi < 30:
+                        return "overweight"
+                    return "obese"
+                ''')},
+            {"key": "m3", "description": "Adds the height to itself instead of squaring it.",
+             "code": dedent(
+                '''\
+                def bmi_category(weight_kg, height_m):
+                    if weight_kg <= 0 or height_m <= 0:
+                        return "invalid"
+                    bmi = weight_kg / (height_m + height_m)
+                    if bmi < 18.5:
+                        return "underweight"
+                    if bmi < 25:
+                        return "normal"
+                    if bmi < 30:
+                        return "overweight"
+                    return "obese"
+                ''')},
+            {"key": "m4", "description": "Ignores a zero or negative weight.",
+             "code": dedent(
+                '''\
+                def bmi_category(weight_kg, height_m):
+                    if height_m <= 0:
+                        return "invalid"
+                    bmi = weight_kg / (height_m * height_m)
+                    if bmi < 18.5:
+                        return "underweight"
+                    if bmi < 25:
+                        return "normal"
+                    if bmi < 30:
+                        return "overweight"
+                    return "obese"
+                ''')},
+        ],
+    },
+    {
+        "slug": "refund_eligibility",
+        "title": "Purchase refund eligibility",
+        "entrypoint": "refund_eligibility",
+        "signature": "refund_eligibility(days_since_purchase: int, is_opened: bool, price: int) -> str",
+        "params": [
+            {"name": "days_since_purchase", "type": "int", "note": "days since the purchase"},
+            {"name": "is_opened", "type": "bool", "note": "whether the item was opened"},
+            {"name": "price", "type": "int", "note": "item price"},
+        ],
+        "requirement": dedent(
+            """\
+            As a returns desk, I want to decide whether a purchase can be refunded.
+
+            Refunds are only allowed within 30 days of purchase, otherwise the request
+            has "expired". An opened item can still be refunded, but only if it cost at
+            least $50; an opened item under $50 is "denied". Anything else is
+            "approved"."""
+        ),
+        "canonical_inputs": [
+            [10, True, 100], [30, False, 100], [10, True, 60],
+            [10, False, 20], [10, True, 20], [40, False, 100],
+        ],
+        "reference": dedent(
+            '''\
+            def refund_eligibility(days_since_purchase, is_opened, price):
+                if days_since_purchase > 30:
+                    return "expired"
+                if is_opened and price < 50:
+                    return "denied"
+                return "approved"
+            '''
+        ),
+        "mutants": [
+            {"key": "m1", "description": "Expires a refund on day 30 exactly (uses >= instead of >).",
+             "code": dedent(
+                '''\
+                def refund_eligibility(days_since_purchase, is_opened, price):
+                    if days_since_purchase >= 30:
+                        return "expired"
+                    if is_opened and price < 50:
+                        return "denied"
+                    return "approved"
+                ''')},
+            {"key": "m2", "description": "Uses a $100 restocking threshold instead of $50.",
+             "code": dedent(
+                '''\
+                def refund_eligibility(days_since_purchase, is_opened, price):
+                    if days_since_purchase > 30:
+                        return "expired"
+                    if is_opened and price < 100:
+                        return "denied"
+                    return "approved"
+                ''')},
+            {"key": "m3", "description": "Denies on opened OR cheap, instead of opened AND cheap.",
+             "code": dedent(
+                '''\
+                def refund_eligibility(days_since_purchase, is_opened, price):
+                    if days_since_purchase > 30:
+                        return "expired"
+                    if is_opened or price < 50:
+                        return "denied"
+                    return "approved"
+                ''')},
+            {"key": "m4", "description": "Skips the opened-item restocking rule.",
+             "code": dedent(
+                '''\
+                def refund_eligibility(days_since_purchase, is_opened, price):
+                    if days_since_purchase > 30:
+                        return "expired"
+                    return "approved"
+                ''')},
+        ],
+    },
+    {
+        "slug": "speeding_fine",
+        "title": "Speeding fine tiers",
+        "entrypoint": "speeding_fine",
+        "signature": "speeding_fine(speed: int, limit: int) -> int",
+        "params": [
+            {"name": "speed", "type": "int", "note": "measured speed"},
+            {"name": "limit", "type": "int", "note": "posted speed limit"},
+        ],
+        "requirement": dedent(
+            """\
+            As a traffic system, I want to work out a speeding fine.
+
+            Driving at or below the limit is no fine. Up to 10 over the limit is a $50
+            fine, up to 30 over is $150, and more than 30 over is $300. A speed or limit
+            that is zero or negative is invalid and returns -1."""
+        ),
+        "canonical_inputs": [
+            [70, 60], [80, 60], [0, 60], [50, 60], [100, 60], [65, 60],
+        ],
+        "reference": dedent(
+            '''\
+            def speeding_fine(speed, limit):
+                if speed <= 0 or limit <= 0:
+                    return -1
+                over = speed - limit
+                if over <= 0:
+                    return 0
+                if over <= 10:
+                    return 50
+                if over <= 30:
+                    return 150
+                return 300
+            '''
+        ),
+        "mutants": [
+            {"key": "m1", "description": "Being exactly 10 over lands in the higher tier (uses < instead of <=).",
+             "code": dedent(
+                '''\
+                def speeding_fine(speed, limit):
+                    if speed <= 0 or limit <= 0:
+                        return -1
+                    over = speed - limit
+                    if over <= 0:
+                        return 0
+                    if over < 10:
+                        return 50
+                    if over <= 30:
+                        return 150
+                    return 300
+                ''')},
+            {"key": "m2", "description": "The middle fine is $100 instead of $150.",
+             "code": dedent(
+                '''\
+                def speeding_fine(speed, limit):
+                    if speed <= 0 or limit <= 0:
+                        return -1
+                    over = speed - limit
+                    if over <= 0:
+                        return 0
+                    if over <= 10:
+                        return 50
+                    if over <= 30:
+                        return 100
+                    return 300
+                ''')},
+            {"key": "m3", "description": "Skips the invalid speed/limit check.",
+             "code": dedent(
+                '''\
+                def speeding_fine(speed, limit):
+                    over = speed - limit
+                    if over <= 0:
+                        return 0
+                    if over <= 10:
+                        return 50
+                    if over <= 30:
+                        return 150
+                    return 300
+                ''')},
+            {"key": "m4", "description": "Adds speed and limit instead of subtracting.",
+             "code": dedent(
+                '''\
+                def speeding_fine(speed, limit):
+                    if speed <= 0 or limit <= 0:
+                        return -1
+                    over = speed + limit
+                    if over <= 0:
+                        return 0
+                    if over <= 10:
+                        return 50
+                    if over <= 30:
+                        return 150
+                    return 300
+                ''')},
+        ],
+    },
+    {
+        "slug": "leap_year",
+        "title": "Leap-year check",
+        "entrypoint": "leap_year",
+        "signature": "leap_year(year: int) -> str",
+        "params": [
+            {"name": "year", "type": "int", "note": "the year to test"},
+        ],
+        "requirement": dedent(
+            """\
+            As a calendar utility, I want to tell whether a year is a leap year.
+
+            A year is a leap year if it is divisible by 4, except that century years are
+            not leap years unless they are also divisible by 400. A year of zero or less
+            is invalid. Return "leap", "common", or "invalid"."""
+        ),
+        "canonical_inputs": [
+            [2000], [2004], [0], [1900], [2001], [2100],
+        ],
+        "reference": dedent(
+            '''\
+            def leap_year(year):
+                if year <= 0:
+                    return "invalid"
+                if year % 400 == 0:
+                    return "leap"
+                if year % 100 == 0:
+                    return "common"
+                if year % 4 == 0:
+                    return "leap"
+                return "common"
+            '''
+        ),
+        "mutants": [
+            {"key": "m1", "description": "Drops the divisible-by-400 exception, so 2000 looks common.",
+             "code": dedent(
+                '''\
+                def leap_year(year):
+                    if year <= 0:
+                        return "invalid"
+                    if year % 100 == 0:
+                        return "common"
+                    if year % 4 == 0:
+                        return "leap"
+                    return "common"
+                ''')},
+            {"key": "m2", "description": "Tests divisibility by 5 instead of 4.",
+             "code": dedent(
+                '''\
+                def leap_year(year):
+                    if year <= 0:
+                        return "invalid"
+                    if year % 400 == 0:
+                        return "leap"
+                    if year % 100 == 0:
+                        return "common"
+                    if year % 5 == 0:
+                        return "leap"
+                    return "common"
+                ''')},
+            {"key": "m3", "description": "Treats year 0 as valid (uses < instead of <=).",
+             "code": dedent(
+                '''\
+                def leap_year(year):
+                    if year < 0:
+                        return "invalid"
+                    if year % 400 == 0:
+                        return "leap"
+                    if year % 100 == 0:
+                        return "common"
+                    if year % 4 == 0:
+                        return "leap"
+                    return "common"
+                ''')},
+            {"key": "m4", "description": "Flips the century test, so ordinary century rules invert.",
+             "code": dedent(
+                '''\
+                def leap_year(year):
+                    if year <= 0:
+                        return "invalid"
+                    if year % 400 == 0:
+                        return "leap"
+                    if year % 100 != 0:
+                        return "common"
+                    if year % 4 == 0:
+                        return "leap"
+                    return "common"
+                ''')},
+        ],
+    },
 ]
+
+
+# ---------------------------------------------------------------------------
+# Fault taxonomy
+#
+# Every seeded bug is labelled with the *kind* of mistake it represents, drawn
+# from the classic mutation-operator families but named in plain language. This
+# is what lets the evaluation report fault detection *by fault class* — e.g.
+# "the multi-agent suite catches boundary bugs the baseline misses" — instead of
+# a single undifferentiated number. It turns the benchmark into a categorised,
+# reusable artifact rather than an opaque bag of bugs.
+# ---------------------------------------------------------------------------
+
+# Ordered so the dashboard can render a stable legend.
+FAULT_TAXONOMY: list[dict] = [
+    {"key": "boundary", "label": "Boundary",
+     "blurb": "An off-by-one at a threshold — a < written as <=, a > as >=."},
+    {"key": "wrong_constant", "label": "Wrong value",
+     "blurb": "A literal threshold, factor, or result changed to the wrong number."},
+    {"key": "wrong_operator", "label": "Wrong operator",
+     "blurb": "An arithmetic or logical operator swapped — + for -, and for or."},
+    {"key": "missing_condition", "label": "Missing check",
+     "blurb": "A whole guard, branch, or clause dropped from the logic."},
+    {"key": "control_flow", "label": "Control flow",
+     "blurb": "Guards evaluated in the wrong order, so the wrong rule wins."},
+]
+
+FAULT_TYPE_KEYS = {f["key"] for f in FAULT_TAXONOMY}
+FAULT_TYPE_LABELS = {f["key"]: f["label"] for f in FAULT_TAXONOMY}
+
+# (slug -> mutant key -> fault class). Kept beside the corpus rather than inline
+# in each mutant dict so the large, verbatim code blocks above stay untouched and
+# easy to diff. `seed.py` stamps these onto the BenchmarkMutant rows.
+FAULT_TYPES: dict[str, dict[str, str]] = {
+    "atm_withdrawal": {"m1": "boundary", "m2": "boundary", "m3": "boundary", "m4": "missing_condition"},
+    "login_lockout": {"m1": "control_flow", "m2": "boundary", "m3": "wrong_constant", "m4": "missing_condition"},
+    "signup_validation": {"m1": "boundary", "m2": "boundary", "m3": "missing_condition", "m4": "missing_condition"},
+    "discount_pricing": {"m1": "missing_condition", "m2": "missing_condition", "m3": "wrong_operator", "m4": "missing_condition"},
+    "bank_transfer": {"m1": "control_flow", "m2": "boundary", "m3": "boundary", "m4": "missing_condition"},
+    "ticket_booking": {"m1": "boundary", "m2": "boundary", "m3": "boundary", "m4": "missing_condition"},
+    "payroll_overtime": {"m1": "wrong_constant", "m2": "wrong_constant", "m3": "missing_condition", "m4": "wrong_operator"},
+    "card_expiry": {"m1": "missing_condition", "m2": "boundary", "m3": "boundary", "m4": "missing_condition"},
+    "shipping_fee": {"m1": "boundary", "m2": "boundary", "m3": "missing_condition", "m4": "wrong_constant"},
+    "loan_approval": {"m1": "boundary", "m2": "boundary", "m3": "wrong_constant", "m4": "missing_condition"},
+    "grade_letter": {"m1": "boundary", "m2": "boundary", "m3": "wrong_constant", "m4": "missing_condition"},
+    "parking_fee": {"m1": "boundary", "m2": "wrong_operator", "m3": "wrong_constant", "m4": "missing_condition"},
+    "bmi_category": {"m1": "boundary", "m2": "boundary", "m3": "wrong_operator", "m4": "missing_condition"},
+    "refund_eligibility": {"m1": "boundary", "m2": "wrong_constant", "m3": "wrong_operator", "m4": "missing_condition"},
+    "speeding_fine": {"m1": "boundary", "m2": "wrong_constant", "m3": "missing_condition", "m4": "wrong_operator"},
+    "leap_year": {"m1": "missing_condition", "m2": "wrong_constant", "m3": "boundary", "m4": "wrong_operator"},
+}
+
+
+def fault_type_for(slug: str, mutant_key: str) -> str | None:
+    """The fault class for one seeded bug, or None if unclassified."""
+    return FAULT_TYPES.get(slug, {}).get(mutant_key)
 
 
 def _manifest_view() -> list[dict]:
@@ -725,6 +1480,7 @@ def _manifest_view() -> list[dict]:
                 {
                     "key": m["key"],
                     "description": m["description"],
+                    "fault_type": fault_type_for(p["slug"], m["key"]),
                     "file": f"fixtures/{p['slug']}/mutants/{m['key']}.py",
                 }
                 for m in p["mutants"]

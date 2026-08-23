@@ -27,9 +27,20 @@ const METRICS = [
     tip: "Reviewer⇄Consensus rounds used before agreement." },
   { key: "tokens_total", label: "Tokens", fmt: int0, better: "none",
     tip: "Total tokens spent per run (cost)." },
+  { key: "faults_per_1k_tokens", label: "Bugs / 1k tokens", fmt: num2, better: "high",
+    tip: "Cost-effectiveness: seeded bugs caught per 1,000 tokens spent. Multi-agent catches more bugs but spends more tokens — this is the honest 'is it worth the cost?' trade-off." },
   { key: "latency_ms_total", label: "Latency", fmt: ms, better: "none",
     tip: "Total wall-clock time per run." },
 ];
+
+// Plain-language names for the fault taxonomy (mirrors the backend corpus).
+const FAULT_LABELS = {
+  boundary: "Boundary",
+  wrong_constant: "Wrong value",
+  wrong_operator: "Wrong operator",
+  missing_condition: "Missing check",
+  control_flow: "Control flow",
+};
 
 function Info({ tip }) {
   return (
@@ -157,6 +168,19 @@ export default function ExperimentResults() {
         cmp.significant ? "yes" : "no",
       ]);
     }
+    // Fault detection by bug type (killed/total and rate per condition).
+    const ft = results.fault_types;
+    if (ft?.legend?.length) {
+      rows.push([]);
+      rows.push(["Fault detection by bug type", ...orderedConditions.flatMap((c) => [`${c.label} caught`, `${c.label} seeded`, `${c.label} rate`])]);
+      for (const f of ft.legend) {
+        const cells = orderedConditions.flatMap((c) => {
+          const r = ft.by_condition?.[c.key]?.[f.key];
+          return r && r.total > 0 ? [r.killed, r.total, r.rate] : ["", "", ""];
+        });
+        if (cells.some((v) => v !== "")) rows.push([f.label, ...cells]);
+      }
+    }
     downloadCsv(`experiment-${exp.id}-results`, rows);
   }
 
@@ -264,6 +288,9 @@ export default function ExperimentResults() {
           </div>
         </section>
       )}
+
+      {/* Fault detection by fault class */}
+      <FaultTypeBreakdown faultTypes={results.fault_types} conditions={orderedConditions} />
 
       {/* Normalised metric comparison */}
       {series.length > 1 && (
@@ -403,6 +430,84 @@ function SignificanceCard({ cmp }) {
   );
 }
 
+// Fault detection broken down by the KIND of bug (boundary, wrong value, …).
+// The sharper thesis result: not just "multi-agent catches more" but *which*
+// classes of bug it closes the gap on versus the baseline.
+function FaultTypeBreakdown({ faultTypes, conditions }) {
+  const legend = faultTypes?.legend || [];
+  const byCond = faultTypes?.by_condition || {};
+
+  // Which fault classes actually have data in any condition.
+  const rows = legend
+    .map((f) => {
+      const cells = conditions.map((c) => {
+        const r = byCond[c.key]?.[f.key];
+        return { key: c.key, label: c.label, ...(r || {}) };
+      });
+      const anyData = cells.some((x) => x.total > 0);
+      return { ...f, cells, anyData };
+    })
+    .filter((r) => r.anyData);
+
+  if (rows.length === 0) return null;
+
+  // Best condition per row (highest detection rate) to highlight the gap.
+  const bestForRow = (cells) => {
+    let best = null;
+    for (const x of cells) {
+      if (x.rate == null) continue;
+      if (best === null || x.rate > best.rate) best = x;
+    }
+    return best?.key ?? null;
+  };
+
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h2>Fault detection by bug type <Info tip="Every seeded bug is labelled with the kind of mistake it represents. This shows which classes of bug each condition catches — e.g. whether the multi-agent suite closes the boundary/edge-case gap the baseline leaves open." /></h2>
+      </div>
+      <div className="table-wrap">
+        <table className="ex-table ft-table">
+          <thead>
+            <tr>
+              <th>Bug type</th>
+              {conditions.map((c) => (
+                <th key={c.key}>
+                  <span className="fd-dot" style={{ "--dot": conditionColor(c.key), background: conditionColor(c.key) }} />
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const winKey = bestForRow(r.cells);
+              return (
+                <tr key={r.key}>
+                  <td className="ex-td-name">
+                    {r.label} <Info tip={r.blurb} />
+                  </td>
+                  {r.cells.map((x) => (
+                    <td key={x.key} className={winKey === x.key && r.cells.length > 1 ? "ex-win" : ""}>
+                      {x.total > 0 ? (
+                        <>
+                          {pct01(x.rate)}
+                          <span className="ex-std"> {x.killed}/{x.total}</span>
+                        </>
+                      ) : "—"}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted ft-note">Share of each bug type caught, pooled across every program and run. The count is bugs caught / bugs of that type seeded.</p>
+    </section>
+  );
+}
+
 function fmtInput(args) {
   if (!Array.isArray(args)) return String(args);
   return args.map((a) => JSON.stringify(a)).join(", ");
@@ -420,7 +525,12 @@ function BugRow({ mutant, conditions }) {
     <div className={`bug ${open ? "open" : ""}`}>
       <button className="bug-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <span className="bug-caret">▸</span>
-        <span className="bug-desc">{mutant.description}</span>
+        <span className="bug-desc">
+          {mutant.fault_type && (
+            <span className={`ft-badge ft-${mutant.fault_type}`}>{FAULT_LABELS[mutant.fault_type] || mutant.fault_type}</span>
+          )}
+          {mutant.description}
+        </span>
         <span className="bug-verdicts">
           {perCond.map(({ c, killed }) => (
             <span

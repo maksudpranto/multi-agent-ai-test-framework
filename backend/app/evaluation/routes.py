@@ -474,7 +474,8 @@ def get_item_drilldown(
             "requirement_text": item.requirement.raw_text if item else None,
             "reference_code": item.reference_code if item else None,
             "mutants": [
-                {"key": m.mutant_key, "description": m.description, "code": m.code}
+                {"key": m.mutant_key, "description": m.description,
+                 "fault_type": m.fault_type, "code": m.code}
                 for m in (item.mutants if item else [])
             ],
         } if item else None,

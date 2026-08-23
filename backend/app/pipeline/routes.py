@@ -26,6 +26,7 @@ from app.models import (
     Requirement,
     utcnow,
 )
+from app.pipeline.refine import refine_suite
 from app.pipeline.schemas import (
     AcceptanceCriteriaIn,
     ModelSelection,
@@ -34,6 +35,8 @@ from app.pipeline.schemas import (
     DebateResult,
     QualityItemOut,
     QualityResult,
+    RefineIn,
+    RefineResult,
     RequirementAnalysisResult,
     TestGenerationResult,
 )
@@ -395,6 +398,70 @@ def get_latest_test_cases(
     if run is None:
         return None
     return _build_test_generation_result(db, run, error=None)
+
+
+@router.post("/refine-test-cases", response_model=RefineResult)
+def refine_test_cases(
+    project_id: int,
+    requirement_id: int,
+    payload: RefineIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> RefineResult:
+    """Human-in-the-loop: apply a user's suggestion to the current suite when it
+    is a valid, in-scope change; otherwise return a reason and leave it unchanged."""
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    suggestion = (payload.suggestion or "").strip()
+    if not suggestion:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Enter a suggestion to apply.",
+        )
+
+    run = _latest_run_with_test_cases(db, requirement.id)
+    if run is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Generate a test suite before suggesting changes.",
+        )
+
+    engine, config = _resolve_run(payload)
+
+    # The deterministic mock backend can't reason about a free-text suggestion.
+    provider = (payload.provider or get_settings().llm_provider).lower().strip()
+    if provider == "mock":
+        cases = _current_test_cases(db, run)
+        return RefineResult(
+            applied=False,
+            reason="Suggestions need a real AI model — pick Gemini or Groq in the "
+            "model selector above (the offline mock can't evaluate them).",
+            test_cases=cases,
+        )
+
+    criteria = list(
+        db.scalars(
+            select(AcceptanceCriterion)
+            .where(AcceptanceCriterion.pipeline_run_id == run.id)
+            .order_by(AcceptanceCriterion.order)
+        )
+    )
+    cases = _current_test_cases(db, run)
+
+    outcome = refine_suite(
+        db=db,
+        run=run,
+        requirement_text=requirement.raw_text,
+        criteria=criteria,
+        cases=cases,
+        suggestion=suggestion,
+        service=engine.llm,
+        model=config.model,
+    )
+    return RefineResult(
+        applied=outcome["applied"],
+        reason=outcome["reason"],
+        test_cases=_current_test_cases(db, run),
+    )
 
 
 @router.post("/review-consensus", response_model=DebateResult)

@@ -41,6 +41,10 @@ MUTANTS_KILLED = "mutants_killed"
 MUTANTS_TOTAL = "mutants_total"
 TOKENS_TOTAL = "tokens_total"
 LATENCY_MS_TOTAL = "latency_ms_total"
+# Cost-effectiveness: seeded bugs caught per 1,000 tokens spent. The headline
+# "is multi-agent worth the extra cost?" number — multi-agent detects more faults
+# but spends more tokens, so faults-per-token is the honest trade-off measure.
+FAULTS_PER_1K_TOKENS = "faults_per_1k_tokens"
 
 
 def _current_test_cases(db: Session, run: PipelineRun) -> list[TestCase]:
@@ -83,13 +87,20 @@ def _fault_detection(
 ) -> tuple[dict[str, float], dict]:
     """Harvest the suite's inputs and score them against the item's mutants.
     Returns (scalar metrics, drill-down detail)."""
-    mutants = [{"key": m.mutant_key, "code": m.code} for m in item.mutants]
+    mutants = [
+        {"key": m.mutant_key, "code": m.code, "fault_type": m.fault_type}
+        for m in item.mutants
+    ]
     if not cases:
         detail = {
             "suite_valid": False, "materialized": False, "inputs": [],
             "n_usable_inputs": 0, "reason": "no_test_cases",
-            "per_mutant": [{"key": m["key"], "killed": False, "killed_by_input": None}
+            "per_mutant": [{"key": m["key"], "fault_type": m["fault_type"],
+                            "killed": False, "killed_by_input": None}
                            for m in mutants],
+            "by_fault_type": _by_fault_type(
+                [{"fault_type": m["fault_type"], "killed": False} for m in mutants]
+            ),
         }
         return (
             {MUTATION_SCORE: 0.0, SUITE_VALID: 0.0, N_INPUTS: 0.0,
@@ -117,6 +128,7 @@ def _fault_detection(
         "inputs": result.inputs,
         "n_usable_inputs": result.n_usable_inputs,
         "per_mutant": result.per_mutant,
+        "by_fault_type": _by_fault_type(result.per_mutant),
     }
     return (
         {
@@ -128,6 +140,19 @@ def _fault_detection(
         },
         detail,
     )
+
+
+def _by_fault_type(per_mutant: list[dict]) -> dict[str, dict[str, int]]:
+    """Group a run's per-mutant verdicts into {fault_type: {killed, total}}, so
+    fault detection can later be aggregated by fault class across an experiment."""
+    out: dict[str, dict[str, int]] = {}
+    for m in per_mutant:
+        ft = m.get("fault_type") or "unclassified"
+        bucket = out.setdefault(ft, {"killed": 0, "total": 0})
+        bucket["total"] += 1
+        if m.get("killed"):
+            bucket["killed"] += 1
+    return out
 
 
 def _coverage_pct(db: Session, run: PipelineRun) -> float | None:
@@ -222,6 +247,12 @@ def compute_run_metrics(
     tokens, latency = _cost(db, run)
     metrics[TOKENS_TOTAL] = tokens
     metrics[LATENCY_MS_TOTAL] = latency
+    # Cost-effectiveness: bugs caught per 1,000 tokens. Only meaningful when the
+    # oracle ran (suite_valid) and tokens were actually spent.
+    if tokens > 0 and metrics.get(SUITE_VALID, 0.0) >= 1.0:
+        metrics[FAULTS_PER_1K_TOKENS] = round(
+            metrics.get(MUTANTS_KILLED, 0.0) / (tokens / 1000.0), 4
+        )
 
     # Replace any prior metric rows for this run (idempotent re-scoring).
     db.query(ExperimentMetric).filter(

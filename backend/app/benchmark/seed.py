@@ -14,7 +14,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.benchmark.corpus import PROGRAMS
+from app.benchmark.corpus import PROGRAMS, fault_type_for
 from app.models import (
     BenchmarkItem,
     BenchmarkMutant,
@@ -139,6 +139,7 @@ def seed_benchmark(db: Session, owner_id: int) -> dict[str, Any]:
                     benchmark_item_id=item.id,
                     mutant_key=m["key"],
                     description=m["description"],
+                    fault_type=fault_type_for(prog["slug"], m["key"]),
                     code=m["code"],
                 )
             )

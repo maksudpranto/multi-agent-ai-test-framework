@@ -83,6 +83,20 @@ class TestGenerationResult(BaseModel):
     error: str | None = None
 
 
+class RefineIn(ModelSelection):
+    """A user's plain-language suggestion to change the current test suite.
+    Inherits the optional model selection so the refinement uses the chosen
+    model."""
+
+    suggestion: str = Field(min_length=1)
+
+
+class RefineResult(BaseModel):
+    applied: bool
+    reason: str
+    test_cases: list[TestCaseOut]
+
+
 class CoverageItemOut(BaseModel):
     acceptance_criterion_id: int
     criterion_text: str

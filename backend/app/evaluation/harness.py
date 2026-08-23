@@ -169,7 +169,10 @@ def score_suite(
         return FaultDetectionResult(
             mutation_score=0.0, suite_valid=False, killed=0, total=total,
             n_inputs=0, n_usable_inputs=0, materialized=materialized, inputs=[],
-            per_mutant=[{"key": m["key"], "killed": False} for m in mutants],
+            per_mutant=[
+                {"key": m["key"], "fault_type": m.get("fault_type"), "killed": False}
+                for m in mutants
+            ],
         )
 
     ref_outcomes = _exec(reference_code, entrypoint, inputs)
@@ -189,6 +192,7 @@ def score_suite(
         per_mutant.append(
             {
                 "key": m["key"],
+                "fault_type": m.get("fault_type"),
                 "killed": was_killed,
                 "killed_by_input": inputs[kill_idx] if was_killed else None,
             }

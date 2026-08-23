@@ -76,21 +76,25 @@
       {
         "key": "m1",
         "description": "Allows a zero withdrawal (checks < 0 instead of <= 0).",
+        "fault_type": "boundary",
         "file": "fixtures/atm_withdrawal/mutants/m1.py"
       },
       {
         "key": "m2",
         "description": "Rejects withdrawing the exact balance (uses >= instead of >).",
+        "fault_type": "boundary",
         "file": "fixtures/atm_withdrawal/mutants/m2.py"
       },
       {
         "key": "m3",
         "description": "Rejects hitting the daily limit exactly (uses >= instead of >).",
+        "fault_type": "boundary",
         "file": "fixtures/atm_withdrawal/mutants/m3.py"
       },
       {
         "key": "m4",
         "description": "Skips the daily-limit check entirely.",
+        "fault_type": "missing_condition",
         "file": "fixtures/atm_withdrawal/mutants/m4.py"
       }
     ]
@@ -155,21 +159,25 @@
       {
         "key": "m1",
         "description": "Checks the password before the lock, so a correct password unlocks a locked account.",
+        "fault_type": "control_flow",
         "file": "fixtures/login_lockout/mutants/m1.py"
       },
       {
         "key": "m2",
         "description": "Off-by-one on the lock threshold (uses > instead of >=).",
+        "fault_type": "boundary",
         "file": "fixtures/login_lockout/mutants/m2.py"
       },
       {
         "key": "m3",
         "description": "A locked account returns 'denied' instead of 'locked'.",
+        "fault_type": "wrong_constant",
         "file": "fixtures/login_lockout/mutants/m3.py"
       },
       {
         "key": "m4",
         "description": "Ignores the password and always reports success when not locked.",
+        "fault_type": "missing_condition",
         "file": "fixtures/login_lockout/mutants/m4.py"
       }
     ]
@@ -257,21 +265,25 @@
       {
         "key": "m1",
         "description": "Treats 18-year-olds as underage (uses <= 18).",
+        "fault_type": "boundary",
         "file": "fixtures/signup_validation/mutants/m1.py"
       },
       {
         "key": "m2",
         "description": "Accepts 7-character passwords (uses < 7 instead of < 8).",
+        "fault_type": "boundary",
         "file": "fixtures/signup_validation/mutants/m2.py"
       },
       {
         "key": "m3",
         "description": "Skips the password-confirmation check.",
+        "fault_type": "missing_condition",
         "file": "fixtures/signup_validation/mutants/m3.py"
       },
       {
         "key": "m4",
         "description": "Only checks for '@' in the email, not a dot.",
+        "fault_type": "missing_condition",
         "file": "fixtures/signup_validation/mutants/m4.py"
       }
     ]
@@ -336,21 +348,25 @@
       {
         "key": "m1",
         "description": "No upper bound on the discount, so over-100% discounts go through.",
+        "fault_type": "missing_condition",
         "file": "fixtures/discount_pricing/mutants/m1.py"
       },
       {
         "key": "m2",
         "description": "Forgets the extra member discount.",
+        "fault_type": "missing_condition",
         "file": "fixtures/discount_pricing/mutants/m2.py"
       },
       {
         "key": "m3",
         "description": "Adds the discount instead of subtracting it.",
+        "fault_type": "wrong_operator",
         "file": "fixtures/discount_pricing/mutants/m3.py"
       },
       {
         "key": "m4",
         "description": "No check for a negative discount.",
+        "fault_type": "missing_condition",
         "file": "fixtures/discount_pricing/mutants/m4.py"
       }
     ]
@@ -415,21 +431,25 @@
       {
         "key": "m1",
         "description": "Checks the amount before the freeze, so a frozen account can surface other errors.",
+        "fault_type": "control_flow",
         "file": "fixtures/bank_transfer/mutants/m1.py"
       },
       {
         "key": "m2",
         "description": "Allows a zero transfer (checks < 0 instead of <= 0).",
+        "fault_type": "boundary",
         "file": "fixtures/bank_transfer/mutants/m2.py"
       },
       {
         "key": "m3",
         "description": "Rejects transferring the whole balance (uses >= instead of >).",
+        "fault_type": "boundary",
         "file": "fixtures/bank_transfer/mutants/m3.py"
       },
       {
         "key": "m4",
         "description": "Ignores the frozen flag entirely.",
+        "fault_type": "missing_condition",
         "file": "fixtures/bank_transfer/mutants/m4.py"
       }
     ]
@@ -494,21 +514,25 @@
       {
         "key": "m1",
         "description": "Allows booking zero tickets (checks < 0 instead of <= 0).",
+        "fault_type": "boundary",
         "file": "fixtures/ticket_booking/mutants/m1.py"
       },
       {
         "key": "m2",
         "description": "Rejects booking exactly the per-booking limit (uses >=).",
+        "fault_type": "boundary",
         "file": "fixtures/ticket_booking/mutants/m2.py"
       },
       {
         "key": "m3",
         "description": "Rejects booking exactly the remaining tickets (uses >=).",
+        "fault_type": "boundary",
         "file": "fixtures/ticket_booking/mutants/m3.py"
       },
       {
         "key": "m4",
         "description": "Skips the per-booking limit check.",
+        "fault_type": "missing_condition",
         "file": "fixtures/ticket_booking/mutants/m4.py"
       }
     ]
@@ -562,21 +586,25 @@
       {
         "key": "m1",
         "description": "Overtime starts after 45 hours, not 40.",
+        "fault_type": "wrong_constant",
         "file": "fixtures/payroll_overtime/mutants/m1.py"
       },
       {
         "key": "m2",
         "description": "Overtime is paid at 2x instead of 1.5x.",
+        "fault_type": "wrong_constant",
         "file": "fixtures/payroll_overtime/mutants/m2.py"
       },
       {
         "key": "m3",
         "description": "No check for negative hours or rate.",
+        "fault_type": "missing_condition",
         "file": "fixtures/payroll_overtime/mutants/m3.py"
       },
       {
         "key": "m4",
         "description": "Overtime multiplier applies to ALL hours, not just the extra ones.",
+        "fault_type": "wrong_operator",
         "file": "fixtures/payroll_overtime/mutants/m4.py"
       }
     ]
@@ -652,22 +680,602 @@
       {
         "key": "m1",
         "description": "Only checks the low end of the month, so month 13 is accepted.",
+        "fault_type": "missing_condition",
         "file": "fixtures/card_expiry/mutants/m1.py"
       },
       {
         "key": "m2",
         "description": "Treats a card expiring this year as already expired (uses <=).",
+        "fault_type": "boundary",
         "file": "fixtures/card_expiry/mutants/m2.py"
       },
       {
         "key": "m3",
         "description": "Expires a card during its own expiry month (uses <=).",
+        "fault_type": "boundary",
         "file": "fixtures/card_expiry/mutants/m3.py"
       },
       {
         "key": "m4",
         "description": "Ignores the month when the years match, so an earlier month this year still passes.",
+        "fault_type": "missing_condition",
         "file": "fixtures/card_expiry/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "shipping_fee",
+    "title": "Parcel shipping fee",
+    "entrypoint": "shipping_fee",
+    "signature": "shipping_fee(weight_kg: float, distance_km: int, is_express: bool) -> float",
+    "params": [
+      {
+        "name": "weight_kg",
+        "type": "float",
+        "note": "parcel weight in kg"
+      },
+      {
+        "name": "distance_km",
+        "type": "int",
+        "note": "shipping distance in km"
+      },
+      {
+        "name": "is_express",
+        "type": "bool",
+        "note": "whether express delivery was chosen"
+      }
+    ],
+    "requirement": "As a shipping calculator, I want to price a parcel delivery.\n\nThe fee is a $5 base, plus $2 per kg, plus $1 for every full 100 km of\ndistance. Express delivery doubles the whole fee. A parcel must weigh more\nthan 0 and at most 30 kg, otherwise return -1 for an invalid parcel. Round\nthe fee to 2 decimals.",
+    "canonical_inputs": [
+      [
+        10,
+        250,
+        false
+      ],
+      [
+        30,
+        100,
+        false
+      ],
+      [
+        0,
+        100,
+        false
+      ],
+      [
+        10,
+        100,
+        true
+      ],
+      [
+        10,
+        150,
+        false
+      ],
+      [
+        31,
+        100,
+        false
+      ]
+    ],
+    "reference_file": "fixtures/shipping_fee/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Rejects a parcel of exactly 30 kg (uses >= instead of >).",
+        "fault_type": "boundary",
+        "file": "fixtures/shipping_fee/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Allows a zero-weight parcel (uses < 0 instead of <= 0).",
+        "fault_type": "boundary",
+        "file": "fixtures/shipping_fee/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Forgets to double the fee for express delivery.",
+        "fault_type": "missing_condition",
+        "file": "fixtures/shipping_fee/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Charges per 200 km instead of per 100 km.",
+        "fault_type": "wrong_constant",
+        "file": "fixtures/shipping_fee/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "loan_approval",
+    "title": "Loan application decision",
+    "entrypoint": "loan_approval",
+    "signature": "loan_approval(credit_score: int, annual_income: int, loan_amount: int) -> str",
+    "params": [
+      {
+        "name": "credit_score",
+        "type": "int",
+        "note": "applicant credit score"
+      },
+      {
+        "name": "annual_income",
+        "type": "int",
+        "note": "applicant yearly income"
+      },
+      {
+        "name": "loan_amount",
+        "type": "int",
+        "note": "amount requested"
+      }
+    ],
+    "requirement": "As a lending system, I want to decide a loan application.\n\nAnyone with a credit score below 600 is declined. A loan larger than five\ntimes the applicant's yearly income is also declined. A score of 750 or\nabove is approved automatically; everyone else in between is sent for manual\nreview. Return \"denied\", \"approved\", or \"refer\".",
+    "canonical_inputs": [
+      [
+        800,
+        10000,
+        20000
+      ],
+      [
+        600,
+        10000,
+        20000
+      ],
+      [
+        750,
+        10000,
+        20000
+      ],
+      [
+        800,
+        10000,
+        40000
+      ],
+      [
+        800,
+        10000,
+        60000
+      ],
+      [
+        550,
+        10000,
+        20000
+      ]
+    ],
+    "reference_file": "fixtures/loan_approval/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Declines a score of exactly 600 (uses <= instead of <).",
+        "fault_type": "boundary",
+        "file": "fixtures/loan_approval/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Requires a score above 750 to auto-approve (uses > instead of >=).",
+        "fault_type": "boundary",
+        "file": "fixtures/loan_approval/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Caps the loan at 3x income instead of 5x.",
+        "fault_type": "wrong_constant",
+        "file": "fixtures/loan_approval/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Skips the loan-to-income check entirely.",
+        "fault_type": "missing_condition",
+        "file": "fixtures/loan_approval/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "grade_letter",
+    "title": "Exam grade letter",
+    "entrypoint": "grade_letter",
+    "signature": "grade_letter(score: int) -> str",
+    "params": [
+      {
+        "name": "score",
+        "type": "int",
+        "note": "exam score, 0-100"
+      }
+    ],
+    "requirement": "As a grading tool, I want to turn an exam score into a letter grade.\n\n90 and above is an A, the 80s a B, the 70s a C, the 60s a D, and anything\nbelow 60 is an F. A score outside 0-100 is not a real score and should\nreturn \"invalid\".",
+    "canonical_inputs": [
+      [
+        90
+      ],
+      [
+        60
+      ],
+      [
+        82
+      ],
+      [
+        150
+      ],
+      [
+        -5
+      ],
+      [
+        75
+      ]
+    ],
+    "reference_file": "fixtures/grade_letter/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "A 90 falls short of an A (uses > instead of >=).",
+        "fault_type": "boundary",
+        "file": "fixtures/grade_letter/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "A 60 falls short of a D (uses > instead of >=).",
+        "fault_type": "boundary",
+        "file": "fixtures/grade_letter/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "The B cutoff is 85 instead of 80.",
+        "fault_type": "wrong_constant",
+        "file": "fixtures/grade_letter/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Never rejects a score above 100.",
+        "fault_type": "missing_condition",
+        "file": "fixtures/grade_letter/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "parking_fee",
+    "title": "Car park pricing",
+    "entrypoint": "parking_fee",
+    "signature": "parking_fee(minutes: int) -> int",
+    "params": [
+      {
+        "name": "minutes",
+        "type": "int",
+        "note": "minutes parked"
+      }
+    ],
+    "requirement": "As a car park, I want to price a stay by the minute.\n\nThe first 30 minutes are free. After that the charge is $3 for every hour\nor part of an hour of the whole stay. A negative duration is invalid and\nreturns -1.",
+    "canonical_inputs": [
+      [
+        10
+      ],
+      [
+        30
+      ],
+      [
+        45
+      ],
+      [
+        120
+      ],
+      [
+        -10
+      ],
+      [
+        90
+      ]
+    ],
+    "reference_file": "fixtures/parking_fee/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Charges for exactly 30 minutes (uses < instead of <=).",
+        "fault_type": "boundary",
+        "file": "fixtures/parking_fee/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Adds the hours to $3 instead of multiplying.",
+        "fault_type": "wrong_operator",
+        "file": "fixtures/parking_fee/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Gives a 60-minute free period instead of 30.",
+        "fault_type": "wrong_constant",
+        "file": "fixtures/parking_fee/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Never rejects a negative duration.",
+        "fault_type": "missing_condition",
+        "file": "fixtures/parking_fee/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "bmi_category",
+    "title": "BMI health category",
+    "entrypoint": "bmi_category",
+    "signature": "bmi_category(weight_kg: float, height_m: float) -> str",
+    "params": [
+      {
+        "name": "weight_kg",
+        "type": "float",
+        "note": "body weight in kg"
+      },
+      {
+        "name": "height_m",
+        "type": "float",
+        "note": "height in metres"
+      }
+    ],
+    "requirement": "As a health tool, I want to classify a body-mass index.\n\nBMI is weight divided by height squared. Below 18.5 is \"underweight\", below\n25 is \"normal\", below 30 is \"overweight\", and 30 or more is \"obese\". A\nweight or height that is zero or negative is invalid and returns\n\"invalid\".",
+    "canonical_inputs": [
+      [
+        100,
+        2
+      ],
+      [
+        74,
+        2
+      ],
+      [
+        45,
+        1.5
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        70,
+        1.75
+      ],
+      [
+        60,
+        -1
+      ]
+    ],
+    "reference_file": "fixtures/bmi_category/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "A BMI of exactly 25 counts as normal (uses <= instead of <).",
+        "fault_type": "boundary",
+        "file": "fixtures/bmi_category/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "A BMI of exactly 18.5 counts as underweight (uses <=).",
+        "fault_type": "boundary",
+        "file": "fixtures/bmi_category/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Adds the height to itself instead of squaring it.",
+        "fault_type": "wrong_operator",
+        "file": "fixtures/bmi_category/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Ignores a zero or negative weight.",
+        "fault_type": "missing_condition",
+        "file": "fixtures/bmi_category/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "refund_eligibility",
+    "title": "Purchase refund eligibility",
+    "entrypoint": "refund_eligibility",
+    "signature": "refund_eligibility(days_since_purchase: int, is_opened: bool, price: int) -> str",
+    "params": [
+      {
+        "name": "days_since_purchase",
+        "type": "int",
+        "note": "days since the purchase"
+      },
+      {
+        "name": "is_opened",
+        "type": "bool",
+        "note": "whether the item was opened"
+      },
+      {
+        "name": "price",
+        "type": "int",
+        "note": "item price"
+      }
+    ],
+    "requirement": "As a returns desk, I want to decide whether a purchase can be refunded.\n\nRefunds are only allowed within 30 days of purchase, otherwise the request\nhas \"expired\". An opened item can still be refunded, but only if it cost at\nleast $50; an opened item under $50 is \"denied\". Anything else is\n\"approved\".",
+    "canonical_inputs": [
+      [
+        10,
+        true,
+        100
+      ],
+      [
+        30,
+        false,
+        100
+      ],
+      [
+        10,
+        true,
+        60
+      ],
+      [
+        10,
+        false,
+        20
+      ],
+      [
+        10,
+        true,
+        20
+      ],
+      [
+        40,
+        false,
+        100
+      ]
+    ],
+    "reference_file": "fixtures/refund_eligibility/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Expires a refund on day 30 exactly (uses >= instead of >).",
+        "fault_type": "boundary",
+        "file": "fixtures/refund_eligibility/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Uses a $100 restocking threshold instead of $50.",
+        "fault_type": "wrong_constant",
+        "file": "fixtures/refund_eligibility/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Denies on opened OR cheap, instead of opened AND cheap.",
+        "fault_type": "wrong_operator",
+        "file": "fixtures/refund_eligibility/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Skips the opened-item restocking rule.",
+        "fault_type": "missing_condition",
+        "file": "fixtures/refund_eligibility/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "speeding_fine",
+    "title": "Speeding fine tiers",
+    "entrypoint": "speeding_fine",
+    "signature": "speeding_fine(speed: int, limit: int) -> int",
+    "params": [
+      {
+        "name": "speed",
+        "type": "int",
+        "note": "measured speed"
+      },
+      {
+        "name": "limit",
+        "type": "int",
+        "note": "posted speed limit"
+      }
+    ],
+    "requirement": "As a traffic system, I want to work out a speeding fine.\n\nDriving at or below the limit is no fine. Up to 10 over the limit is a $50\nfine, up to 30 over is $150, and more than 30 over is $300. A speed or limit\nthat is zero or negative is invalid and returns -1.",
+    "canonical_inputs": [
+      [
+        70,
+        60
+      ],
+      [
+        80,
+        60
+      ],
+      [
+        0,
+        60
+      ],
+      [
+        50,
+        60
+      ],
+      [
+        100,
+        60
+      ],
+      [
+        65,
+        60
+      ]
+    ],
+    "reference_file": "fixtures/speeding_fine/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Being exactly 10 over lands in the higher tier (uses < instead of <=).",
+        "fault_type": "boundary",
+        "file": "fixtures/speeding_fine/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "The middle fine is $100 instead of $150.",
+        "fault_type": "wrong_constant",
+        "file": "fixtures/speeding_fine/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Skips the invalid speed/limit check.",
+        "fault_type": "missing_condition",
+        "file": "fixtures/speeding_fine/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Adds speed and limit instead of subtracting.",
+        "fault_type": "wrong_operator",
+        "file": "fixtures/speeding_fine/mutants/m4.py"
+      }
+    ]
+  },
+  {
+    "slug": "leap_year",
+    "title": "Leap-year check",
+    "entrypoint": "leap_year",
+    "signature": "leap_year(year: int) -> str",
+    "params": [
+      {
+        "name": "year",
+        "type": "int",
+        "note": "the year to test"
+      }
+    ],
+    "requirement": "As a calendar utility, I want to tell whether a year is a leap year.\n\nA year is a leap year if it is divisible by 4, except that century years are\nnot leap years unless they are also divisible by 400. A year of zero or less\nis invalid. Return \"leap\", \"common\", or \"invalid\".",
+    "canonical_inputs": [
+      [
+        2000
+      ],
+      [
+        2004
+      ],
+      [
+        0
+      ],
+      [
+        1900
+      ],
+      [
+        2001
+      ],
+      [
+        2100
+      ]
+    ],
+    "reference_file": "fixtures/leap_year/reference.py",
+    "mutants": [
+      {
+        "key": "m1",
+        "description": "Drops the divisible-by-400 exception, so 2000 looks common.",
+        "fault_type": "missing_condition",
+        "file": "fixtures/leap_year/mutants/m1.py"
+      },
+      {
+        "key": "m2",
+        "description": "Tests divisibility by 5 instead of 4.",
+        "fault_type": "wrong_constant",
+        "file": "fixtures/leap_year/mutants/m2.py"
+      },
+      {
+        "key": "m3",
+        "description": "Treats year 0 as valid (uses < instead of <=).",
+        "fault_type": "boundary",
+        "file": "fixtures/leap_year/mutants/m3.py"
+      },
+      {
+        "key": "m4",
+        "description": "Flips the century test, so ordinary century rules invert.",
+        "fault_type": "wrong_operator",
+        "file": "fixtures/leap_year/mutants/m4.py"
       }
     ]
   }

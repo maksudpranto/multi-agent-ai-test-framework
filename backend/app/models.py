@@ -583,6 +583,10 @@ class BenchmarkMutant(Base):
     )
     mutant_key: Mapped[str] = mapped_column(String(50))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The fault class this seeded bug represents (boundary / wrong_constant /
+    # wrong_operator / missing_condition / control_flow), from the corpus'
+    # FAULT_TYPES taxonomy. Lets the evaluation report fault detection by class.
+    fault_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
     code: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

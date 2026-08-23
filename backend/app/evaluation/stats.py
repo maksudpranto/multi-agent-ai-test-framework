@@ -147,6 +147,7 @@ _SUMMARY_METRICS = [
     M.ROUNDS_TO_CONSENSUS,
     M.TOKENS_TOTAL,
     M.LATENCY_MS_TOTAL,
+    M.FAULTS_PER_1K_TOKENS,
 ]
 
 
@@ -188,6 +189,58 @@ def _cells(
         by_run.setdefault(row.pipeline_run_id, {})[row.metric_name] = row.metric_value
 
     return {cell: by_run.get(run.id, {}) for cell, run in run_by_cell.items()}
+
+
+def fault_type_breakdown(db: Session, experiment_id: int) -> dict[str, Any]:
+    """Fault detection broken down by fault class, per condition.
+
+    Reads each completed run's ``eval_detail['by_fault_type']`` (killed/total per
+    fault class, written by the harness) and sums it over every item and
+    repetition of each condition. The result answers a sharper question than the
+    single mutation score: *which kinds of bug* does each arm catch — e.g. does
+    the multi-agent suite close the boundary/edge-case gap the baseline leaves
+    open?"""
+    from app.benchmark.corpus import FAULT_TAXONOMY  # local: avoid import cycle
+
+    runs = list(
+        db.scalars(
+            select(PipelineRun).where(
+                PipelineRun.experiment_id == experiment_id,
+                PipelineRun.status == RunStatus.completed,
+                PipelineRun.experiment_condition.is_not(None),
+            )
+        )
+    )
+    # condition -> fault_type -> {killed, total}
+    agg: dict[str, dict[str, dict[str, int]]] = {}
+    for run in runs:
+        detail = run.eval_detail or {}
+        # Only count cells where the oracle actually ran.
+        if not detail.get("suite_valid"):
+            continue
+        by_ft = detail.get("by_fault_type") or {}
+        cond = agg.setdefault(run.experiment_condition, {})
+        for ft, cnt in by_ft.items():
+            bucket = cond.setdefault(ft, {"killed": 0, "total": 0})
+            bucket["killed"] += int(cnt.get("killed", 0))
+            bucket["total"] += int(cnt.get("total", 0))
+
+    by_condition: dict[str, dict[str, Any]] = {}
+    for cond_key, per_ft in agg.items():
+        rows = {}
+        for ft, c in per_ft.items():
+            total = c["total"]
+            rows[ft] = {
+                "killed": c["killed"],
+                "total": total,
+                "rate": round(c["killed"] / total, 4) if total else None,
+            }
+        by_condition[cond_key] = rows
+
+    return {
+        "legend": [dict(f) for f in FAULT_TAXONOMY],
+        "by_condition": by_condition,
+    }
 
 
 def _valid_score(values: dict[str, float]) -> bool:
@@ -335,6 +388,7 @@ def aggregate_experiment(db: Session, experiment_id: int) -> dict[str, Any]:
         "conditions": condition_out,
         "comparisons": comparisons,
         "headline": headline,
+        "fault_types": fault_type_breakdown(db, experiment_id),
     }
 
 

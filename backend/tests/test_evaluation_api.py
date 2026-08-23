@@ -84,14 +84,14 @@ def test_full_evaluation_flow(client):
     r = client.post("/evaluation/benchmark/seed")
     assert r.status_code == 200
     seed = r.json()
-    assert seed["n_items"] == 8
+    assert seed["n_items"] == 16
     dataset_id = seed["dataset_id"]
 
     # List items.
     r = client.get(f"/evaluation/datasets/{dataset_id}/items")
     assert r.status_code == 200
     items = r.json()
-    assert len(items) == 8
+    assert len(items) == 16
     assert all(it["n_mutants"] == 4 for it in items)
     a_requirement = items[0]["requirement_id"]
 
@@ -115,20 +115,35 @@ def test_full_evaluation_flow(client):
     assert r.status_code == 200
     stat = r.json()
     assert stat["experiment"]["status"] == "completed"
-    assert stat["progress"]["completed"] == stat["progress"]["total"] == 16  # 8 items x 2
+    assert stat["progress"]["completed"] == stat["progress"]["total"] == 32  # 16 items x 2
 
     # Results with pairwise significance.
     r = client.get(f"/evaluation/experiments/{exp_id}/results")
     assert r.status_code == 200
     results = r.json()
-    assert results["n_items"] == 8
+    assert results["n_items"] == 16
     assert {c["key"] for c in results["conditions"]} == {"single_llm", "full_pipeline"}
     assert len(results["comparisons"]) == 1
     comp = results["comparisons"][0]
     assert comp["condition"] == "full_pipeline"
-    assert comp["n_pairs"] == 8
+    assert comp["n_pairs"] == 16
     assert 0.0 <= comp["p_value"] <= 1.0
     assert results["headline"]["available"] is True
+
+    # Fault-type breakdown: the taxonomy legend plus per-condition kill counts.
+    ft = results["fault_types"]
+    assert {f["key"] for f in ft["legend"]} == {
+        "boundary", "wrong_constant", "wrong_operator", "missing_condition", "control_flow",
+    }
+    for cond_key in ("single_llm", "full_pipeline"):
+        rows = ft["by_condition"][cond_key]
+        assert rows, f"no fault-type rows for {cond_key}"
+        for cls in rows.values():
+            assert 0 <= cls["killed"] <= cls["total"]
+
+    # Cost-effectiveness metric is reported per condition.
+    for c in results["conditions"]:
+        assert "faults_per_1k_tokens" in c["metrics"]
 
     # Drill-down for one item.
     r = client.get(f"/evaluation/experiments/{exp_id}/items/{a_requirement}")
@@ -138,6 +153,8 @@ def test_full_evaluation_flow(client):
     assert {c["condition"] for c in drill["conditions"]} == {"single_llm", "full_pipeline"}
     for cond in drill["conditions"]:
         assert "mutation_score" in cond["metrics"]
+    # Every seeded bug carries its fault class for the per-bug view.
+    assert all(m["fault_type"] for m in drill["item"]["mutants"])
 
 
 def test_rename_and_delete_experiment(client):
