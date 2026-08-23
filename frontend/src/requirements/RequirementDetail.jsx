@@ -1418,6 +1418,14 @@ function QualityMatrix({ quality, cases = [] }) {
   const flaggedRows = rows.filter((r) => r.flagged);
   const cleanRows = rows.filter((r) => !r.flagged);
 
+  const qTabs = [];
+  if (flaggedRows.length) qTabs.push(["flagged", "Needs a look", flaggedRows.length]);
+  if (cleanRows.length) qTabs.push(["clean", "Passed", cleanRows.length]);
+  qTabs.push(["all", "All", items.length]);
+  const [qf, setQf] = useState(flaggedRows.length ? "flagged" : "clean");
+  const showFlagged = (qf === "flagged" || qf === "all") && flaggedRows.length > 0;
+  const showClean = (qf === "clean" || qf === "all") && cleanRows.length > 0;
+
   return (
     <div className="coverage">
       <div className={`debate-outcome ${bannerTone}`}>
@@ -1440,9 +1448,21 @@ function QualityMatrix({ quality, cases = [] }) {
         </div>
       </div>
 
-      {flaggedRows.length > 0 && (
+      <div className="tc-tabs ql-tabs">
+        {qTabs.map(([key, label, n]) => (
+          <button
+            key={key}
+            className={qf === key ? "active" : ""}
+            onClick={() => setQf(key)}
+          >
+            {label} <span className="n">{n}</span>
+          </button>
+        ))}
+      </div>
+
+      {showFlagged && (
         <>
-          <p className="debate-intro">Needs a look — {flaggedRows.length}</p>
+          {qf === "all" && <p className="debate-intro">Needs a look — {flaggedRows.length}</p>}
           <ul className="ql-list">
             {flaggedRows.map((r) => (
               <li className={`ql-item ${r.it.duplicate_flag ? "dup" : ""}`} key={r.it.test_case_id}>
@@ -1466,12 +1486,11 @@ function QualityMatrix({ quality, cases = [] }) {
         </>
       )}
 
-      {cleanRows.length > 0 && (
+      {showClean && (
         <>
-          <p className="debate-intro">
-            {flaggedRows.length ? "Passed cleanly" : "Every test case passed"} —{" "}
-            {cleanRows.length} with no issues flagged
-          </p>
+          {qf === "all" && (
+            <p className="debate-intro">Passed cleanly — {cleanRows.length} with no issues flagged</p>
+          )}
           <ul className="ql-clean">
             {cleanRows.map((r) => (
               <li className="ql-crow" key={r.it.test_case_id}>
