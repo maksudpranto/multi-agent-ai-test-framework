@@ -3050,6 +3050,70 @@ input[type="file"]::file-selector-button:hover {
   margin: 16px 0 8px;
 }
 
+/* Review tab — plain-language outcome + metric tiles */
+.debate-outcome {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+.debate-outcome.ok { background: rgba(22, 163, 74, 0.08); border: 1px solid rgba(22, 163, 74, 0.22); }
+.debate-outcome.warn { background: rgba(217, 119, 6, 0.08); border: 1px solid rgba(217, 119, 6, 0.28); }
+.debate-outcome p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); }
+.dbo-ic {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: 14px; font-weight: 800; color: #fff;
+}
+.debate-outcome.ok .dbo-ic { background: var(--green); }
+.debate-outcome.warn .dbo-ic { background: var(--signal-yellow); }
+
+.debate-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.dbt {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.dbt b { font-size: 22px; font-weight: 740; line-height: 1; letter-spacing: -0.02em; }
+.dbt span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+.debate-clean {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  border: 1px dashed var(--border-strong);
+}
+.dbc-ic { font-size: 24px; line-height: 1; flex-shrink: 0; }
+.debate-clean b { display: block; font-size: 15px; margin-bottom: 4px; }
+.debate-clean p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary); max-width: 72ch; }
+
+.debate-intro { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.turn-role {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--accent); background: var(--accent-soft);
+  border-radius: 5px; padding: 1px 6px;
+}
+.turn-consensus .turn-role { color: #15803d; background: rgba(22, 163, 74, 0.1); }
+.turn-sub { font-size: 12.5px; color: var(--text-muted); margin-left: auto; }
+
 /* Export bar */
 .export-bar {
   display: flex;

@@ -1146,27 +1146,68 @@ function TestCaseTable({ cases, showTrace }) {
 
 function DebateTranscript({ debate }) {
   const rounds = [...new Set(debate.turns.map((t) => t.round))].sort((a, b) => a - b);
+  const findings = debate.total_findings;
+  const revisions = debate.revisions_made;
+  const clean = findings === 0;
+  const ok = clean || debate.consensus_reached;
+  const headline = clean
+    ? "The Reviewer checked every test case and raised no issues — the suite passed on the first look, so nothing was changed."
+    : `The Reviewer flagged ${findings} issue${findings === 1 ? "" : "s"}, and the Consensus agent made ${revisions} change${revisions === 1 ? "" : "s"} in response. ${
+        debate.consensus_reached
+          ? `They agreed after ${debate.rounds_used} round${debate.rounds_used === 1 ? "" : "s"}.`
+          : `The debate stopped at its ${debate.rounds_used}-round limit before fully agreeing.`
+      }`;
+
   return (
     <div className="debate">
-      <div className="debate-summary">
-        <span className={`badge ${debate.consensus_reached ? "badge-green" : "badge-red"}`}>
-          {debate.consensus_reached ? "Consensus reached" : "Max rounds hit"}
-        </span>
-        <span className="badge badge-grey">{debate.rounds_used} round(s)</span>
-        <span className="badge badge-grey">{debate.total_findings} finding(s)</span>
-        <span className="badge badge-grey">{debate.revisions_made} revision(s)</span>
+      <div className={`debate-outcome ${ok ? "ok" : "warn"}`}>
+        <span className="dbo-ic">{ok ? "✓" : "!"}</span>
+        <p>{headline}</p>
       </div>
 
-      {rounds.map((round) => (
-        <div className="debate-round" key={round}>
-          <div className="round-label">Round {round}</div>
-          {debate.turns
-            .filter((t) => t.round === round)
-            .map((turn) => (
-              <DebateTurn key={turn.id} turn={turn} />
-            ))}
+      <div className="debate-tiles">
+        <div className="dbt">
+          <b>{debate.rounds_used}</b>
+          <span>round{debate.rounds_used === 1 ? "" : "s"} of back-and-forth</span>
         </div>
-      ))}
+        <div className="dbt">
+          <b>{findings}</b>
+          <span>issue{findings === 1 ? "" : "s"} the Reviewer raised</span>
+        </div>
+        <div className="dbt">
+          <b>{revisions}</b>
+          <span>change{revisions === 1 ? "" : "s"} made to the suite</span>
+        </div>
+      </div>
+
+      {clean ? (
+        <div className="debate-clean">
+          <span className="dbc-ic" aria-hidden>🛡️</span>
+          <div>
+            <b>Nothing to fix</b>
+            <p>
+              The Reviewer read through the suite and was satisfied straight away.
+              When it spots weak, missing, or duplicate cases, they show up here as a
+              back-and-forth with the Consensus agent — who revises or adds cases in
+              response.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="debate-intro">The full exchange, round by round:</p>
+          {rounds.map((round) => (
+            <div className="debate-round" key={round}>
+              <div className="round-label">Round {round}</div>
+              {debate.turns
+                .filter((t) => t.round === round)
+                .map((turn) => (
+                  <DebateTurn key={turn.id} turn={turn} />
+                ))}
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -1174,15 +1215,19 @@ function DebateTranscript({ debate }) {
 function DebateTurn({ turn }) {
   const isReviewer = turn.speaker === "reviewer";
   const c = turn.content || {};
+  const sub = isReviewer
+    ? c.needs_revision
+      ? "flagged issues"
+      : "satisfied — no changes"
+    : c.resolutions?.length
+      ? "responded with changes"
+      : "no changes needed";
   return (
     <div className={`debate-turn ${isReviewer ? "turn-reviewer" : "turn-consensus"}`}>
       <div className="turn-head">
         <span className="speaker">{isReviewer ? "Reviewer" : "Consensus"}</span>
-        {isReviewer && (
-          <span className="muted">
-            {c.needs_revision ? "requested changes" : "satisfied — no changes"}
-          </span>
-        )}
+        <span className="turn-role">{isReviewer ? "critic" : "fixer"}</span>
+        <span className="turn-sub">{sub}</span>
       </div>
 
       {isReviewer &&
