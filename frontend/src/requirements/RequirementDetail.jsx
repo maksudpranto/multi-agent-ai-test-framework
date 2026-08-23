@@ -1316,38 +1316,33 @@ function CoverageMatrix({ coverage }) {
         </div>
       </div>
 
-      <p className="debate-intro">Which tests verify each acceptance criterion:</p>
-      <table className="coverage-table">
-        <thead>
-          <tr>
-            <th>Acceptance criterion</th>
-            <th>Status</th>
-            <th>Verified by</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((it) => {
-            const n = it.covering_test_case_ids.length;
-            return (
-              <tr key={it.acceptance_criterion_id} className={it.covered ? "" : "cov-gap"}>
-                <td>{it.criterion_text}</td>
-                <td>
-                  <span className={`badge ${it.covered ? "badge-green" : "badge-red"}`}>
-                    {it.covered ? "covered" : "gap"}
-                  </span>
-                </td>
-                <td>
-                  {n ? (
-                    `${n} test${n === 1 ? "" : "s"}`
-                  ) : (
-                    <span className="muted">{it.gap_notes || "no test yet"}</span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <p className="debate-intro">Each acceptance criterion, and the tests that verify it:</p>
+      <ul className="cov-list">
+        {items.map((it, idx) => {
+          const n = it.covering_test_case_ids.length;
+          return (
+            <li className={`cov-item ${it.covered ? "" : "gap"}`} key={it.acceptance_criterion_id}>
+              <span className={`cov-check ${it.covered ? "ok" : "gap"}`} aria-hidden>
+                {it.covered ? "✓" : "!"}
+              </span>
+              <div className="cov-body">
+                <div className="cov-crit">
+                  <code className="cov-ac">AC{idx + 1}</code>
+                  <span>{it.criterion_text}</span>
+                </div>
+                {!it.covered && (
+                  <div className="cov-note">
+                    {it.gap_notes || "No test verifies this criterion yet."}
+                  </div>
+                )}
+              </div>
+              <span className={`cov-tests ${it.covered ? "" : "none"}`}>
+                {n ? `${n} test${n === 1 ? "" : "s"}` : "no test"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
