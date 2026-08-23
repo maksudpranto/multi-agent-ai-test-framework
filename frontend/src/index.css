@@ -3053,24 +3053,37 @@ input[type="file"]::file-selector-button:hover {
 /* Review tab — plain-language outcome + metric tiles */
 .debate-outcome {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  margin-bottom: 14px;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 12px 30px -18px rgba(20, 22, 40, 0.4);
 }
-.debate-outcome.ok { background: rgba(22, 163, 74, 0.08); border: 1px solid rgba(22, 163, 74, 0.22); }
-.debate-outcome.warn { background: rgba(217, 119, 6, 0.08); border: 1px solid rgba(217, 119, 6, 0.28); }
-.debate-outcome p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); }
+.debate-outcome.ok {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(16, 185, 129, 0.03) 55%, var(--surface) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+.debate-outcome.warn {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0.04) 55%, var(--surface) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.debate-outcome p { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--text); }
 .dbo-ic {
   flex-shrink: 0;
-  width: 26px; height: 26px;
+  width: 34px; height: 34px;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  font-size: 14px; font-weight: 800; color: #fff;
+  border-radius: 11px;
+  font-size: 16px; font-weight: 800; color: #fff;
 }
-.debate-outcome.ok .dbo-ic { background: var(--green); }
-.debate-outcome.warn .dbo-ic { background: var(--signal-yellow); }
+.debate-outcome.ok .dbo-ic {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 6px 14px -4px rgba(5, 150, 105, 0.55);
+}
+.debate-outcome.warn .dbo-ic {
+  background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+  box-shadow: 0 6px 14px -4px rgba(217, 119, 6, 0.5);
+}
 
 .debate-tiles {
   display: flex;
@@ -3175,6 +3188,25 @@ input[type="file"]::file-selector-button:hover {
   background: var(--surface);
 }
 .ql-item.dup { border-color: rgba(217, 119, 6, 0.35); background: rgba(217, 119, 6, 0.04); }
+
+/* Premium "Needs a look" cards — refined rose, soft accent + elevation */
+.ql-list.needs .ql-item {
+  border-color: rgba(244, 63, 94, 0.22);
+  border-left: 3px solid #f43f5e;
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(244, 63, 94, 0.015) 55%, var(--surface) 100%);
+  box-shadow: 0 10px 26px -18px rgba(190, 30, 70, 0.55);
+}
+.ql-list.needs .ql-item.dup {
+  border-color: rgba(244, 63, 94, 0.3);
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.13) 0%, rgba(244, 63, 94, 0.03) 60%, var(--surface) 100%);
+}
+.ql-list.needs .ql-dup {
+  color: #fff;
+  background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+  border: 1px solid transparent;
+  box-shadow: 0 4px 10px -3px rgba(225, 29, 72, 0.5);
+}
+
 .ql-main { flex: 1; min-width: 220px; }
 .ql-title-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ql-title { font-size: 14px; font-weight: 560; color: var(--text); line-height: 1.4; }

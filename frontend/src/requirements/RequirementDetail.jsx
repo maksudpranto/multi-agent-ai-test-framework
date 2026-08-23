@@ -1481,7 +1481,7 @@ function QualityMatrix({ quality, cases = [] }) {
 
       {/* Needs a look — flagged cases only (chips only when actually imperfect) */}
       {qf === "flagged" && (
-        <ul className="ql-list">
+        <ul className="ql-list needs">
           {flaggedRows.map((r) => (
             <li className={`ql-item ${r.it.duplicate_flag ? "dup" : ""}`} key={r.it.test_case_id}>
               <div className="ql-main">
