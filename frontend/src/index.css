@@ -3210,6 +3210,36 @@ input[type="file"]::file-selector-button:hover {
   .ql-scores { width: 100%; }
   .qscore { flex: 1; }
 }
+
+/* Passed cases — compact one-line list */
+.ql-clean {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+}
+.ql-crow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+}
+.ql-crow + .ql-crow { border-top: 1px solid var(--divider); }
+.ql-crow-ic {
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+  font-size: 11px; font-weight: 800;
+}
+.ql-crow-title { font-size: 13.5px; color: var(--text); line-height: 1.4; }
+.debate-intro + .ql-list, .debate-intro + .ql-clean { margin-top: 8px; }
+.ql-clean + .debate-intro, .ql-list + .debate-intro { margin-top: 20px; }
 .turn-role {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--accent); background: var(--accent-soft);

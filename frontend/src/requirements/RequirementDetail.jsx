@@ -1392,6 +1392,32 @@ function QualityMatrix({ quality, cases = [] }) {
       ? ` ${dups} possible duplicate${dups === 1 ? "" : "s"} flagged to review.`
       : " No duplicates found.");
 
+  // Split cases into the few that need attention (a duplicate, or a sub-100
+  // score) and the rest that passed cleanly — so the page leads with what
+  // matters instead of 15 identical "100%" cards.
+  const rows = items.map((it) => {
+    const clarity = scorePct(it.clarity_score);
+    const atomicity = scorePct(it.atomicity_score);
+    const traceability = scorePct(it.traceability_score);
+    const nums = [clarity, atomicity, traceability].filter((v) => v != null);
+    const minV = nums.length ? Math.min(...nums) : null;
+    const imperfect = minV != null && minV < 100;
+    const weak = minV != null && minV < 90;
+    const flagged = it.duplicate_flag || weak;
+    const genericNote = it.notes && /well[-\s]?formed/i.test(it.notes);
+    let note = null;
+    if (it.duplicate_flag) {
+      note = it.notes
+        ? humanizeDupNote(it.notes, byId)
+        : "Flagged as a possible duplicate of another test case.";
+    } else if (it.notes && !genericNote) {
+      note = it.notes;
+    }
+    return { it, clarity, atomicity, traceability, flagged, imperfect, note };
+  });
+  const flaggedRows = rows.filter((r) => r.flagged);
+  const cleanRows = rows.filter((r) => !r.flagged);
+
   return (
     <div className="coverage">
       <div className={`debate-outcome ${bannerTone}`}>
@@ -1414,36 +1440,48 @@ function QualityMatrix({ quality, cases = [] }) {
         </div>
       </div>
 
-      <p className="debate-intro">How each test case scored:</p>
-      <ul className="ql-list">
-        {items.map((it) => {
-          const genericNote = it.notes && /well[-\s]?formed/i.test(it.notes);
-          let note = null;
-          if (it.duplicate_flag) {
-            note = it.notes
-              ? humanizeDupNote(it.notes, byId)
-              : "Flagged as a possible duplicate of another test case.";
-          } else if (it.notes && !genericNote) {
-            note = it.notes;
-          }
-          return (
-            <li className={`ql-item ${it.duplicate_flag ? "dup" : ""}`} key={it.test_case_id}>
-              <div className="ql-main">
-                <div className="ql-title-line">
-                  <span className="ql-title">{it.title}</span>
-                  {it.duplicate_flag && <span className="ql-dup">possible duplicate</span>}
+      {flaggedRows.length > 0 && (
+        <>
+          <p className="debate-intro">Needs a look — {flaggedRows.length}</p>
+          <ul className="ql-list">
+            {flaggedRows.map((r) => (
+              <li className={`ql-item ${r.it.duplicate_flag ? "dup" : ""}`} key={r.it.test_case_id}>
+                <div className="ql-main">
+                  <div className="ql-title-line">
+                    <span className="ql-title">{r.it.title}</span>
+                    {r.it.duplicate_flag && <span className="ql-dup">possible duplicate</span>}
+                  </div>
+                  {r.note && <div className="ql-note">{r.note}</div>}
                 </div>
-                {note && <div className="ql-note">{note}</div>}
-              </div>
-              <div className="ql-scores">
-                <QScore label="Clarity" pct={scorePct(it.clarity_score)} />
-                <QScore label="Atomicity" pct={scorePct(it.atomicity_score)} />
-                <QScore label="Traceability" pct={scorePct(it.traceability_score)} />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                {r.imperfect && (
+                  <div className="ql-scores">
+                    <QScore label="Clarity" pct={r.clarity} />
+                    <QScore label="Atomicity" pct={r.atomicity} />
+                    <QScore label="Traceability" pct={r.traceability} />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {cleanRows.length > 0 && (
+        <>
+          <p className="debate-intro">
+            {flaggedRows.length ? "Passed cleanly" : "Every test case passed"} —{" "}
+            {cleanRows.length} with no issues flagged
+          </p>
+          <ul className="ql-clean">
+            {cleanRows.map((r) => (
+              <li className="ql-crow" key={r.it.test_case_id}>
+                <span className="ql-crow-ic" aria-hidden>✓</span>
+                <span className="ql-crow-title">{r.it.title}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
