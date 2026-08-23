@@ -1348,55 +1348,76 @@ function CoverageMatrix({ coverage }) {
 }
 
 function scorePct(v) {
-  return v == null ? "—" : `${Math.round(v * 100)}%`;
+  return v == null ? null : Math.round(v * 100);
+}
+
+// A small labelled score chip, coloured by how good the score is.
+function QScore({ label, pct }) {
+  const tone = pct == null ? "na" : pct >= 80 ? "ok" : pct >= 50 ? "warn" : "bad";
+  return (
+    <span className={`qscore ${tone}`} title={label}>
+      <b>{pct == null ? "—" : `${pct}%`}</b>
+      <span>{label}</span>
+    </span>
+  );
 }
 
 function QualityMatrix({ quality }) {
   const items = quality.items || [];
   const overall = Math.round((quality.overall_score || 0) * 100);
+  const dups = quality.duplicate_count || 0;
+  const good = overall >= 70;
+  const bannerTone = good && dups === 0 ? "ok" : "warn";
+  const headline =
+    `${good ? "The suite scores well" : "The suite scores below the bar"} — ${overall}% overall: the tests are clear, focused (one thing each), and traceable.` +
+    (dups
+      ? ` ${dups} possible duplicate${dups === 1 ? "" : "s"} flagged to review.`
+      : " No duplicates found.");
+
   return (
     <div className="coverage">
-      <div className="debate-summary">
-        <span className={`badge ${overall >= 70 ? "badge-green" : "badge-red"}`}>
-          {overall}% overall quality
-        </span>
-        <span className="badge badge-grey">{quality.total} case(s)</span>
-        <span className={`badge ${quality.duplicate_count ? "badge-red" : "badge-grey"}`}>
-          {quality.duplicate_count} duplicate(s)
-        </span>
+      <div className={`debate-outcome ${bannerTone}`}>
+        <span className="dbo-ic">{bannerTone === "ok" ? "✓" : "!"}</span>
+        <p>{headline}</p>
       </div>
-      <table className="coverage-table">
-        <thead>
-          <tr>
-            <th>Test case</th>
-            <th>Clarity</th>
-            <th>Atomicity</th>
-            <th>Traceability</th>
-            <th>Dup?</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((it) => (
-            <tr key={it.test_case_id}>
-              <td>
-                <span className="muted">#{it.test_case_id}</span> {it.title}
-              </td>
-              <td>{scorePct(it.clarity_score)}</td>
-              <td>{scorePct(it.atomicity_score)}</td>
-              <td>{scorePct(it.traceability_score)}</td>
-              <td>
-                {it.duplicate_flag ? (
-                  <span className="badge badge-red">dup</span>
-                ) : (
-                  <span className="muted">—</span>
-                )}
-              </td>
-              <td className="muted">{it.notes}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+
+      <div className="debate-tiles">
+        <div className="dbt">
+          <b>{overall}%</b>
+          <span>overall quality score</span>
+        </div>
+        <div className="dbt">
+          <b>{quality.total}</b>
+          <span>test cases scored</span>
+        </div>
+        <div className="dbt">
+          <b>{dups}</b>
+          <span>possible duplicate{dups === 1 ? "" : "s"}</span>
+        </div>
+      </div>
+
+      <p className="debate-intro">How each test case scored:</p>
+      <ul className="ql-list">
+        {items.map((it) => {
+          const genericNote = it.notes && /well[-\s]?formed/i.test(it.notes);
+          return (
+            <li className={`ql-item ${it.duplicate_flag ? "dup" : ""}`} key={it.test_case_id}>
+              <div className="ql-main">
+                <div className="ql-title-line">
+                  <span className="ql-title">{it.title}</span>
+                  {it.duplicate_flag && <span className="ql-dup">possible duplicate</span>}
+                </div>
+                {it.notes && !genericNote && <div className="ql-note">{it.notes}</div>}
+              </div>
+              <div className="ql-scores">
+                <QScore label="Clarity" pct={scorePct(it.clarity_score)} />
+                <QScore label="Atomicity" pct={scorePct(it.atomicity_score)} />
+                <QScore label="Traceability" pct={scorePct(it.traceability_score)} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

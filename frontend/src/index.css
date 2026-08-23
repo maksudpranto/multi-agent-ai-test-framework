@@ -3160,6 +3160,55 @@ input[type="file"]::file-selector-button:hover {
 @media (max-width: 560px) {
   .cov-tests { align-self: flex-start; }
 }
+
+/* Quality tab — per-case scores */
+.ql-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ql-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+}
+.ql-item.dup { border-color: rgba(217, 119, 6, 0.35); background: rgba(217, 119, 6, 0.04); }
+.ql-main { flex: 1; min-width: 220px; }
+.ql-title-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ql-title { font-size: 14px; font-weight: 560; color: var(--text); line-height: 1.4; }
+.ql-dup {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--signal-yellow); background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.28); border-radius: 5px; padding: 1px 6px;
+}
+.ql-note { margin-top: 5px; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
+.ql-scores { display: flex; gap: 8px; flex-shrink: 0; }
+.qscore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 62px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+}
+.qscore b { font-size: 14px; font-weight: 730; line-height: 1; }
+.qscore span { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.qscore.ok { background: rgba(22, 163, 74, 0.08); border-color: rgba(22, 163, 74, 0.22); }
+.qscore.ok b { color: #15803d; }
+.qscore.warn { background: rgba(217, 119, 6, 0.08); border-color: rgba(217, 119, 6, 0.25); }
+.qscore.warn b { color: var(--signal-yellow); }
+.qscore.bad { background: rgba(220, 38, 38, 0.08); border-color: rgba(220, 38, 38, 0.25); }
+.qscore.bad b { color: var(--crimson); }
+
+@media (max-width: 560px) {
+  .ql-scores { width: 100%; }
+  .qscore { flex: 1; }
+}
 .turn-role {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--accent); background: var(--accent-soft);
