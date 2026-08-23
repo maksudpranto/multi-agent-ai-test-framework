@@ -3230,38 +3230,40 @@ input[type="file"]::file-selector-button:hover {
   .qscore { flex: 1; }
 }
 
-/* Passed cases — compact one-line list */
-.ql-clean {
+/* Looks-good cases — light grid of check-tiles */
+.ql-pass {
   list-style: none;
   margin: 8px 0 0;
-  padding: 6px 4px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: var(--surface);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
 }
-.ql-crow {
+.ql-pass-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px;
-  border-radius: 8px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.05) 0%, var(--surface) 60%);
 }
-.ql-crow + .ql-crow { border-top: 1px solid var(--divider); }
-.ql-crow-ic {
+.ql-pass-ic {
   flex-shrink: 0;
-  width: 18px; height: 18px;
+  width: 20px; height: 20px;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%;
-  background: rgba(22, 163, 74, 0.12);
-  color: #15803d;
+  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+  color: #fff;
   font-size: 11px; font-weight: 800;
+  box-shadow: 0 3px 8px -3px rgba(5, 150, 105, 0.5);
 }
-.ql-crow-title { font-size: 13.5px; color: var(--text); line-height: 1.4; }
-.debate-intro + .ql-list, .debate-intro + .ql-clean { margin-top: 8px; }
-.ql-clean + .debate-intro, .ql-list + .debate-intro { margin-top: 20px; }
+.ql-pass-title { font-size: 13px; color: var(--text); line-height: 1.4; }
+.debate-intro + .ql-list, .debate-intro + .ql-pass { margin-top: 8px; }
+.ql-pass + .debate-intro, .ql-list + .debate-intro { margin-top: 20px; }
 .ql-tabs { margin: 4px 0 12px; }
 .tc-tabs.ql-tabs button { text-transform: none; }
-.ql-tabs + .ql-list, .ql-tabs + .ql-clean { margin-top: 0; }
+.ql-tabs + .ql-list, .ql-tabs + .ql-pass { margin-top: 0; }
 .turn-role {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--accent); background: var(--accent-soft);

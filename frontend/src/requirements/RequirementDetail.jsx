@@ -1420,7 +1420,7 @@ function QualityMatrix({ quality, cases = [] }) {
 
   const qTabs = [["all", "All", items.length]];
   if (flaggedRows.length) qTabs.push(["flagged", "Needs a look", flaggedRows.length]);
-  if (cleanRows.length) qTabs.push(["clean", "Passed", cleanRows.length]);
+  if (cleanRows.length) qTabs.push(["clean", "Looks good", cleanRows.length]);
   const [qf, setQf] = useState("all");
 
   return (
@@ -1503,13 +1503,13 @@ function QualityMatrix({ quality, cases = [] }) {
         </ul>
       )}
 
-      {/* Passed — compact one-line checklist */}
+      {/* Looks good — clean cases as a light grid of check-tiles */}
       {qf === "clean" && (
-        <ul className="ql-clean">
+        <ul className="ql-pass">
           {cleanRows.map((r) => (
-            <li className="ql-crow" key={r.it.test_case_id}>
-              <span className="ql-crow-ic" aria-hidden>✓</span>
-              <span className="ql-crow-title">{r.it.title}</span>
+            <li className="ql-pass-item" key={r.it.test_case_id}>
+              <span className="ql-pass-ic" aria-hidden>✓</span>
+              <span className="ql-pass-title">{r.it.title}</span>
             </li>
           ))}
         </ul>
