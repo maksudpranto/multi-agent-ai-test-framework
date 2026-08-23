@@ -874,7 +874,7 @@ export default function RequirementDetail() {
                 Evaluate quality to score the suite and detect duplicates.
               </p>
             ) : (
-              <QualityMatrix quality={quality} />
+              <QualityMatrix quality={quality} cases={multiCases} />
             )}
           </section>
         )}
@@ -1362,8 +1362,26 @@ function QScore({ label, pct }) {
   );
 }
 
-function QualityMatrix({ quality }) {
+// The duplicate note is free text that references other cases by their internal
+// id (e.g. "overlaps with test case 2456"). Users never see those ids, so we
+// swap any id that matches a case in the suite for that case's title — turning
+// the note into something actionable ("overlaps with 'Attempt login…'").
+function humanizeDupNote(note, byId) {
+  if (!note) return note;
+  const parts = note.split(/(\d+)/);
+  return parts.map((p, i) =>
+    /^\d+$/.test(p) && byId[Number(p)] ? (
+      <b key={i} className="ql-ref">“{byId[Number(p)]}”</b>
+    ) : (
+      <span key={i}>{p}</span>
+    )
+  );
+}
+
+function QualityMatrix({ quality, cases = [] }) {
   const items = quality.items || [];
+  const byId = {};
+  for (const c of cases) byId[c.id] = c.title;
   const overall = Math.round((quality.overall_score || 0) * 100);
   const dups = quality.duplicate_count || 0;
   const good = overall >= 70;
@@ -1400,6 +1418,14 @@ function QualityMatrix({ quality }) {
       <ul className="ql-list">
         {items.map((it) => {
           const genericNote = it.notes && /well[-\s]?formed/i.test(it.notes);
+          let note = null;
+          if (it.duplicate_flag) {
+            note = it.notes
+              ? humanizeDupNote(it.notes, byId)
+              : "Flagged as a possible duplicate of another test case.";
+          } else if (it.notes && !genericNote) {
+            note = it.notes;
+          }
           return (
             <li className={`ql-item ${it.duplicate_flag ? "dup" : ""}`} key={it.test_case_id}>
               <div className="ql-main">
@@ -1407,7 +1433,7 @@ function QualityMatrix({ quality }) {
                   <span className="ql-title">{it.title}</span>
                   {it.duplicate_flag && <span className="ql-dup">possible duplicate</span>}
                 </div>
-                {it.notes && !genericNote && <div className="ql-note">{it.notes}</div>}
+                {note && <div className="ql-note">{note}</div>}
               </div>
               <div className="ql-scores">
                 <QScore label="Clarity" pct={scorePct(it.clarity_score)} />

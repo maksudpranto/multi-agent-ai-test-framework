@@ -3183,7 +3183,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--signal-yellow); background: rgba(217, 119, 6, 0.1);
   border: 1px solid rgba(217, 119, 6, 0.28); border-radius: 5px; padding: 1px 6px;
 }
-.ql-note { margin-top: 5px; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
+.ql-note { margin-top: 5px; font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+.ql-ref { color: var(--text); font-weight: 640; }
 .ql-scores { display: flex; gap: 8px; flex-shrink: 0; }
 .qscore {
   display: flex;
