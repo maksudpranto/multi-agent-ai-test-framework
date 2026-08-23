@@ -916,11 +916,9 @@ export default function RequirementDetail() {
 }
 
 const EXPORT_FORMATS = [
-  { fmt: "json", label: "JSON" },
-  { fmt: "csv", label: "CSV" },
-  { fmt: "md", label: "Markdown" },
-  { fmt: "xlsx", label: "Excel" },
   { fmt: "pdf", label: "PDF" },
+  { fmt: "xlsx", label: "Excel" },
+  { fmt: "md", label: "Markdown" },
 ];
 
 const TYPE_CHIP = {
