@@ -385,6 +385,9 @@ def aggregate_experiment(db: Session, experiment_id: int) -> dict[str, Any]:
         "experiment_id": experiment_id,
         "n_items": len(requirement_ids),
         "n_reps": len(reps_present),
+        # The programs that actually ran (a quick run covers only a subset), so
+        # the drill-down lists exactly what was evaluated.
+        "ran_requirement_ids": requirement_ids,
         "conditions": condition_out,
         "comparisons": comparisons,
         "headline": headline,

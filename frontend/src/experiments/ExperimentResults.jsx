@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import BarChart from "./charts/BarChart";
 import GroupedBarChart from "./charts/GroupedBarChart";
 import { conditionColor, METRIC_COLOR } from "./charts/palette";
-import { downloadCsv, svgToPng } from "./charts/chartExport";
+import { downloadCsv } from "./charts/chartExport";
 
 // --- metric display metadata ------------------------------------------------
 const pct01 = (v) => `${Math.round((v ?? 0) * 100)}%`;
@@ -13,25 +12,32 @@ const int0 = (v) => Math.round(v ?? 0).toLocaleString();
 const ms = (v) => `${Math.round((v ?? 0) / 100) / 10}s`;
 
 const METRICS = [
-  { key: "mutation_score", label: "Fault detection", fmt: pct01, better: "high",
-    tip: "Mutation score — the share of seeded bugs the generated suite actually caught. The headline result." },
-  { key: "coverage_pct", label: "Coverage", fmt: (v) => `${Math.round(v ?? 0)}%`, better: "high",
-    tip: "Percent of acceptance criteria with at least one tracing test case." },
-  { key: "quality_score", label: "Quality", fmt: num2, better: "high",
-    tip: "Mean of clarity, atomicity and traceability (0–1), judged by the Quality agent." },
-  { key: "n_test_cases", label: "Test cases", fmt: (v) => int0(v), better: "high",
-    tip: "Average number of test cases in the suite." },
-  { key: "duplicate_rate", label: "Duplicates", fmt: pct01, better: "low",
-    tip: "Fraction of near-duplicate cases — lower is better." },
-  { key: "rounds_to_consensus", label: "Debate rounds", fmt: num2, better: "none",
-    tip: "Reviewer⇄Consensus rounds used before agreement." },
-  { key: "tokens_total", label: "Tokens", fmt: int0, better: "none",
-    tip: "Total tokens spent per run (cost)." },
-  { key: "faults_per_1k_tokens", label: "Bugs / 1k tokens", fmt: num2, better: "high",
-    tip: "Cost-effectiveness: seeded bugs caught per 1,000 tokens spent. Multi-agent catches more bugs but spends more tokens — this is the honest 'is it worth the cost?' trade-off." },
-  { key: "latency_ms_total", label: "Latency", fmt: ms, better: "none",
-    tip: "Total wall-clock time per run." },
+  { key: "mutation_score", label: "Bugs caught", fmt: pct01, better: "high",
+    tip: "The share of the planted bugs this approach's tests actually caught — the headline result." },
+  { key: "coverage_pct", label: "Rules covered", fmt: (v) => `${Math.round(v ?? 0)}%`, better: "high",
+    tip: "The share of the requirement's rules that have at least one test." },
+  { key: "quality_score", label: "Test quality", fmt: num2, better: "high",
+    tip: "How clear, focused and well-linked the tests are (0–1), judged by the Quality agent." },
+  { key: "n_test_cases", label: "Tests written", fmt: (v) => int0(v), better: "high",
+    tip: "How many test cases the suite contains." },
+  { key: "duplicate_rate", label: "Duplicate tests", fmt: pct01, better: "low",
+    tip: "The share of tests that are near-duplicates of another — lower is better." },
+  { key: "rounds_to_consensus", label: "Self-review rounds", fmt: num2, better: "none",
+    tip: "How many rounds of critique-and-fix the agents ran before agreeing. Only the agent team does this." },
+  { key: "tokens_total", label: "Tokens used", fmt: int0, better: "none",
+    tip: "How much work the AI did, measured in tokens — the main cost." },
+  { key: "faults_per_1k_tokens", label: "Bugs per 1k tokens", fmt: num2, better: "high",
+    tip: "Bugs caught for every 1,000 tokens spent — the 'is it worth the cost?' number." },
+  { key: "latency_ms_total", label: "Time per run", fmt: ms, better: "none",
+    tip: "How long one run took." },
 ];
+
+// Grouped for the metric table so related numbers sit together.
+const METRIC_GROUPS = [
+  { title: "How good are the tests?", keys: ["mutation_score", "coverage_pct", "quality_score", "duplicate_rate", "n_test_cases"] },
+  { title: "What did it cost?", keys: ["rounds_to_consensus", "tokens_total", "faults_per_1k_tokens", "latency_ms_total"] },
+];
+const METRIC_BY_KEY = Object.fromEntries(METRICS.map((m) => [m.key, m]));
 
 // Plain-language names for the fault taxonomy (mirrors the backend corpus).
 const FAULT_LABELS = {
@@ -68,13 +74,228 @@ function winnerKey(conditions, metric) {
   return best?.key ?? null;
 }
 
+// The agent team's pipeline — shown so the reader sees this is agent-based, not
+// one monolithic prompt. Each stage is a specialised agent with one job.
+const AGENT_STAGES = [
+  { name: "Analyst", note: "reads the requirement" },
+  { name: "Generator", note: "writes the tests" },
+  { name: "Reviewer ⇄ Consensus", note: "debate & fix", debate: true },
+  { name: "Coverage", note: "checks every rule is tested" },
+  { name: "Quality", note: "flags weak / duplicate tests" },
+];
+
+// Classify a condition as the single-AI baseline or an agent team (full or
+// ablated), so the page can label the two contenders in plain language.
+function conditionKind(c) {
+  if (c.is_baseline) return { team: false, tag: "Single AI", sub: "one AI, one prompt" };
+  if (/ablation|no[_-]?debate/i.test(c.key)) return { team: true, tag: "Agent team", sub: "no self-review" };
+  return { team: true, tag: "Agent team", sub: "reviews its own tests" };
+}
+
+function TeamIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="7" cy="8" r="2.4" /><circle cx="17" cy="8" r="2.4" />
+      <path d="M3.5 18a3.5 3.5 0 0 1 7 0M13.5 18a3.5 3.5 0 0 1 7 0" />
+    </svg>
+  );
+}
+function SingleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="8" r="3" /><path d="M5.5 19a6.5 6.5 0 0 1 13 0" />
+    </svg>
+  );
+}
+
+// The agent-team assembly line — a numbered, connected list so it reads as a
+// clear sequence of hand-offs no matter how narrow the card gets.
+function AgentPipeline() {
+  return (
+    <ol className="xr-pipe" aria-label="Agent pipeline">
+      {AGENT_STAGES.map((s, i) => (
+        <li key={s.name} className={`xr-pipe-step ${s.debate ? "debate" : ""}`}>
+          <span className="xr-pipe-num">{i + 1}</span>
+          <span className="xr-pipe-txt"><b>{s.name}</b><em>{s.note}</em></span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+// The five steps of the experiment method. Showing this flow is what makes the
+// page's purpose click — the reader sees it's a controlled experiment, not a chart.
+const FLOW_STEPS = [
+  { title: "A requirement", note: "a plain-English feature to test" },
+  { title: "Two approaches write tests", note: "a single AI vs a 5-agent team" },
+  { title: "We plant bugs", note: "seed real faults into the code" },
+  { title: "Count the catches", note: "run each suite, see which bugs die" },
+  { title: "Compare", note: "score it, then test for significance" },
+];
+
+function HowItWorks() {
+  return (
+    <div className="xr-how">
+      <span className="xr-how-title">How this experiment works</span>
+      <ol className="xr-flow">
+        {FLOW_STEPS.map((s, i) => (
+          <li className="xr-flow-item" key={s.title}>
+            <div className="xr-flow-step">
+              <span className="xr-flow-num">{i + 1}</span>
+              <span className="xr-flow-b">{s.title}</span>
+              <span className="xr-flow-s">{s.note}</span>
+            </div>
+            {i < FLOW_STEPS.length - 1 && <span className="xr-flow-arrow" aria-hidden>→</span>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+// One recitable paragraph — literally the script for explaining the whole page.
+function AtAGlance({ results, headline, conditions }) {
+  if (!headline?.available) return null;
+  const cmp = headline.comparison;
+  const winner = conditions.find((c) => c.key === headline.winner);
+  const who = winner?.is_baseline ? "the single AI" : "the agent team";
+  const scorePct = `${Math.round(headline.winner_mutation_score * 100)}%`;
+  const reps = results.n_reps > 1 ? `, averaged over ${results.n_reps} repeated runs` : "";
+
+  let outcome;
+  if (winner?.is_baseline || !cmp) {
+    outcome = <>{cap(who)} came out on top, catching <b>{scorePct}</b> — no approach won by a meaningful margin.</>;
+  } else {
+    const delta = cmp.pct_improvement != null ? `${cmp.pct_improvement}%` : `${Math.round(cmp.mean_delta * 100)} points`;
+    outcome = (
+      <>{cap(who)} caught the most — <b>{scorePct}</b>, <b>{delta} more</b> than a single AI{cmp.significant
+        ? <>, a <b>statistically significant</b> gap (p={cmp.p_value}).</>
+        : <>, though <b>not yet a statistically significant</b> gap (p={cmp.p_value}).</>}</>
+    );
+  }
+  return (
+    <div className="xr-glance">
+      <span className="xr-glance-label">In one line</span>
+      <p>
+        This experiment pitted <b>{conditions.length} approaches</b> against <b>{results.n_items} programs</b>{reps}.
+        Each program hides <b>4 planted bugs</b>, and we counted how many each approach's tests catch. {outcome}
+      </p>
+    </div>
+  );
+}
+
+// Orientation: what this page is, the recitable summary, and how it works.
+function ExperimentBrief({ results, headline, conditions }) {
+  return (
+    <section className="xr-brief">
+      <span className="xr-eyebrow">Experiment · fault-based evidence</span>
+      <h2 className="xr-q">Do a <em>team</em> of AI agents write better tests than a <em>single</em> AI?</h2>
+      <p className="xr-lead">
+        This page is the evidence. It runs the same requirements through a single AI and an
+        agent team, plants real bugs in the code, and measures whose tests catch more.
+      </p>
+      <AtAGlance results={results} headline={headline} conditions={conditions} />
+      <HowItWorks />
+      <details className="xr-meet">
+        <summary><span className="xr-det-caret" aria-hidden>▸</span> Meet the agent team — five specialists that hand off in a pipeline</summary>
+        <AgentPipeline />
+      </details>
+    </section>
+  );
+}
+
+// A section heading carrying its step number in the page's argument.
+function StepHead({ n, title, tip, aside }) {
+  return (
+    <div className="section-head">
+      <h2><span className="xr-step">{n}</span>{title} {tip && <Info tip={tip} />}</h2>
+      {aside}
+    </div>
+  );
+}
+
+// The merged result: one row per approach — identity, a bar, and its score — so
+// the cards and the chart become a single, clean leaderboard (no duplication).
+function ResultLeaderboard({ rows }) {
+  return (
+    <div className="xr-result">
+      <div className="xr-result-rows">
+        {rows.map((d) => (
+          <div key={d.key} className={`xr-rrow ${d.best ? "best" : ""} ${d.team ? "team" : "single"}`} style={{ "--dot": d.color }}>
+            <div className="xr-rid">
+              <div className="xr-rtop">
+                {d.team ? <TeamIcon /> : <SingleIcon />}
+                <span className="xr-rname">{d.label}</span>
+                {d.best && <span className="xr-rbest">Best</span>}
+              </div>
+              <div className="xr-rsub">{d.sub}</div>
+            </div>
+            <div className="xr-rtrack">
+              <div className="xr-rfill" style={{ width: `${Math.max(2, Math.round(d.value * 100))}%`, background: d.color }} />
+            </div>
+            <div className="xr-rval">
+              {pct01(d.value)}
+              {d.spread != null && <span className="xr-rspread">± {pct01(d.spread)}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="xr-rscale" aria-hidden>
+        <span />
+        <div className="xr-rscale-ticks">
+          {[0, 25, 50, 75, 100].map((t) => <span key={t}>{t}%</span>)}
+        </div>
+        <span />
+      </div>
+    </div>
+  );
+}
+
+// Plain-language cost trade-off: the agent team is more thorough but spends more.
+function CostCallout({ conditions, step }) {
+  const team = conditions.find((c) => !c.is_baseline && /full/i.test(c.key)) || conditions.find((c) => !c.is_baseline);
+  const single = conditions.find((c) => c.is_baseline);
+  const tok = (c) => c?.metrics?.tokens_total?.mean;
+  const eff = (c) => c?.metrics?.faults_per_1k_tokens?.mean;
+  if (!team || !single || tok(team) == null || tok(single) == null) return null;
+  const ratio = tok(single) ? tok(team) / tok(single) : null;
+  const ratioText = ratio ? (ratio >= 10 ? `~${Math.round(ratio)}×` : `${ratio.toFixed(1)}×`) : "—";
+  const effTeam = eff(team);
+  const effSingle = eff(single);
+  return (
+    <section className="section">
+      <StepHead n={step} title="What did the extra agents cost?" tip="The agent team runs several agents and a self-review round, so it does much more work — measured in 'tokens', the AI's unit of work — than a single prompt." />
+      <div className="xr-cost">
+        <div className="xr-cost-cell">
+          <div className="xr-cost-big">{ratioText}</div>
+          <div className="xr-cost-cap">more work than a single AI<br /><span className="muted">{int0(tok(team))} vs {int0(tok(single))} tokens per run</span></div>
+        </div>
+        {effTeam != null ? (
+          <div className="xr-cost-cell">
+            <div className="xr-cost-big">{effTeam.toFixed(1)}</div>
+            <div className="xr-cost-cap">bugs caught for every 1,000 tokens<br /><span className="muted">single AI: {effSingle != null ? effSingle.toFixed(1) : "—"}</span></div>
+          </div>
+        ) : (
+          <div className="xr-cost-cell">
+            <div className="xr-cost-cap">The agent team caught more bugs, but spent far more doing it. Whether that trade is worth it depends on how much catching each extra bug matters to you.</div>
+          </div>
+        )}
+      </div>
+      <p className="muted xr-cost-take">
+        In plain terms: the agent team is more thorough, but roughly {ratioText.replace("~", "")} the cost of a single AI.
+      </p>
+    </section>
+  );
+}
+
 export default function ExperimentResults() {
   const { experimentId } = useParams();
   const navigate = useNavigate();
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
-  const barRef = useRef(null);
   const groupRef = useRef(null);
 
   const fetchResults = useCallback(async () => {
@@ -121,20 +342,52 @@ export default function ExperimentResults() {
   const running = prog.status === "running" || prog.status === "pending";
   const headline = results.headline;
 
-  // --- figures data ---
-  const faultData = orderedConditions
+  // --- step numbers: count only the sections that will actually render, so the
+  // argument always reads 1..N with no gaps (some sections hide on legacy runs). ---
+  const ftHasData = !!(
+    results.fault_types?.by_condition &&
+    Object.values(results.fault_types.by_condition).some((rows) => rows && Object.keys(rows).length)
+  );
+  const costBase = orderedConditions.find((c) => c.is_baseline);
+  const costTeam = orderedConditions.find((c) => !c.is_baseline && /full/i.test(c.key))
+    || orderedConditions.find((c) => !c.is_baseline);
+  const hasCost = !!(costTeam && costBase
+    && costTeam.metrics?.tokens_total?.mean != null && costBase.metrics?.tokens_total?.mean != null);
+  const hasSig = results.comparisons?.length > 0;
+  // A quick run covers only a subset of programs — list exactly those that ran.
+  const ranIds = new Set(results.ran_requirement_ids || []);
+  const shownItems = ranIds.size ? items.filter((it) => ranIds.has(it.requirement_id)) : items;
+  const hasEvidence = shownItems.length > 0;
+  let stepK = 1;
+  const stepResult = stepK++;
+  const stepFaults = ftHasData ? stepK++ : null;
+  const stepSig = hasSig ? stepK++ : null;
+  const stepCost = hasCost ? stepK++ : null;
+  const stepEvidence = hasEvidence ? stepK++ : null;
+
+  // --- merged result rows: identity + score, sorted best-first ---
+  const resultRows = orderedConditions
     .filter((c) => c.metrics.mutation_score)
-    .map((c) => ({
-      key: c.key,
-      label: c.label,
-      value: c.metrics.mutation_score.mean,
-      color: conditionColor(c.key),
-    }));
+    .map((c) => {
+      const kind = conditionKind(c);
+      const s = c.metrics.mutation_score;
+      return {
+        key: c.key,
+        label: c.label,
+        value: s.mean,
+        color: conditionColor(c.key),
+        team: kind.team,
+        sub: s.n > 0 ? `caught over ${s.n} program${s.n === 1 ? "" : "s"}` : "",
+        best: headline?.winner === c.key,
+        spread: c.n_reps > 1 && c.run_to_run_std != null ? c.run_to_run_std : null,
+      };
+    })
+    .sort((a, b) => b.value - a.value);
 
   const seriesDefs = [
-    { key: "mutation_score", label: "Fault detection", scale: 100 },
-    { key: "coverage_pct", label: "Coverage", scale: 1 },
-    { key: "quality_score", label: "Quality", scale: 100 },
+    { key: "mutation_score", label: "Bugs caught", scale: 100 },
+    { key: "coverage_pct", label: "Rules covered", scale: 1 },
+    { key: "quality_score", label: "Test quality", scale: 100 },
   ].filter((s) => orderedConditions.some((c) => c.metrics[s.key]));
   const series = seriesDefs.map((s) => ({ key: s.key, label: s.label, color: METRIC_COLOR[s.key] }));
   const groups = orderedConditions.map((c) => ({
@@ -191,7 +444,7 @@ export default function ExperimentResults() {
           <Link to="/experiments" className="back-link">← Experiments</Link>
           <h1>{exp.name}</h1>
           <p className="muted">
-            {results.n_items} programs · {orderedConditions.length} conditions ·{" "}
+            {results.n_items} programs · {orderedConditions.length} approaches ·{" "}
             <span className={`chip ${running ? "chip-amber" : prog.status === "failed" ? "chip-red" : "chip-green"}`}>
               {running && <span className="spinner sm" />}
               {prog.status}
@@ -211,9 +464,6 @@ export default function ExperimentResults() {
             }
           }}>Rename</button>
           <button className="ghost" onClick={exportCsv}>Export CSV</button>
-          <button className="ghost" onClick={() => svgToPng(barRef.current, `experiment-${exp.id}-fault-detection`)}>
-            Export chart (PNG)
-          </button>
           <button className="ghost danger" disabled={running} title={running ? "Stop it first" : "Delete experiment"}
             onClick={async () => {
               if (confirm(`Delete "${exp.name}"? This removes the experiment and all its runs and results.`)) {
@@ -230,57 +480,29 @@ export default function ExperimentResults() {
         </div>
       )}
 
-      {/* Headline */}
-      {headline?.available && (
-        <HeadlineCallout headline={headline} conditions={orderedConditions} />
-      )}
+      {/* Orientation: what this page is, a recitable summary, and how it works */}
+      <ExperimentBrief results={results} headline={headline} conditions={orderedConditions} />
 
-      {/* Fault-detection tiles */}
+      {/* 1 — The result */}
       <section className="section">
-        <div className="section-head">
-          <h2>Fault detection by condition <Info tip="How many of the seeded bugs each condition's suites caught, averaged over the benchmark. This is the thesis's core measure." /></h2>
-          {results.n_reps > 1 && (
-            <span className="muted">averaged over {results.n_reps} runs · ± = run-to-run spread</span>
-          )}
-        </div>
-        <div className="fd-tiles">
-          {orderedConditions.map((c) => {
-            const s = c.metrics.mutation_score;
-            const isWinner = headline?.winner === c.key;
-            return (
-              <div key={c.key} className={`fd-tile ${isWinner ? "win" : ""} ${c.is_baseline ? "base" : ""}`}>
-                {isWinner && <span className="fd-crown">Best</span>}
-                <div className="fd-name" style={{ "--dot": conditionColor(c.key) }}>
-                  <span className="fd-dot" /> {c.label}
-                </div>
-                <div className="fd-score">
-                  {s ? pct01(s.mean) : "—"}
-                  {c.n_reps > 1 && c.run_to_run_std != null && (
-                    <span className="fd-spread" title="Run-to-run spread across repeated runs (± standard deviation)">
-                      ± {pct01(c.run_to_run_std)}
-                    </span>
-                  )}
-                </div>
-                <div className="fd-sub">
-                  {c.is_baseline ? "baseline" : "of seeded faults caught"}
-                  {s && s.n > 0 ? ` · ${s.n} programs` : ""}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <figure className="ex-figure">
-          <BarChart ref={barRef} data={faultData} max={1} format={pct01} />
-          <figcaption>Mean mutation score per condition (higher = more bugs caught).</figcaption>
-        </figure>
+        <StepHead
+          n={stepResult}
+          title="The result: who caught more bugs?"
+          tip="The share of seeded bugs each approach's suites caught, averaged over every program. This is the thesis's core measure."
+          aside={results.n_reps > 1 ? <span className="muted">averaged over {results.n_reps} runs · ± = run-to-run spread</span> : null}
+        />
+        <ResultLeaderboard rows={resultRows} />
       </section>
 
-      {/* Significance */}
-      {results.comparisons?.length > 0 && (
+      {/* 2 — Which kinds of bug */}
+      {ftHasData && (
+        <FaultTypeBreakdown faultTypes={results.fault_types} conditions={orderedConditions} step={stepFaults} />
+      )}
+
+      {/* 3 — Is the difference real */}
+      {hasSig && (
         <section className="section">
-          <div className="section-head">
-            <h2>Statistical significance <Info tip="Each condition is compared to the single-LLM baseline with a Wilcoxon signed-rank test, paired by program. p < 0.05 means the difference is unlikely to be chance." /></h2>
-          </div>
+          <StepHead n={stepSig} title="Is the difference real, or luck?" tip="Each agent condition is compared to the single-AI baseline with a Wilcoxon signed-rank test, paired by program. p < 0.05 means the gap is unlikely to be chance." />
           <div className="sig-grid">
             {results.comparisons.map((cmp) => (
               <SignificanceCard key={cmp.condition} cmp={cmp} />
@@ -289,77 +511,92 @@ export default function ExperimentResults() {
         </section>
       )}
 
-      {/* Fault detection by fault class */}
-      <FaultTypeBreakdown faultTypes={results.fault_types} conditions={orderedConditions} />
+      {/* 4 — What did the extra agents cost */}
+      <CostCallout conditions={orderedConditions} step={stepCost} />
 
-      {/* Normalised metric comparison */}
-      {series.length > 1 && (
-        <section className="section">
-          <div className="section-head">
-            <h2>All metrics, normalised <Info tip="Fault detection, coverage and quality on a shared 0–100 scale so conditions can be compared at a glance." /></h2>
-          </div>
-          <figure className="ex-figure">
-            <div className="ex-legend">
-              {series.map((s) => (
-                <span key={s.key} className="ex-leg"><i style={{ background: s.color }} />{s.label}</span>
-              ))}
-            </div>
-            <GroupedBarChart ref={groupRef} series={series} groups={groups} />
-          </figure>
-        </section>
-      )}
-
-      {/* Summary table */}
-      <section className="section">
-        <div className="section-head">
-          <h2>Summary <Info tip="Mean ± standard deviation for every metric. The best value in each column is highlighted." /></h2>
-        </div>
-        <div className="table-wrap">
-          <table className="ex-table">
-            <thead>
-              <tr>
-                <th>Condition</th>
-                {METRICS.map((m) => (
-                  <th key={m.key}>{m.label} <Info tip={m.tip} /></th>
+      {/* All the numbers — folded away by default to keep the page clean */}
+      <details className="xr-details">
+        <summary>
+          <span className="xr-det-caret" aria-hidden>▸</span>
+          <span className="xr-det-title">All the numbers</span>
+          <span className="muted">full metric table &amp; normalised chart</span>
+        </summary>
+        <div className="xr-details-body">
+          {series.length > 1 && (
+            <figure className="ex-figure">
+              <div className="ex-legend">
+                {series.map((s) => (
+                  <span key={s.key} className="ex-leg"><i style={{ background: s.color }} />{s.label}</span>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {orderedConditions.map((c) => (
-                <tr key={c.key}>
-                  <td className="ex-td-name">
-                    <span className="fd-dot" style={{ "--dot": conditionColor(c.key), background: conditionColor(c.key) }} />
-                    {c.label}
-                  </td>
-                  {METRICS.map((m) => {
-                    const s = c.metrics[m.key];
-                    const isWin = winnerKey(orderedConditions, m) === c.key;
-                    return (
-                      <td key={m.key} className={isWin ? "ex-win" : ""}>
-                        {s ? (
-                          <>
-                            {m.fmt(s.mean)}
-                            {s.n > 1 && <span className="ex-std"> ±{m.fmt(s.std)}</span>}
-                          </>
-                        ) : "—"}
-                      </td>
-                    );
-                  })}
+              </div>
+              <GroupedBarChart ref={groupRef} series={series} groups={groups} />
+            </figure>
+          )}
+          <div className="table-wrap">
+            <table className="ex-table xr-mt">
+              <thead>
+                <tr>
+                  <th className="xr-mt-col-name">Metric</th>
+                  {orderedConditions.map((c) => (
+                    <th key={c.key}>
+                      <span className="fd-dot" style={{ "--dot": conditionColor(c.key), background: conditionColor(c.key) }} />
+                      {c.label}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Per-item drill-down */}
-      {items.length > 0 && (
-        <section className="section">
-          <div className="section-head">
-            <h2>Per-program breakdown <Info tip="Open a program to see the suite each condition produced and exactly which bugs it caught." /></h2>
+              </thead>
+              <tbody>
+                {METRIC_GROUPS.map((g) => {
+                  const keys = g.keys.filter(
+                    (k) => METRIC_BY_KEY[k] && orderedConditions.some((c) => c.metrics[k] != null)
+                  );
+                  if (keys.length === 0) return null;
+                  return (
+                    <Fragment key={g.title}>
+                      <tr className="xr-mt-group">
+                        <td colSpan={orderedConditions.length + 1}>{g.title}</td>
+                      </tr>
+                      {keys.map((key) => {
+                        const m = METRIC_BY_KEY[key];
+                        const winner = winnerKey(orderedConditions, m);
+                        return (
+                          <tr key={key}>
+                            <td className="xr-mt-name">{m.label} <Info tip={m.tip} /></td>
+                            {orderedConditions.map((c) => {
+                              const s = c.metrics[m.key];
+                              const isWin = winner === c.key;
+                              return (
+                                <td key={c.key} className={isWin ? "ex-win" : ""}>
+                                  {s ? (
+                                    <>
+                                      {m.fmt(s.mean)}
+                                      {s.n > 1 && <span className="ex-std"> ±{m.fmt(s.std)}</span>}
+                                    </>
+                                  ) : "—"}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+          <p className="muted xr-mt-note">
+            “—” means not measured for that approach — e.g. a single AI has no rules-covered, quality, or self-review step.
+          </p>
+        </div>
+      </details>
+
+      {/* 5 — The evidence, program by program */}
+      {hasEvidence && (
+        <section className="section">
+          <StepHead n={stepEvidence} title="The evidence, program by program" tip="Open a program to see the suite each approach produced and exactly which bugs it caught." />
           <div className="drill-list">
-            {items.map((it) => (
+            {shownItems.map((it) => (
               <DrilldownItem key={it.id} item={it} experimentId={exp.id} />
             ))}
           </div>
@@ -369,62 +606,42 @@ export default function ExperimentResults() {
   );
 }
 
-function HeadlineCallout({ headline, conditions }) {
-  const cmp = headline.comparison;
-  const winnerIsBaseline = conditions.find((c) => c.key === headline.winner)?.is_baseline;
-  const scorePct = `${Math.round(headline.winner_mutation_score * 100)}%`;
-
-  let body;
-  if (winnerIsBaseline || !cmp) {
-    body = (
-      <>The <b>{headline.winner_label}</b> scored highest at <b>{scorePct}</b> fault detection —
-        no condition beat the baseline by a significant margin here.</>
-    );
-  } else {
-    const delta = cmp.pct_improvement != null ? `+${cmp.pct_improvement}%` : `+${Math.round(cmp.mean_delta * 100)} pts`;
-    body = (
-      <>The <b>{headline.winner_label}</b> caught <b>{scorePct}</b> of seeded faults — <b>{delta}</b> over
-        the single-LLM baseline{cmp.significant
-          ? <>, and the difference is <b>statistically significant</b> (p={cmp.p_value}, Wilcoxon).</>
-          : <>, though the difference is <b>not statistically significant</b> (p={cmp.p_value}).</>}</>
-    );
-  }
-
-  return (
-    <div className={`headline-callout ${cmp?.significant ? "sig" : ""}`}>
-      <div className="hc-icon" aria-hidden>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
-      </div>
-      <p>{body}</p>
-    </div>
-  );
-}
-
 function SignificanceCard({ cmp }) {
+  const name = cmp.condition_label || cmp.condition;
   if (cmp.insufficient_data) {
     return (
       <div className="sig-card">
-        <div className="sig-name">{cmp.condition_label || cmp.condition}</div>
-        <p className="muted">Not enough valid pairs to test.</p>
+        <div className="sig-name">{name} <span className="sig-vs">vs Single AI</span></div>
+        <p className="muted">Not enough data to judge yet.</p>
       </div>
     );
   }
-  const delta = cmp.pct_improvement != null ? `${cmp.pct_improvement > 0 ? "+" : ""}${cmp.pct_improvement}%` : "—";
+  const better = (cmp.mean_delta ?? 0) >= 0;
+  const delta = cmp.pct_improvement != null
+    ? `${cmp.pct_improvement > 0 ? "+" : ""}${cmp.pct_improvement}%`
+    : "—";
+  const n = cmp.n_pairs;
+  const verdict = cmp.significant ? "Likely real" : "Could be luck";
+  const plain = cmp.significant
+    ? "The gap is big and consistent enough that it's probably real — unlikely to be down to chance."
+    : "The gap is small enough that it could just be chance. Running more programs would show whether it holds up.";
   return (
     <div className={`sig-card ${cmp.significant ? "sig" : ""}`}>
       <div className="sig-head">
-        <div className="sig-name">{cmp.condition_label || cmp.condition} <span className="sig-vs">vs baseline</span></div>
-        <span className={`chip ${cmp.significant ? "chip-green" : "chip-grey"}`}>
-          {cmp.significant ? "significant" : "n.s."}
-        </span>
+        <div className="sig-name">{name} <span className="sig-vs">vs Single AI</span></div>
+        <span className={`sig-verdict ${cmp.significant ? "good" : "weak"}`}>{verdict}</span>
       </div>
-      <div className="sig-delta">{delta}<span className="sig-delta-cap">fault detection</span></div>
-      <div className="sig-stats">
-        <div><b>p={cmp.p_value}</b><span>Wilcoxon</span></div>
-        <div><b>{cmp.cohens_dz ?? "—"}</b><span>Cohen's dz</span></div>
-        <div><b>{cmp.wins}/{cmp.losses}/{cmp.ties}</b><span>win/lose/tie</span></div>
+      <div className="sig-delta">{delta}<span className="sig-delta-cap">{better ? "more bugs caught" : "fewer bugs caught"}</span></div>
+      <p className="sig-plain">{plain}</p>
+      <div className="sig-evidence">
+        <span className="sig-ev-main">
+          Ahead on <b>{cmp.wins}</b> of {n} program{n === 1 ? "" : "s"}
+          {cmp.ties ? `, tied on ${cmp.ties}` : ""}
+          {cmp.losses ? `, behind on ${cmp.losses}` : ""}
+        </span>
+        <span className="sig-ev-maths">
+          the maths <Info tip={`p-value = ${cmp.p_value} (how likely this gap is pure chance — below 0.05 means unlikely). Effect size (Cohen's dz) = ${cmp.cohens_dz ?? "—"} (how big the gap is relative to its variability). Test: Wilcoxon signed-rank, paired by program.`} />
+        </span>
       </div>
     </div>
   );
@@ -433,7 +650,7 @@ function SignificanceCard({ cmp }) {
 // Fault detection broken down by the KIND of bug (boundary, wrong value, …).
 // The sharper thesis result: not just "multi-agent catches more" but *which*
 // classes of bug it closes the gap on versus the baseline.
-function FaultTypeBreakdown({ faultTypes, conditions }) {
+function FaultTypeBreakdown({ faultTypes, conditions, step }) {
   const legend = faultTypes?.legend || [];
   const byCond = faultTypes?.by_condition || {};
 
@@ -463,9 +680,7 @@ function FaultTypeBreakdown({ faultTypes, conditions }) {
 
   return (
     <section className="section">
-      <div className="section-head">
-        <h2>Fault detection by bug type <Info tip="Every seeded bug is labelled with the kind of mistake it represents. This shows which classes of bug each condition catches — e.g. whether the multi-agent suite closes the boundary/edge-case gap the baseline leaves open." /></h2>
-      </div>
+      <StepHead n={step} title="Which kinds of bug did each catch?" tip="Every seeded bug is labelled with the kind of mistake it represents. This shows which classes of bug each approach catches — e.g. whether the agent team closes the boundary/edge-case gap a single AI leaves open." />
       <div className="table-wrap">
         <table className="ex-table ft-table">
           <thead>
@@ -513,52 +728,58 @@ function fmtInput(args) {
   return args.map((a) => JSON.stringify(a)).join(", ");
 }
 
-// One planted bug: its description, the buggy code, and a caught/missed verdict
-// per condition (with the exact input that exposed it).
-function BugRow({ mutant, conditions }) {
+// A one-word column label for the bug matrix header.
+function shortApproach(c) {
+  if (c.is_baseline) return "Single AI";
+  if (/ablation|no[_-]?debate/i.test(c.condition)) return "No self-review";
+  return "Agent team";
+}
+
+// One planted bug: fault-type badge + plain description, a caught/missed mark per
+// approach, and — when opened — the buggy code and the exact input that caught it.
+function BugRow({ mutant, conditions, cols }) {
   const [open, setOpen] = useState(false);
   const perCond = conditions.map((c) => {
     const pm = (c.detail?.per_mutant || []).find((m) => m.key === mutant.key);
     return { c, killed: pm ? pm.killed : null, by: pm?.killed_by_input };
   });
   return (
-    <div className={`bug ${open ? "open" : ""}`}>
-      <button className="bug-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span className="bug-caret">▸</span>
-        <span className="bug-desc">
+    <div className={`xrb ${open ? "open" : ""}`}>
+      <button className="xrb-head" style={{ gridTemplateColumns: cols }} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span className="xrb-desc">
+          <span className="xrb-caret" aria-hidden>▸</span>
           {mutant.fault_type && (
             <span className={`ft-badge ft-${mutant.fault_type}`}>{FAULT_LABELS[mutant.fault_type] || mutant.fault_type}</span>
           )}
-          {mutant.description}
+          <span className="xrb-text">{mutant.description}</span>
         </span>
-        <span className="bug-verdicts">
-          {perCond.map(({ c, killed }) => (
-            <span
-              key={c.condition}
-              className={`verdict ${killed === null ? "na" : killed ? "ok" : "miss"}`}
-              title={`${c.label}: ${killed === null ? "not scored" : killed ? "caught" : "missed"}`}
-            >
-              {killed === null ? "—" : killed ? "✓" : "✗"}
-            </span>
-          ))}
-        </span>
+        {perCond.map(({ c, killed }) => (
+          <span
+            key={c.condition}
+            className={`xrb-v ${killed === null ? "na" : killed ? "ok" : "miss"}`}
+            style={killed ? { "--dot": conditionColor(c.condition) } : undefined}
+            title={`${c.label}: ${killed === null ? "not scored" : killed ? "caught" : "missed"}`}
+          >
+            {killed === null ? "—" : killed ? "✓" : "✗"}
+          </span>
+        ))}
       </button>
       {open && (
-        <div className="bug-body">
-          <div className="bug-code">
-            <div className="bug-code-label">The planted bug</div>
+        <div className="xrb-body">
+          <div className="xrb-code">
+            <span className="xrb-code-label">The bug that was planted</span>
             <pre>{mutant.code}</pre>
           </div>
-          <div className="bug-catches">
+          <div className="xrb-catches">
             {perCond.map(({ c, killed, by }) => (
-              <div key={c.condition} className={`bug-catch ${killed ? "ok" : killed === null ? "na" : "miss"}`}>
-                <span className="bc-name">
-                  <span className="fd-dot" style={{ "--dot": conditionColor(c.condition), background: conditionColor(c.condition) }} />
+              <div key={c.condition} className={`xrb-catch ${killed ? "ok" : killed === null ? "na" : "miss"}`}>
+                <span className="xrb-catch-name">
+                  <span className="fd-dot" style={{ background: conditionColor(c.condition) }} />
                   {c.label}
                 </span>
-                <span className="bc-verdict">
+                <span className="xrb-catch-verdict">
                   {killed === null ? "not scored" : killed
-                    ? <>caught — input <code>{fmtInput(by)}</code></>
+                    ? <>caught with <code>{fmtInput(by)}</code></>
                     : "missed this bug"}
                 </span>
               </div>
@@ -591,80 +812,129 @@ function DrilldownItem({ item, experimentId }) {
     }
   }
 
-  const conditions = detail?.conditions || [];
+  // Single AI (baseline) first as the control, then the agent teams.
+  const conditions = [...(detail?.conditions || [])].sort(
+    (a, b) => (b.is_baseline ? 1 : 0) - (a.is_baseline ? 1 : 0)
+  );
   const mutants = detail?.item?.mutants || [];
+  const cols = `1fr ${"96px ".repeat(conditions.length).trim()}`;
+
+  // Highlight a "best" approach only when there's a real difference between them.
+  const rates = conditions
+    .map((c) => (c.metrics?.mutants_total ? c.metrics.mutants_killed / c.metrics.mutants_total : null))
+    .filter((x) => x != null);
+  const maxRate = rates.length ? Math.max(...rates) : null;
+  const hasWinner = rates.length > 1 && maxRate > Math.min(...rates);
+
+  const requirement = (detail?.item?.requirement_text || "")
+    .split(/\n\s*\n/)[0]?.replace(/\s*\n\s*/g, " ").trim();
 
   return (
-    <div className={`drill ${open ? "open" : ""}`}>
-      <button className="drill-head" onClick={toggle} aria-expanded={open}>
-        <span className="drill-caret">▸</span>
-        <span className="drill-title">{item.title}</span>
-        <code className="drill-fn">{item.entrypoint}()</code>
-        <span className="drill-mut">{item.n_mutants} bugs</span>
+    <div className={`xrd ${open ? "open" : ""}`}>
+      <button className="xrd-head" onClick={toggle} aria-expanded={open}>
+        <span className="xrd-caret" aria-hidden>▸</span>
+        <span className="xrd-title">{item.title}</span>
+        <code className="xrd-fn">{item.entrypoint}()</code>
+        <span className="xrd-nbugs">{item.n_mutants} seeded bugs</span>
       </button>
       {open && (
-        <div className="drill-body">
-          {loading && <p className="muted">Loading…</p>}
+        <div className="xrd-body">
+          {loading && <p className="muted xrd-loading">Loading…</p>}
           {detail && (
             <>
-              {detail.item?.requirement_text && (
-                <p className="drill-req">{detail.item.requirement_text.split("\n")[0]}</p>
+              {requirement && (
+                <div className="xrd-req">
+                  <span className="xrd-req-label">Requirement under test</span>
+                  <p>{requirement}</p>
+                </div>
               )}
 
-              {/* Per-condition score summary */}
-              <div className="drill-summary">
+              {/* Scoreboard: how each approach did on this program */}
+              <div className="xrd-board">
                 {conditions.map((c) => {
+                  const kind = conditionKind({ is_baseline: c.is_baseline, key: c.condition });
                   const killed = c.metrics?.mutants_killed;
                   const total = c.metrics?.mutants_total;
                   const nCases = (c.test_cases || []).length;
+                  const isBest = hasWinner && total && killed / total === maxRate;
                   return (
-                    <div key={c.condition} className="dsum">
-                      <span className="dsum-name">
-                        <span className="fd-dot" style={{ "--dot": conditionColor(c.condition), background: conditionColor(c.condition) }} />
-                        {c.label}
-                      </span>
-                      <span className="dsum-score">
-                        {killed != null && total != null ? `${killed}/${total} bugs` : "—"}
-                      </span>
+                    <div
+                      key={c.condition}
+                      className={`xrd-score ${kind.team ? "team" : "single"} ${isBest ? "best" : ""}`}
+                      style={{ "--dot": conditionColor(c.condition) }}
+                    >
+                      <div className="xrd-score-top">
+                        <span className="xrd-score-kind">{kind.team ? <TeamIcon /> : <SingleIcon />}{c.label}</span>
+                        {isBest && <span className="xrd-score-best">Best</span>}
+                      </div>
+                      <div className="xrd-score-frac">
+                        {killed != null && total != null
+                          ? <><b>{killed}</b><span className="xrd-frac-den">/{total}</span><em>bugs caught</em></>
+                          : <span className="muted">not scored</span>}
+                      </div>
+                      {total != null && (
+                        <div className="xrd-dots" aria-hidden>
+                          {Array.from({ length: total }).map((_, i) => (
+                            <span key={i} className={`xrd-dot ${i < killed ? "on" : ""}`} />
+                          ))}
+                        </div>
+                      )}
                       <button
-                        className="dsum-cases"
+                        className={`xrd-viewcases ${showCases === c.condition ? "active" : ""}`}
                         onClick={() => setShowCases(showCases === c.condition ? null : c.condition)}
                       >
-                        {nCases} test case{nCases === 1 ? "" : "s"} {showCases === c.condition ? "▲" : "▼"}
+                        {showCases === c.condition ? "Hide" : "View"} {nCases} test{nCases === 1 ? "" : "s"}
                       </button>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Test cases for the chosen condition */}
-              {showCases && (
-                <ol className="drill-caselist">
-                  {(conditions.find((c) => c.condition === showCases)?.test_cases || []).map((tc) => (
-                    <li key={tc.id}>
-                      <b>{tc.title}</b>
-                      {tc.type && <span className="tc-type">{tc.type}</span>}
-                    </li>
-                  ))}
-                </ol>
-              )}
+              {/* The chosen approach's test cases */}
+              {showCases && (() => {
+                const cc = conditions.find((c) => c.condition === showCases);
+                const cases = cc?.test_cases || [];
+                return (
+                  <div className="xrd-cases-panel">
+                    <div className="xrd-cases-head">
+                      <span className="fd-dot" style={{ background: conditionColor(showCases) }} />
+                      {cases.length} test{cases.length === 1 ? "" : "s"} written by {cc?.label}
+                    </div>
+                    {cases.length > 0 ? (
+                      <ol className="xrd-cases">
+                        {cases.map((tc) => (
+                          <li key={tc.id}>
+                            <b>{tc.title}</b>
+                            {tc.type && <span className="tc-type">{tc.type}</span>}
+                          </li>
+                        ))}
+                      </ol>
+                    ) : <p className="muted">No test cases in this suite.</p>}
+                  </div>
+                );
+              })()}
 
               {/* Bug-by-bug matrix */}
               {mutants.length > 0 ? (
-                <div className="bug-matrix">
-                  <div className="bug-matrix-head">
-                    <span>Each planted bug — who caught it</span>
-                    <span className="bug-cols">
+                <div className="xrd-bugs-block">
+                  <div className="xrd-bugs-title">
+                    Which bugs did each approach catch?
+                    <span className="muted">✓ caught · ✗ missed · click a bug to see its code</span>
+                  </div>
+                  <div className="xrd-matrix">
+                    <div className="xrd-mhead" style={{ gridTemplateColumns: cols }}>
+                      <span>Planted bug</span>
                       {conditions.map((c) => (
-                        <span key={c.condition} className="bug-col" title={c.label}>
-                          {c.label.split(" ")[0].slice(0, 4)}
+                        <span key={c.condition} className="xrd-mcol" title={c.label}>
+                          <span className="fd-dot" style={{ background: conditionColor(c.condition) }} />
+                          {shortApproach(c)}
                         </span>
                       ))}
-                    </span>
+                    </div>
+                    {mutants.map((m) => (
+                      <BugRow key={m.key} mutant={m} conditions={conditions} cols={cols} />
+                    ))}
                   </div>
-                  {mutants.map((m) => (
-                    <BugRow key={m.key} mutant={m} conditions={conditions} />
-                  ))}
                 </div>
               ) : (
                 <p className="muted">Per-bug detail isn't available for this run.</p>

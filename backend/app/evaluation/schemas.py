@@ -50,6 +50,9 @@ class ExperimentCreate(BaseModel):
     # How many times to run the whole grid (averages out LLM run-to-run noise and
     # yields a reproducibility spread). Clamped server-side to a sane range.
     repetitions: int = 1
+    # "full" runs every program; "quick" runs a small representative subset so a
+    # run is cheap/fast during iteration. Validated server-side.
+    scope: str = "full"
 
 
 class ExperimentOut(BaseModel):
@@ -60,6 +63,7 @@ class ExperimentOut(BaseModel):
     status: str
     conditions: list[str]
     repetitions: int
+    scope: str
     created_at: datetime
     completed_at: datetime | None
 

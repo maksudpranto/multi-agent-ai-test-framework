@@ -498,6 +498,10 @@ class Experiment(Base):
     # How many times to run the whole grid. >1 averages out LLM run-to-run
     # noise and yields a reported reproducibility spread (std across repetitions).
     repetitions: Mapped[int] = mapped_column(Integer, default=1)
+    # "full" runs every benchmark program; "quick" runs a small representative
+    # subset (corpus.QUICK_SLUGS) so a run is cheap/fast during iteration. The
+    # thesis result uses "full"; "quick" is for development.
+    scope: Mapped[str] = mapped_column(String(20), default="full")
     status: Mapped[RunStatus] = mapped_column(
         Enum(RunStatus), default=RunStatus.pending
     )

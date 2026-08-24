@@ -119,6 +119,7 @@ def _exp_out(experiment: Experiment) -> ExperimentOut:
         status=experiment.status.value if hasattr(experiment.status, "value") else experiment.status,
         conditions=[c.key for c in resolve_conditions(experiment.conditions)],
         repetitions=experiment.repetitions or 1,
+        scope=experiment.scope or "full",
         created_at=experiment.created_at,
         completed_at=experiment.completed_at,
     )
@@ -265,6 +266,7 @@ def create_experiment(
 
     conditions = [c.key for c in resolve_conditions(payload.conditions)]
     repetitions = max(1, min(10, int(payload.repetitions or 1)))
+    scope = payload.scope if payload.scope in ("quick", "full") else "full"
     experiment = Experiment(
         owner_id=user.id,
         name=name,
@@ -272,6 +274,7 @@ def create_experiment(
         mode=ExperimentMode.multi_agent,
         conditions=conditions,
         repetitions=repetitions,
+        scope=scope,
         status=RunStatus.pending,
     )
     db.add(experiment)

@@ -47,20 +47,20 @@ class Condition:
 CONDITIONS: dict[str, Condition] = {
     "single_llm": Condition(
         key="single_llm",
-        label="Single-LLM baseline",
+        label="Single AI",
         description=(
-            "One prompt turns the requirement straight into test cases — the "
-            "control arm every other condition is measured against."
+            "One AI writes the whole test suite from a single prompt — the "
+            "baseline every other approach is measured against."
         ),
         mode=ExperimentMode.single_llm,
         is_baseline=True,
     ),
     "full_pipeline": Condition(
         key="full_pipeline",
-        label="Full multi-agent pipeline",
+        label="Agent team",
         description=(
-            "Analysis, generation, the Reviewer<->Consensus debate, coverage, "
-            "quality, and prioritisation — the complete framework."
+            "A team of AI agents that hand off in turn and review and fix each "
+            "other's tests before finishing — the complete framework."
         ),
         mode=ExperimentMode.multi_agent,
         reviewer_enabled=True,
@@ -68,10 +68,11 @@ CONDITIONS: dict[str, Condition] = {
     ),
     "ablation_no_debate": Condition(
         key="ablation_no_debate",
-        label="Multi-agent, no debate",
+        label="Agent team, no self-review",
         description=(
-            "The multi-agent pipeline with the Reviewer<->Consensus debate turned "
-            "off, isolating how much the debate itself contributes."
+            "The same agent team, but with the self-review step switched off — "
+            "the step where one agent critiques the tests and another fixes them. "
+            "This isolates how much that self-review adds."
         ),
         mode=ExperimentMode.multi_agent,
         reviewer_enabled=False,

@@ -23,6 +23,7 @@ import logging
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.benchmark.corpus import QUICK_SLUGS
 from app.config import _PROVIDER_DEFAULT_MODEL, get_settings
 from app.database import SessionLocal
 from app.evaluation.conditions import Condition, resolve_conditions
@@ -42,6 +43,26 @@ from app.workflow.config import RunConfig
 from app.workflow.engine import DefaultWorkflowEngine
 
 logger = logging.getLogger("evaluation.runner")
+
+
+def scoped_items(db: Session, experiment: Experiment) -> list[BenchmarkItem]:
+    """The benchmark programs this experiment runs: all of them for a 'full'
+    experiment, or the small representative subset for a 'quick' one. Ordered by
+    id so the runner and the progress counter agree on the grid."""
+    items = list(
+        db.scalars(
+            select(BenchmarkItem)
+            .where(BenchmarkItem.dataset_id == experiment.dataset_id)
+            .order_by(BenchmarkItem.id)
+        )
+    )
+    if (experiment.scope or "full") == "quick":
+        quick = set(QUICK_SLUGS)
+        subset = [it for it in items if it.slug in quick]
+        # Never let a stale/renamed subset silently run zero programs.
+        if subset:
+            return subset
+    return items
 
 
 class ExperimentRunner:
@@ -145,13 +166,7 @@ class ExperimentRunner:
             raise ValueError(f"Experiment {experiment_id} not found")
 
         conditions = resolve_conditions(experiment.conditions)
-        items = list(
-            db.scalars(
-                select(BenchmarkItem)
-                .where(BenchmarkItem.dataset_id == experiment.dataset_id)
-                .order_by(BenchmarkItem.id)
-            )
-        )
+        items = scoped_items(db, experiment)
         base_config = RunConfig.defaults()
         base_config.model = self.model
 
@@ -261,11 +276,7 @@ def experiment_progress(db: Session, experiment_id: int) -> dict:
 
     conditions = resolve_conditions(experiment.conditions)
     repetitions = max(1, int(experiment.repetitions or 1))
-    n_items = db.scalar(
-        select(func.count(BenchmarkItem.id)).where(
-            BenchmarkItem.dataset_id == experiment.dataset_id
-        )
-    ) or 0
+    n_items = len(scoped_items(db, experiment))
     total = n_items * len(conditions) * repetitions
 
     completed_cells = db.execute(

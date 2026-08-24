@@ -1464,6 +1464,21 @@ def fault_type_for(slug: str, mutant_key: str) -> str | None:
     return FAULT_TYPES.get(slug, {}).get(mutant_key)
 
 
+# A small, representative subset for a cheap/fast "Quick" experiment run. It spans
+# the domains (finance, auth, validation, pricing, grading, calendar) and all five
+# fault classes, so a Quick run is a fair — if lower-powered — preview. The full
+# 16-program run is what the thesis result is based on. Keep this list stable so
+# Quick runs stay comparable across sessions.
+QUICK_SLUGS: list[str] = [
+    "atm_withdrawal",
+    "login_lockout",
+    "signup_validation",
+    "discount_pricing",
+    "grade_letter",
+    "leap_year",
+]
+
+
 def _manifest_view() -> list[dict]:
     """Metadata-only view of the corpus (no code bodies) for manifest.json."""
     return [

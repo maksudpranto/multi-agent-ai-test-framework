@@ -180,6 +180,29 @@ def test_rename_and_delete_experiment(client):
     assert client.get(f"/evaluation/experiments/{exp_id}").status_code == 404
 
 
+def test_quick_scope_runs_only_the_subset(client):
+    """A 'quick' experiment covers only the representative subset — far fewer
+    cells than a full run — so iterating stays cheap."""
+    from app.benchmark.corpus import QUICK_SLUGS
+
+    client.post("/evaluation/benchmark/seed")
+    exp = client.post(
+        "/evaluation/experiments",
+        json={"name": "Quick", "conditions": ["single_llm", "full_pipeline"], "scope": "quick"},
+    ).json()
+    assert exp["scope"] == "quick"
+
+    assert client.post(f"/evaluation/experiments/{exp['id']}/run", json={}).status_code == 202
+
+    stat = client.get(f"/evaluation/experiments/{exp['id']}").json()
+    # subset programs x 2 conditions x 1 repeat
+    assert stat["progress"]["total"] == len(QUICK_SLUGS) * 2
+
+    res = client.get(f"/evaluation/experiments/{exp['id']}/results").json()
+    assert res["n_items"] == len(QUICK_SLUGS)
+    assert len(res["ran_requirement_ids"]) == len(QUICK_SLUGS)
+
+
 def test_delete_removes_runs_and_metrics(client):
     """Deleting an experiment removes its runs and metrics too."""
     from sqlalchemy import select

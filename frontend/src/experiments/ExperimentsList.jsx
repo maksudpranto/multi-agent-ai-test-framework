@@ -243,6 +243,7 @@ export default function ExperimentsList() {
   const [name, setName] = useState("");
   const [picked, setPicked] = useState({});
   const [reps, setReps] = useState(1);
+  const [scope, setScope] = useState("full");
   const [launching, setLaunching] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState(null);
   const nameRef = useRef(null);
@@ -306,7 +307,7 @@ export default function ExperimentsList() {
     if (!name.trim() || chosen.length === 0) return;
     setLaunching(true);
     try {
-      const exp = await api.createExperiment({ name: name.trim(), conditions: chosen, repetitions: reps });
+      const exp = await api.createExperiment({ name: name.trim(), conditions: chosen, repetitions: reps, scope });
       await api.runExperiment(exp.id);
       navigate(`/experiments/${exp.id}`);
     } catch (err) {
@@ -349,8 +350,8 @@ export default function ExperimentsList() {
           </button>
         </div>
         <p className="muted exp-setup-copy">
-          Name your study, pick which approaches to compare, and how many times to
-          repeat it. Each runs against a benchmark of eight everyday features (ATM
+          Name your study, pick which approaches to compare, how many programs to run,
+          and how many times to repeat it. The benchmark is 16 everyday features (ATM
           withdrawal, login, sign-up, bank transfer…) with planted bugs.
         </p>
         {seed && (
@@ -396,6 +397,27 @@ export default function ExperimentsList() {
           </div>
 
           <div className="field">
+            <span className="field-label">Programs to run</span>
+            <span className="field-sub">A full run covers all 16 programs (for the thesis result). A quick run uses a representative 6 — far fewer tokens and much faster, for iterating.</span>
+            <div className="reps-pills">
+              <button
+                type="button"
+                className={`reps-pill ${scope === "quick" ? "on" : ""}`}
+                onClick={() => setScope("quick")}
+              >
+                Quick · 6 programs
+              </button>
+              <button
+                type="button"
+                className={`reps-pill ${scope === "full" ? "on" : ""}`}
+                onClick={() => setScope("full")}
+              >
+                Full · 16 programs
+              </button>
+            </div>
+          </div>
+
+          <div className="field">
             <span className="field-label">Repeat runs</span>
             <span className="field-sub">AI output varies run to run — repeating averages out the noise and reports the spread (±).</span>
             <div className="reps-pills">
@@ -414,7 +436,7 @@ export default function ExperimentsList() {
 
           <div className="exp-create-foot">
             <p className="muted exp-foot-note">
-              Runs in the background on the model chosen in section 2 · offline mock is free.
+              <b>≈ {nSelected * (scope === "quick" ? 6 : 16) * reps} pipeline runs</b> ({nSelected} approaches × {scope === "quick" ? 6 : 16} programs × {reps} repeat{reps === 1 ? "" : "s"}) · runs in the background · offline mock is free.
             </p>
             <button type="submit" className="exp-run-btn" disabled={launching || !name.trim() || nSelected === 0}>
               {launching ? (
