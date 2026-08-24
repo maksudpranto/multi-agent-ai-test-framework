@@ -371,13 +371,16 @@ export default function ExperimentResults() {
     .map((c) => {
       const kind = conditionKind(c);
       const s = c.metrics.mutation_score;
+      // Row name is the short tag ("Agent team" / "Single AI") so every row is a
+      // single line of equal height; the distinguishing descriptor and the sample
+      // size go on the sub line.
       return {
         key: c.key,
-        label: c.label,
+        label: kind.tag,
         value: s.mean,
         color: conditionColor(c.key),
         team: kind.team,
-        sub: s.n > 0 ? `caught over ${s.n} program${s.n === 1 ? "" : "s"}` : "",
+        sub: s.n > 0 ? `${kind.sub} · across ${s.n} program${s.n === 1 ? "" : "s"}` : kind.sub,
         best: headline?.winner === c.key,
         spread: c.n_reps > 1 && c.run_to_run_std != null ? c.run_to_run_std : null,
       };
