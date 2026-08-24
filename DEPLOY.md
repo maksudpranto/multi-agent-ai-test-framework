@@ -23,9 +23,10 @@ Deploy the **backend first** (you need its URL for the frontend).
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
      (this is also in `backend/Procfile`)
-4. **Database:** Render → **New → PostgreSQL** (free), copy its *Internal Database URL*.
-   - Add `psycopg2-binary` to `backend/requirements.txt` first (the Postgres driver — not needed for local SQLite).
-   - SQLite also "works" but resets whenever the instance restarts, so use Postgres for anything real.
+4. **Database:** Render → **New → PostgreSQL** (free), copy its *Internal Database URL*, and set it as `DATABASE_URL` on the web service.
+   - The Postgres driver (`psycopg2-binary`) is already in `requirements.txt`, and the backend accepts either `postgres://` or `postgresql://` URLs.
+   - Leaving `DATABASE_URL` unset falls back to SQLite, which resets whenever the instance restarts — so set Postgres for anything you want to keep.
+   - `backend/runtime.txt` pins Python 3.12 so the driver installs cleanly.
 5. **Environment variables** (Render → the web service → Environment):
    ```
    DATABASE_URL=postgresql://…            # the Render Postgres URL (leave unset to use throwaway SQLite)
