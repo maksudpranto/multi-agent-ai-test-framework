@@ -597,7 +597,6 @@ export default function ExperimentsList() {
           )}
         </details>
 
-        <h3 className="progs-subhead">Your programs</h3>
         <CustomPrograms programs={customPrograms} onChanged={refreshCustom} />
       </section>
 

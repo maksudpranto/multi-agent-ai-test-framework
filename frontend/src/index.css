@@ -4374,7 +4374,11 @@ input[type="file"]::file-selector-button:hover {
   color: var(--text-muted); background: var(--surface-mist); border-radius: 999px;
   padding: 2px 9px; margin-left: 4px; vertical-align: middle;
 }
-.cp-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.cp { margin-top: 22px; }
+.cp-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.cp-top-text { min-width: 0; }
+.cp-heading { font-size: 15px; margin: 0 0 4px; }
+.cp-top .ai-btn { flex: none; }
 .cp-lead { margin: 0; max-width: none; }
 
 /* Prefill-a-sample bar at the top of the add-program form */
@@ -4409,12 +4413,8 @@ input[type="file"]::file-selector-button:hover {
 }
 .cp-bugchip.dead { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
 
-/* Add form */
-.cp-form {
-  display: flex; flex-direction: column; gap: 16px; margin-top: 14px;
-  padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-lg);
-  background: var(--surface-soft);
-}
+/* Add form (rendered inside a modal, so no card framing of its own) */
+.cp-form { display: flex; flex-direction: column; gap: 16px; }
 .cp-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 560px) { .cp-form-grid { grid-template-columns: 1fr; } }
 .cp-hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-muted); font-size: 12px; margin-left: 6px; }

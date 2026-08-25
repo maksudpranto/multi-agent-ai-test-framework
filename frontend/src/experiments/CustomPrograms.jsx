@@ -1,5 +1,14 @@
 import { useState } from "react";
 import { api } from "../api/client";
+import Modal from "../components/Modal";
+
+// Spark mark used on AI-driven actions across the app.
+const SparkIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+    <path d="M8 0.8l1.5 4.2 4.2 1.5-4.2 1.5L8 12.2 6.5 8 2.3 6.5 6.5 5z" />
+    <path d="M13 10.2l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z" opacity="0.8" />
+  </svg>
+);
 
 // The fault classes the benchmark taxonomy recognises (kept in sync with the
 // backend FAULT_TAXONOMY). Tagging a bug is optional but powers the
@@ -243,7 +252,7 @@ function AddForm({ onCreated, onCancel }) {
 }
 
 export default function CustomPrograms({ programs, onChanged }) {
-  const [adding, setAdding] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
   async function remove(id) {
@@ -261,27 +270,36 @@ export default function CustomPrograms({ programs, onChanged }) {
   return (
     <div className="cp">
       <div className="cp-top">
-        <p className="muted cp-lead">
-          Add your own program with known bugs, then run a <b>Custom</b> experiment to watch the
-          pipeline catch them — a hands-on way to verify the whole thing. Kept separate from the
-          built-in benchmark.
-        </p>
-        {!adding && (
-          <button className="ghost" onClick={() => setAdding(true)}>+ Add program</button>
-        )}
+        <div className="cp-top-text">
+          <h3 className="cp-heading">Your programs</h3>
+          <p className="muted cp-lead">
+            Add your own program with known bugs, then run a <b>Custom</b> experiment to watch the
+            pipeline catch them — a hands-on way to verify the whole thing. Kept separate from the
+            built-in benchmark.
+          </p>
+        </div>
+        <button className="ai-btn" onClick={() => setModalOpen(true)}>
+          <SparkIcon /> Add a program
+        </button>
       </div>
 
-      {adding && (
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Add a program"
+        subtitle="Define a program, its correct reference, some inputs, and the bugs to seed."
+        width={820}
+      >
         <AddForm
-          onCancel={() => setAdding(false)}
+          onCancel={() => setModalOpen(false)}
           onCreated={(_prog, hadWarnings) => {
             onChanged();
-            if (!hadWarnings) setAdding(false);
+            if (!hadWarnings) setModalOpen(false);
           }}
         />
-      )}
+      </Modal>
 
-      {programs.length === 0 && !adding ? (
+      {programs.length === 0 ? (
         <p className="muted cp-empty">No custom programs yet.</p>
       ) : (
         <div className="cp-list">
