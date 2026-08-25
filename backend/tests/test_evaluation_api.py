@@ -228,6 +228,87 @@ def test_delete_removes_runs_and_metrics(client):
     db.close()
 
 
+def test_custom_program_add_selfcheck_list_delete(client):
+    client.post("/evaluation/benchmark/seed")
+
+    payload = {
+        "title": "Is even",
+        "entrypoint": "is_even",
+        "requirement": "Return whether an integer n is even.",
+        "reference_code": "def is_even(n):\n    return n % 2 == 0\n",
+        "canonical_inputs": [[2], [3], [0], [-1]],
+        "mutants": [
+            {"description": "Inverts parity", "fault_type": "wrong_operator",
+             "code": "def is_even(n):\n    return n % 2 == 1\n"},
+            {"description": "Dead bug (identical)", "fault_type": "boundary",
+             "code": "def is_even(n):\n    return n % 2 == 0\n"},
+        ],
+    }
+    r = client.post("/evaluation/benchmark/custom", json=payload)
+    assert r.status_code == 201, r.text
+    body = r.json()
+    prog = body["program"]
+    assert prog["slug"].startswith("custom_")
+    kills = {m["description"]: m["kills"] for m in prog["mutants"]}
+    assert kills["Inverts parity"] is True
+    assert kills["Dead bug (identical)"] is False
+    # The self-check warns about the bug that can never be caught.
+    assert any("never changes the output" in w for w in body["warnings"])
+
+    # It shows up in the custom list...
+    r = client.get("/evaluation/benchmark/custom")
+    assert r.status_code == 200 and len(r.json()) == 1
+
+    # ...and a 'custom'-scope experiment is now accepted.
+    r = client.post("/evaluation/experiments", json={"name": "Custom run", "scope": "custom"})
+    assert r.status_code == 201
+    assert r.json()["scope"] == "custom"
+
+    # Delete it; the custom list is empty again.
+    r = client.delete(f"/evaluation/benchmark/custom/{prog['id']}")
+    assert r.status_code == 204
+    assert client.get("/evaluation/benchmark/custom").json() == []
+
+
+def test_builtin_programs_listing_and_quick_subset(client):
+    client.post("/evaluation/benchmark/seed")
+
+    r = client.get("/evaluation/benchmark/programs")
+    assert r.status_code == 200
+    programs = r.json()
+    assert len(programs) == 16
+    assert all(not p["is_custom"] for p in programs)
+    assert sum(1 for p in programs if p["default_quick"]) == 6
+
+    # Quick run with an explicit 2-program selection.
+    chosen = [programs[0]["id"], programs[3]["id"]]
+    r = client.post(
+        "/evaluation/experiments",
+        json={"name": "Pick two", "scope": "quick", "item_ids": chosen},
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["scope"] == "quick"
+    assert set(body["item_ids"]) == set(chosen)
+
+    # scoped_items runs exactly the two chosen programs.
+    from sqlalchemy import select
+    import app.evaluation.runner as rm
+    from app.models import Experiment
+
+    db = rm.SessionLocal()
+    exp = db.scalar(select(Experiment).where(Experiment.id == body["id"]))
+    items = rm.scoped_items(db, exp)
+    assert {it.id for it in items} == set(chosen)
+    db.close()
+
+
+def test_custom_scope_rejected_without_programs(client):
+    client.post("/evaluation/benchmark/seed")
+    r = client.post("/evaluation/experiments", json={"name": "No customs", "scope": "custom"})
+    assert r.status_code == 409
+
+
 def test_results_requires_ownership(client):
     # A different user's token cannot read the experiment.
     r = client.post("/evaluation/benchmark/seed")

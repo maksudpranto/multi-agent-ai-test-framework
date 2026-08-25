@@ -68,6 +68,10 @@ class DefaultWorkflowEngine(WorkflowEngine):
             from app.agents.test_generation import TestGenerationAgent
 
             return TestGenerationAgent(self.llm)
+        if stage == PipelineStage.test_data:
+            from app.agents.test_data import TestDataAgent
+
+            return TestDataAgent(self.llm)
         if stage == PipelineStage.reviewer:
             from app.agents.reviewer import ReviewerAgent
 
@@ -304,6 +308,33 @@ class DefaultWorkflowEngine(WorkflowEngine):
         run.current_stage = PipelineStage.prioritization
         db.commit()
         return result
+
+    # -- test data: concrete sample data for one case (on demand) ------------
+    def run_test_data(
+        self,
+        db: Session,
+        run: PipelineRun,
+        *,
+        test_case: TestCase,
+        user_story: str,
+        config: RunConfig,
+    ) -> AgentResult:
+        """Generate concrete sample data for a single test case. Returns the
+        agent result; the caller persists `output["test_data"]` onto the case."""
+        payload = {
+            "id": test_case.id,
+            "title": test_case.title,
+            "steps": test_case.steps,
+            "expected_result": test_case.expected_result,
+            "type": test_case.type,
+        }
+        return self.run_stage(
+            db,
+            run,
+            PipelineStage.test_data,
+            inputs={"user_story": user_story, "test_case": payload},
+            config=config,
+        )
 
     # -- coverage / validation: traceability matrix + adequacy judgement -----
     def run_coverage(

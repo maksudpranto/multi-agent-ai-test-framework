@@ -148,6 +148,15 @@ export const api = {
   getLatestTestCases: (projectId, requirementId) =>
     request(`${P(projectId)}/requirements/${requirementId}/latest-test-cases`),
 
+  // Test Data agent: generate concrete sample data for one test case, on demand.
+  generateTestData: (projectId, requirementId, testCaseId) =>
+    pipe(
+      request(
+        `${P(projectId)}/requirements/${requirementId}/test-cases/${testCaseId}/sample-data`,
+        { method: "POST", body: modelBody() }
+      )
+    ),
+
   runReviewConsensus: (projectId, requirementId) =>
     pipe(
       request(`${P(projectId)}/requirements/${requirementId}/review-consensus`, {
@@ -210,6 +219,15 @@ export const api = {
   listConditions: () => request("/evaluation/conditions"),
   seedBenchmark: () => pipe(request("/evaluation/benchmark/seed", { method: "POST" })),
   listBenchmarkItems: (datasetId) => request(`/evaluation/datasets/${datasetId}/items`),
+  // Built-in (pre-seeded) programs for the current user, with a default_quick flag.
+  getBenchmarkPrograms: () => request("/evaluation/benchmark/programs"),
+
+  // Custom (user-authored) benchmark programs + their seeded bugs.
+  listCustomPrograms: () => request("/evaluation/benchmark/custom"),
+  createCustomProgram: (body) =>
+    request("/evaluation/benchmark/custom", { method: "POST", body }),
+  deleteCustomProgram: (itemId) =>
+    request(`/evaluation/benchmark/custom/${itemId}`, { method: "DELETE" }),
   listExperiments: () => request("/evaluation/experiments"),
   createExperiment: (body) =>
     request("/evaluation/experiments", { method: "POST", body }),

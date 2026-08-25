@@ -266,6 +266,31 @@ Return ONLY a JSON object with a "test_cases" array. Each item must contain:
 Do not include prose outside the JSON.
 """
 
+TEST_DATA_V1 = """\
+You are a test-data engineer. Produce concrete, realistic sample data that makes
+the following ONE test case executable — actual values a tester could paste in
+and run, not descriptions.
+
+USER STORY (domain context):
+{user_story}
+
+TEST CASE:
+{test_case}
+
+Return ONLY a JSON object with a single key "test_data" whose value fits the
+case's type and domain:
+- For a data-driven case, use {{"valid": {{...}}, "invalid": {{...}},
+  "boundary": [...]}} — realistic field names and values drawn from the story,
+  invalid values that should be rejected, and boundary/edge values (min, max,
+  just-inside, just-outside, empty, zero, max length, off-by-one).
+- For a boundary-type case, emphasise the edge values that matter.
+- For a negative/security case, emphasise the invalid or malicious inputs.
+- For a pure UI-navigation case with no real data, return {{"test_data": {{}}}}.
+
+Use the same units and field names the story implies. Do not restate the steps
+or include any prose outside the JSON.
+"""
+
 SEED_PROMPTS: list[dict] = [
     {
         "stage": PipelineStage.requirement_analysis,
@@ -287,6 +312,12 @@ SEED_PROMPTS: list[dict] = [
         "version": "v2",
         "template": TEST_GENERATION_V2,
         "description": "Rich generation: full test suite per criterion + mock data + edge cases.",
+    },
+    {
+        "stage": PipelineStage.test_data,
+        "version": "v1",
+        "template": TEST_DATA_V1,
+        "description": "Test data: concrete sample data for one test case, on demand.",
     },
     {
         "stage": PipelineStage.reviewer,

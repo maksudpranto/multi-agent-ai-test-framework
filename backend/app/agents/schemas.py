@@ -43,6 +43,19 @@ class TestGenerationOut(BaseModel):
     test_cases: list[GeneratedTestCaseOut] = Field(default_factory=list)
 
 
+# --- Test Data ------------------------------------------------------------
+# An on-demand agent that produces concrete, executable sample data for a
+# single existing test case — filling the case's `test_data` field so it can be
+# run, not just read. Same free-form shape the generator uses.
+
+
+class TestDataOut(BaseModel):
+    test_data: dict[str, Any] | list[Any] = Field(
+        description="Concrete sample data to execute the case, e.g. "
+        '{"valid": {...}, "invalid": {...}, "boundary": [...]}',
+    )
+
+
 # --- Reviewer -------------------------------------------------------------
 # The Reviewer critiques the *current* test cases and, crucially, emits a
 # verdict (`needs_revision`) that the engine uses to decide whether the debate

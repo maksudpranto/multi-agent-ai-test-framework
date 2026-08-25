@@ -38,6 +38,7 @@ from app.pipeline.schemas import (
     RefineIn,
     RefineResult,
     RequirementAnalysisResult,
+    TestCaseOut,
     TestGenerationResult,
 )
 from app.workflow.config import RunConfig
@@ -753,6 +754,40 @@ def run_prioritization(
     db.commit()
     db.refresh(run)
     return _build_test_generation_result(db, run, error=result.error)
+
+
+@router.post("/test-cases/{test_case_id}/sample-data", response_model=TestCaseOut)
+def generate_sample_data(
+    project_id: int,
+    requirement_id: int,
+    test_case_id: int,
+    selection: ModelSelection | None = Body(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> TestCase:
+    """Test Data agent: generate concrete sample data for one test case, on
+    demand, and store it on the case. Used from the test-case details view."""
+    requirement = _get_owned_requirement(project_id, requirement_id, user, db)
+    test_case = db.get(TestCase, test_case_id)
+    if test_case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found")
+    run = db.get(PipelineRun, test_case.pipeline_run_id)
+    if run is None or run.requirement_id != requirement.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found")
+
+    engine, config = _resolve_run(selection)
+    result = engine.run_test_data(
+        db, run, test_case=test_case, user_story=requirement.raw_text, config=config
+    )
+    if not result.success:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=result.error or "Test data generation failed",
+        )
+    test_case.test_data = result.output["test_data"]
+    db.commit()
+    db.refresh(test_case)
+    return test_case
 
 
 @router.post("/orchestrate")

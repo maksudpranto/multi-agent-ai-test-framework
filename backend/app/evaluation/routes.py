@@ -9,6 +9,8 @@ request. Status/results are polled from the other endpoints.
 """
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -16,12 +18,17 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user
 from app.config import _PROVIDER_DEFAULT_MODEL, get_settings
 from app.database import get_db
+from app.benchmark.corpus import QUICK_SLUGS
 from app.evaluation.conditions import CONDITIONS, resolve_conditions
 from app.evaluation.runner import experiment_progress, run_experiment_task
 from app.evaluation.schemas import (
     BenchmarkItemOut,
     BenchmarkSeedResult,
     ConditionOut,
+    CustomMutantOut,
+    CustomProgramCreated,
+    CustomProgramIn,
+    CustomProgramOut,
     ExperimentCreate,
     ExperimentOut,
     ExperimentProgress,
@@ -35,6 +42,7 @@ from app.models import (
     AcceptanceCriterion,
     AgentExecution,
     BenchmarkItem,
+    BenchmarkMutant,
     CoverageReport,
     Dataset,
     DebateTurn,
@@ -43,8 +51,12 @@ from app.models import (
     ExperimentMode,
     ExportLog,
     PipelineRun,
+    Priority,
     QualityReport,
+    Requirement,
     RequirementAnalysis,
+    RequirementStatus,
+    RequirementType,
     RunStatus,
     TestCase,
     TestCaseStatus,
@@ -120,6 +132,7 @@ def _exp_out(experiment: Experiment) -> ExperimentOut:
         conditions=[c.key for c in resolve_conditions(experiment.conditions)],
         repetitions=experiment.repetitions or 1,
         scope=experiment.scope or "full",
+        item_ids=experiment.item_ids or None,
         created_at=experiment.created_at,
         completed_at=experiment.completed_at,
     )
@@ -199,17 +212,226 @@ def list_benchmark_items(
         )
     )
     return [
-        BenchmarkItemOut(
-            id=it.id,
-            slug=it.slug,
-            title=it.title,
-            entrypoint=it.entrypoint,
-            signature=it.signature,
-            requirement_id=it.requirement_id,
-            n_mutants=len(it.mutants),
-        )
+        _item_out(it)
         for it in items
     ]
+
+
+_QUICK_SLUGS = set(QUICK_SLUGS)
+
+
+def _item_out(it: BenchmarkItem) -> BenchmarkItemOut:
+    return BenchmarkItemOut(
+        id=it.id,
+        slug=it.slug,
+        title=it.title,
+        entrypoint=it.entrypoint,
+        signature=it.signature,
+        requirement_id=it.requirement_id,
+        n_mutants=len(it.mutants),
+        is_custom=it.is_custom,
+        default_quick=(not it.is_custom) and it.slug in _QUICK_SLUGS,
+    )
+
+
+@router.get("/benchmark/programs", response_model=list[BenchmarkItemOut])
+def list_builtin_programs(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[BenchmarkItemOut]:
+    """The built-in (pre-seeded) benchmark programs for the current user, with a
+    `default_quick` flag marking the representative Quick subset. Empty until the
+    benchmark is seeded."""
+    dataset = _benchmark_dataset(user, db)
+    if dataset is None:
+        return []
+    items = list(
+        db.scalars(
+            select(BenchmarkItem)
+            .where(
+                BenchmarkItem.dataset_id == dataset.id,
+                BenchmarkItem.is_custom.is_(False),
+            )
+            .order_by(BenchmarkItem.id)
+        )
+    )
+    return [_item_out(it) for it in items]
+
+
+# ---------------------------------------------------------------------------
+# Custom (user-authored) benchmark programs
+# ---------------------------------------------------------------------------
+
+
+def _slugify(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+    return s or "program"
+
+
+def _unique_custom_slug(db: Session, dataset_id: int, base: str) -> str:
+    slug = f"custom_{base}"
+    n = 1
+    while db.scalar(
+        select(BenchmarkItem).where(
+            BenchmarkItem.dataset_id == dataset_id, BenchmarkItem.slug == slug
+        )
+    ):
+        n += 1
+        slug = f"custom_{base}_{n}"
+    return slug
+
+
+def _custom_program_out(
+    item: BenchmarkItem, kills: dict[int, bool | None] | None = None
+) -> CustomProgramOut:
+    kills = kills or {}
+    return CustomProgramOut(
+        id=item.id,
+        slug=item.slug,
+        title=item.title,
+        entrypoint=item.entrypoint,
+        signature=item.signature,
+        requirement_id=item.requirement_id,
+        requirement=item.requirement.raw_text if item.requirement else "",
+        reference_code=item.reference_code,
+        canonical_inputs=item.canonical_inputs or [],
+        mutants=[
+            CustomMutantOut(
+                id=m.id,
+                mutant_key=m.mutant_key,
+                description=m.description,
+                fault_type=m.fault_type,
+                code=m.code,
+                kills=kills.get(m.id),
+            )
+            for m in item.mutants
+        ],
+    )
+
+
+@router.get("/benchmark/custom", response_model=list[CustomProgramOut])
+def list_custom_programs(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[CustomProgramOut]:
+    """The current user's own benchmark programs (added through the app)."""
+    dataset = _benchmark_dataset(user, db)
+    if dataset is None:
+        return []
+    items = list(
+        db.scalars(
+            select(BenchmarkItem)
+            .where(
+                BenchmarkItem.dataset_id == dataset.id,
+                BenchmarkItem.is_custom.is_(True),
+            )
+            .order_by(BenchmarkItem.id)
+        )
+    )
+    return [_custom_program_out(it) for it in items]
+
+
+@router.post(
+    "/benchmark/custom",
+    response_model=CustomProgramCreated,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_custom_program(
+    payload: CustomProgramIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> CustomProgramCreated:
+    """Add a user-authored program + its seeded bugs, and self-check them: run
+    the reference and every bug on the given inputs so we can flag a bug that
+    never diverges (and therefore can never be caught)."""
+    from app.benchmark.seed import _get_or_create_dataset, _get_or_create_project
+    from app.evaluation.harness import _diverges, _exec
+
+    project = _get_or_create_project(db, user.id)
+    dataset = _get_or_create_dataset(db, user.id)
+
+    inputs = [list(x) for x in payload.canonical_inputs]
+    ref_out = _exec(payload.reference_code, payload.entrypoint, inputs)
+    usable = [i for i, o in enumerate(ref_out) if o["status"] == "ok"]
+    warnings: list[str] = []
+    if not usable:
+        warnings.append(
+            "Your reference implementation errored or timed out on every input — check "
+            f"it defines {payload.entrypoint}(...) and that the inputs match its parameters."
+        )
+
+    requirement = Requirement(
+        project_id=project.id,
+        dataset_id=dataset.id,
+        title=payload.title,
+        raw_text=payload.requirement,
+        req_type=RequirementType.feature_description,
+        priority=Priority.medium,
+        status=RequirementStatus.ready,
+    )
+    db.add(requirement)
+    db.flush()
+
+    item = BenchmarkItem(
+        dataset_id=dataset.id,
+        requirement_id=requirement.id,
+        slug=_unique_custom_slug(db, dataset.id, _slugify(payload.title)),
+        title=payload.title,
+        entrypoint=payload.entrypoint,
+        signature=payload.signature,
+        params=None,
+        canonical_inputs=inputs,
+        reference_code=payload.reference_code,
+        is_custom=True,
+    )
+    db.add(item)
+    db.flush()
+
+    kills: dict[int, bool | None] = {}
+    for idx, m in enumerate(payload.mutants, start=1):
+        mut_out = _exec(m.code, payload.entrypoint, inputs)
+        does_kill: bool | None = (
+            any(_diverges(ref_out[i], mut_out[i]) for i in usable) if usable else None
+        )
+        if does_kill is False:
+            warnings.append(
+                f"Bug {idx} (“{m.description}”) never changes the output on your inputs, "
+                "so no test can catch it — add an input that triggers it, or fix the bug."
+            )
+        mutant = BenchmarkMutant(
+            benchmark_item_id=item.id,
+            mutant_key=f"m{idx}",
+            description=m.description,
+            fault_type=m.fault_type,
+            code=m.code,
+        )
+        db.add(mutant)
+        db.flush()
+        kills[mutant.id] = does_kill
+
+    db.commit()
+    db.refresh(item)
+    return CustomProgramCreated(program=_custom_program_out(item, kills), warnings=warnings)
+
+
+@router.delete("/benchmark/custom/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_custom_program(
+    item_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    """Delete one of the current user's custom programs (and its bugs). The
+    built-in corpus can't be deleted this way."""
+    dataset = _benchmark_dataset(user, db)
+    item = db.get(BenchmarkItem, item_id)
+    if item is None or dataset is None or item.dataset_id != dataset.id or not item.is_custom:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Custom program not found"
+        )
+    # Deleting the item cascades to its mutants. The backing requirement is left
+    # in the hidden benchmark project (a past experiment run may still link it).
+    db.delete(item)
+    db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +488,37 @@ def create_experiment(
 
     conditions = [c.key for c in resolve_conditions(payload.conditions)]
     repetitions = max(1, min(10, int(payload.repetitions or 1)))
-    scope = payload.scope if payload.scope in ("quick", "full") else "full"
+    scope = payload.scope if payload.scope in ("quick", "full", "custom") else "full"
+    if scope == "custom" and db.scalar(
+        select(BenchmarkItem.id).where(
+            BenchmarkItem.dataset_id == dataset.id, BenchmarkItem.is_custom.is_(True)
+        ).limit(1)
+    ) is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No custom programs yet — add one before running a custom experiment.",
+        )
+    # For a quick run, keep only the chosen built-in item ids that really belong
+    # to this dataset (ignore anything stale/foreign or custom).
+    item_ids: list[int] | None = None
+    if scope == "quick" and payload.item_ids:
+        valid = set(
+            db.scalars(
+                select(BenchmarkItem.id).where(
+                    BenchmarkItem.dataset_id == dataset.id,
+                    BenchmarkItem.is_custom.is_(False),
+                    BenchmarkItem.id.in_(payload.item_ids),
+                )
+            )
+        )
+        chosen = [i for i in payload.item_ids if i in valid]
+        if not chosen:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="None of the selected programs were found in the benchmark.",
+            )
+        item_ids = chosen
+
     experiment = Experiment(
         owner_id=user.id,
         name=name,
@@ -275,6 +527,7 @@ def create_experiment(
         conditions=conditions,
         repetitions=repetitions,
         scope=scope,
+        item_ids=item_ids,
         status=RunStatus.pending,
     )
     db.add(experiment)

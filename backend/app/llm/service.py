@@ -140,6 +140,18 @@ def _dev_mock_responder(messages, system) -> str:
             }
         )
 
+    # --- Test Data: concrete sample data for one case (on-demand agent). ---
+    if "you are a test-data engineer" in text:
+        return json.dumps(
+            {
+                "test_data": {
+                    "valid": {"input": "well-formed sample value"},
+                    "invalid": {"input": "malformed value that should be rejected"},
+                    "boundary": [0, 1, 9999999],
+                }
+            }
+        )
+
     # --- Reviewer: flag once on round 1, be satisfied from round 2 (so the
     # debate terminates by consensus rather than by hitting max rounds). ---
     if "you are a meticulous qa reviewer" in text:

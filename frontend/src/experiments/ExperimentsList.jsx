@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import ModelPicker from "../components/ModelPicker";
 import UsagePanel from "../components/UsagePanel";
+import Modal from "../components/Modal";
+import CustomPrograms from "./CustomPrograms";
 
 const STATUS_CHIP = {
   pending: "chip-grey",
@@ -232,6 +234,10 @@ export default function ExperimentsList() {
   const navigate = useNavigate();
   const [conditions, setConditions] = useState([]);
   const [experiments, setExperiments] = useState([]);
+  const [customPrograms, setCustomPrograms] = useState([]);
+  const [builtinPrograms, setBuiltinPrograms] = useState([]);
+  const [quickIds, setQuickIds] = useState(() => new Set()); // chosen for a Quick run
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -254,12 +260,20 @@ export default function ExperimentsList() {
 
   const load = useCallback(async () => {
     try {
-      const [conds, exps] = await Promise.all([
+      const [conds, exps, custom, builtin] = await Promise.all([
         api.listConditions(),
         api.listExperiments(),
+        api.listCustomPrograms().catch(() => []),
+        api.getBenchmarkPrograms().catch(() => []),
       ]);
       setConditions(conds);
       setExperiments(exps);
+      setCustomPrograms(custom);
+      setBuiltinPrograms(builtin);
+      // Default the Quick selection to the representative subset, once.
+      setQuickIds((prev) =>
+        prev.size ? prev : new Set(builtin.filter((p) => p.default_quick).map((p) => p.id))
+      );
       setPicked((prev) =>
         Object.keys(prev).length ? prev : Object.fromEntries(conds.map((c) => [c.key, true]))
       );
@@ -293,6 +307,11 @@ export default function ExperimentsList() {
     try {
       const info = await api.seedBenchmark();
       setSeed(info);
+      const builtin = await api.getBenchmarkPrograms().catch(() => []);
+      setBuiltinPrograms(builtin);
+      setQuickIds((prev) =>
+        prev.size ? prev : new Set(builtin.filter((p) => p.default_quick).map((p) => p.id))
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -307,7 +326,13 @@ export default function ExperimentsList() {
     if (!name.trim() || chosen.length === 0) return;
     setLaunching(true);
     try {
-      const exp = await api.createExperiment({ name: name.trim(), conditions: chosen, repetitions: reps, scope });
+      const exp = await api.createExperiment({
+        name: name.trim(),
+        conditions: chosen,
+        repetitions: reps,
+        scope,
+        item_ids: scope === "quick" ? [...quickIds] : undefined,
+      });
       await api.runExperiment(exp.id);
       navigate(`/experiments/${exp.id}`);
     } catch (err) {
@@ -317,6 +342,21 @@ export default function ExperimentsList() {
   }
 
   const nSelected = conditions.filter((c) => picked[c.key]).length;
+  const customCount = customPrograms.length;
+  const fullCount = builtinPrograms.length || 16;
+  const programCount =
+    scope === "quick" ? quickIds.size : scope === "custom" ? customCount : fullCount;
+  const refreshCustom = useCallback(async () => {
+    setCustomPrograms(await api.listCustomPrograms().catch(() => []));
+  }, []);
+  function toggleQuick(id) {
+    setQuickIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <div className="content exp-page">
@@ -325,21 +365,34 @@ export default function ExperimentsList() {
           <p className="hero-eyebrow">Research</p>
           <h1>Experiments</h1>
           <p className="hero-sub">
-            Run a controlled, fault-based comparison: each condition turns the same
-            requirements into a test suite, and we <b>run those suites against code
-            with seeded bugs</b> to measure how many they catch — with a significance
-            test, not a guess.
+            A controlled, fault-based comparison: each approach writes tests for the same
+            <b> 16 everyday features</b> (ATM withdrawal, login, sign-up, bank transfer…),
+            then we <b>run those tests against code seeded with bugs</b> and measure how
+            many each approach catches — with a significance test, not a guess.
           </p>
         </div>
       </section>
 
       {error && <p className="error">{error}</p>}
 
-      {/* Section 1 — New experiment */}
+      {/* Section 1 — AI model selection + live quota */}
+      <section className="section">
+        <div className="section-head">
+          <h2>
+            <span className="step-n">1</span> AI model &amp; free quota
+          </h2>
+        </div>
+        <div className="exp-model-row">
+          <ModelPicker onProviderChange={setSelectedProvider} />
+        </div>
+        <UsagePanel providerFilter={selectedProvider} />
+      </section>
+
+      {/* Section 2 — New experiment */}
       <section className="section exp-setup">
         <div className="section-head">
           <h2>
-            <span className="step-n">1</span> New experiment
+            <span className="step-n">2</span> New experiment
           </h2>
           <button className="ghost" onClick={onSeed} disabled={seeding}>
             {seeding ? (
@@ -349,11 +402,6 @@ export default function ExperimentsList() {
             )}
           </button>
         </div>
-        <p className="muted exp-setup-copy">
-          Name your study, pick which approaches to compare, how many programs to run,
-          and how many times to repeat it. The benchmark is 16 everyday features (ATM
-          withdrawal, login, sign-up, bank transfer…) with planted bugs.
-        </p>
         {seed && (
           <div className="exp-seed-note">
             ✓ Benchmark ready — {seed.n_items} programs
@@ -375,8 +423,8 @@ export default function ExperimentsList() {
           </label>
 
           <div className="field">
-            <span className="field-label">Approaches to compare</span>
-            <span className="field-sub">Each becomes a column in the results. Keep the baseline plus at least one multi-agent arm.</span>
+            <span className="field-label">What to compare</span>
+            <span className="field-sub">Each becomes a column in the results. Keep <b>Single AI</b> and at least one agent team.</span>
             <div className="cond-pills">
               {conditions.map((c) => (
                 <label
@@ -396,49 +444,85 @@ export default function ExperimentsList() {
             </div>
           </div>
 
-          <div className="field">
-            <span className="field-label">Programs to run</span>
-            <span className="field-sub">A full run covers all 16 programs (for the thesis result). A quick run uses a representative 6 — far fewer tokens and much faster, for iterating.</span>
-            <div className="reps-pills">
-              <button
-                type="button"
-                className={`reps-pill ${scope === "quick" ? "on" : ""}`}
-                onClick={() => setScope("quick")}
-              >
-                Quick · 6 programs
-              </button>
-              <button
-                type="button"
-                className={`reps-pill ${scope === "full" ? "on" : ""}`}
-                onClick={() => setScope("full")}
-              >
-                Full · 16 programs
-              </button>
-            </div>
-          </div>
-
-          <div className="field">
-            <span className="field-label">Repeat runs</span>
-            <span className="field-sub">AI output varies run to run — repeating averages out the noise and reports the spread (±).</span>
-            <div className="reps-pills">
-              {[1, 3, 5].map((n) => (
+          <div className="field-grid2">
+            <div className="field">
+              <span className="field-label">How much to run</span>
+              <span className="field-sub"><b>Full</b> = all 16 (the thesis result). <b>Quick</b> = a fast 6-program sample. <b>Custom</b> = your own programs.</span>
+              <div className="reps-pills">
                 <button
                   type="button"
-                  key={n}
-                  className={`reps-pill ${reps === n ? "on" : ""}`}
-                  onClick={() => setReps(n)}
+                  className={`reps-pill ${scope === "quick" ? "on" : ""}`}
+                  onClick={() => setScope("quick")}
                 >
-                  {n === 1 ? "1 run" : `${n} runs`}
+                  Quick · {quickIds.size}
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className={`reps-pill ${scope === "full" ? "on" : ""}`}
+                  onClick={() => setScope("full")}
+                >
+                  Full · {fullCount}
+                </button>
+                <button
+                  type="button"
+                  className={`reps-pill ${scope === "custom" ? "on" : ""}`}
+                  onClick={() => setScope("custom")}
+                  disabled={customCount === 0}
+                  title={customCount === 0 ? "Add a program under “Your programs” first" : "Run only your own programs"}
+                >
+                  Custom · {customCount}
+                </button>
+              </div>
+            </div>
+
+            <div className="field">
+              <span className="field-label">Repeat runs</span>
+              <span className="field-sub">Averages out run-to-run noise and reports a ± spread.</span>
+              <div className="reps-pills">
+                {[1, 3, 5].map((n) => (
+                  <button
+                    type="button"
+                    key={n}
+                    className={`reps-pill ${reps === n ? "on" : ""}`}
+                    onClick={() => setReps(n)}
+                  >
+                    {n === 1 ? "1 run" : `${n} runs`}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
+          {scope === "quick" && (
+            <div className="qpick-bar">
+              <span className="qpick-summary">
+                {builtinPrograms.length === 0 ? (
+                  "Seed the benchmark to choose programs."
+                ) : (
+                  <><b>{quickIds.size}</b> of {fullCount} programs selected</>
+                )}
+              </span>
+              <button
+                type="button"
+                className="ghost btn-sm"
+                onClick={() => setPickerOpen(true)}
+                disabled={builtinPrograms.length === 0}
+              >
+                Choose programs
+              </button>
+            </div>
+          )}
+
           <div className="exp-create-foot">
-            <p className="muted exp-foot-note">
-              <b>≈ {nSelected * (scope === "quick" ? 6 : 16) * reps} pipeline runs</b> ({nSelected} approaches × {scope === "quick" ? 6 : 16} programs × {reps} repeat{reps === 1 ? "" : "s"}) · runs in the background · offline mock is free.
-            </p>
-            <button type="submit" className="exp-run-btn" disabled={launching || !name.trim() || nSelected === 0}>
+            <div className="exp-estimate">
+              <div className="exp-est-main">
+                ≈ {nSelected * programCount * reps} test suites to generate &amp; score
+              </div>
+              <div className="exp-est-sub">
+                {nSelected} approach{nSelected === 1 ? "" : "es"} × {programCount} program{programCount === 1 ? "" : "s"} × {reps} repeat{reps === 1 ? "" : "s"} · runs in the background · mock model is free
+              </div>
+            </div>
+            <button type="submit" className="exp-run-btn" disabled={launching || !name.trim() || nSelected === 0 || programCount === 0}>
               {launching ? (
                 <span className="busy-label"><span className="spinner" /> Launching…</span>
               ) : (
@@ -449,27 +533,78 @@ export default function ExperimentsList() {
         </form>
       </section>
 
-      {/* Section 2 — AI model selection + live quota */}
+      <Modal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Choose Quick programs"
+        subtitle={`${quickIds.size} of ${fullCount} selected · a Quick run scores only these`}
+        width={620}
+      >
+        <div className="qpick-actions qpick-modal-actions">
+          <button type="button" onClick={() => setQuickIds(new Set(builtinPrograms.filter((p) => p.default_quick).map((p) => p.id)))}>Default 6</button>
+          <button type="button" onClick={() => setQuickIds(new Set(builtinPrograms.map((p) => p.id)))}>All</button>
+          <button type="button" onClick={() => setQuickIds(new Set())}>None</button>
+        </div>
+        <div className="qpick-list">
+          {builtinPrograms.map((p) => (
+            <label key={p.id} className={`qpick-row ${quickIds.has(p.id) ? "on" : ""}`}>
+              <input type="checkbox" checked={quickIds.has(p.id)} onChange={() => toggleQuick(p.id)} />
+              <span className="qpick-row-title">{p.title}</span>
+              <code className="qpick-row-fn">{p.entrypoint}()</code>
+              {p.default_quick && <span className="qpick-row-tag">default</span>}
+            </label>
+          ))}
+        </div>
+        <div className="qpick-modal-foot">
+          <span className="muted">{quickIds.size} selected</span>
+          <button type="button" className="exp-run-btn" onClick={() => setPickerOpen(false)}>Done</button>
+        </div>
+      </Modal>
+
+      {/* Section 3 — Programs: the built-in benchmark + your own */}
       <section className="section">
         <div className="section-head">
-          <h2>
-            <span className="step-n">2</span> AI model selection &amp; details
-          </h2>
+          <h2><span className="step-n">3</span> Programs</h2>
         </div>
-        <p className="muted exp-setup-copy">
-          Choose the free model that powers every agent in your study. The panel below
-          shows how much free quota that provider has left right now.
+        <p className="muted cp-lead">
+          The small programs the agents write tests against — each hides <b>4 planted bugs</b>.
+          These are the "projects" an experiment runs.
         </p>
-        <div className="exp-model-row">
-          <ModelPicker onProviderChange={setSelectedProvider} />
-        </div>
-        <UsagePanel providerFilter={selectedProvider} />
+
+        <details className="progs-builtin" open>
+          <summary>
+            <span className="progs-caret">▸</span>
+            Built-in benchmark
+            <span className="progs-n">{fullCount} programs</span>
+          </summary>
+          {builtinPrograms.length === 0 ? (
+            <p className="muted progs-empty">Not seeded yet — use “Seed / refresh benchmark” above.</p>
+          ) : (
+            <div className="progs-grid">
+              {builtinPrograms.map((p) => (
+                <div className="progs-card" key={p.id}>
+                  <div className="progs-card-top">
+                    <span className="progs-title">{p.title}</span>
+                    {p.default_quick && <span className="progs-quick" title="In the default Quick subset">Quick</span>}
+                  </div>
+                  <div className="progs-meta">
+                    <code className="cp-entry">{p.entrypoint}()</code>
+                    <span className="progs-bugs">{p.n_mutants} bugs</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </details>
+
+        <h3 className="progs-subhead">Your programs</h3>
+        <CustomPrograms programs={customPrograms} onChanged={refreshCustom} />
       </section>
 
-      {/* Section 3 — Your experiments */}
+      {/* Section 4 — Your experiments */}
       <section className="section">
         <div className="section-head">
-          <h2><span className="step-n">3</span> Your experiments</h2>
+          <h2><span className="step-n">4</span> Your experiments</h2>
           <div className="exp-list-tools">
             <div className="exp-search">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">

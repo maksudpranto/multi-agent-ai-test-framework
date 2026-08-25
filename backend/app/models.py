@@ -25,6 +25,7 @@ class PipelineStage(str, enum.Enum):
     planning = "planning"  # Orchestrator planner decisions (agentic control)
     requirement_analysis = "requirement_analysis"
     test_generation = "test_generation"
+    test_data = "test_data"  # On-demand: concrete sample data for one test case
     reviewer = "reviewer"
     consensus = "consensus"
     prioritization = "prioritization"
@@ -502,6 +503,10 @@ class Experiment(Base):
     # subset (corpus.QUICK_SLUGS) so a run is cheap/fast during iteration. The
     # thesis result uses "full"; "quick" is for development.
     scope: Mapped[str] = mapped_column(String(20), default="full")
+    # For a "quick" scope: the specific BenchmarkItem ids the user chose to run.
+    # Null/empty falls back to the default representative subset (QUICK_SLUGS).
+    # Ignored for "full" (all built-in) and "custom" (all user programs).
+    item_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
     status: Mapped[RunStatus] = mapped_column(
         Enum(RunStatus), default=RunStatus.pending
     )
@@ -566,6 +571,10 @@ class BenchmarkItem(Base):
     # always has valid inputs so a run never silently scores zero.
     canonical_inputs: Mapped[list | None] = mapped_column(JSON, nullable=True)
     reference_code: Mapped[str] = mapped_column(Text)
+    # True for user-authored programs added through the app (kept out of the
+    # fixed thesis corpus: 'quick'/'full' runs use only built-in items, a
+    # 'custom' run uses only these). False for the seeded benchmark programs.
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     requirement: Mapped["Requirement"] = relationship()

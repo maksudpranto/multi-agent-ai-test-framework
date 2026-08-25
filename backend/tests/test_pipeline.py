@@ -366,6 +366,39 @@ def test_debate_records_reviewer_findings_in_transcript(db):
     assert first.content["findings"][0]["severity"] in {"high", "medium", "low"}
 
 
+def test_test_data_agent_fills_sample_data_for_one_case(db):
+    """The on-demand Test Data agent produces concrete sample data for a single
+    case, logs an audit row, and its output can be persisted onto the case."""
+    engine, run, story, criteria, cfg = _run_multi_agent_through_generation(db)
+
+    case = db.scalars(
+        select(GeneratedTestCase).where(
+            GeneratedTestCase.pipeline_run_id == run.id
+        )
+    ).first()
+    assert case is not None
+
+    result = engine.run_test_data(
+        db, run, test_case=case, user_story=story.raw_text, config=cfg
+    )
+    assert result.success
+    assert "test_data" in result.output and result.output["test_data"]
+
+    # The route persists the agent's output onto the case; do the same here.
+    case.test_data = result.output["test_data"]
+    db.commit()
+    db.refresh(case)
+    assert case.test_data == result.output["test_data"]
+
+    execution = db.scalar(
+        select(AgentExecution).where(
+            AgentExecution.pipeline_run_id == run.id,
+            AgentExecution.stage == PipelineStage.test_data,
+        )
+    )
+    assert execution is not None and execution.status == ExecutionStatus.success
+
+
 def test_prioritizer_assigns_rank_and_severity(db):
     engine, run, story, criteria, cfg = _run_multi_agent_through_generation(db)
 

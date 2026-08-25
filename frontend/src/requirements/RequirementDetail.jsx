@@ -225,11 +225,32 @@ export default function RequirementDetail() {
   const [plSteps, setPlSteps] = useState(PIPELINE_STEPS);
   const [orchestrating, setOrchestrating] = useState(false);
   const [orchestration, setOrchestration] = useState(null);
+  const [dataBusyId, setDataBusyId] = useState(null); // test case whose data is generating
   const [selectedProvider, setSelectedProvider] = useState(getModelSelection()?.provider || null);
 
   // Floor each agent action to a short minimum so its loading state is
   // actually visible (a no-op once a real LLM call takes longer).
   const pace = (p) => Promise.all([p, sleep(500)]).then(([r]) => r);
+
+  // Test Data agent: fill one test case's sample data on demand, then refresh
+  // whichever suite it belongs to so the new data shows in place.
+  async function onGenerateData(testCaseId) {
+    setDataBusyId(testCaseId);
+    setError("");
+    try {
+      await pace(api.generateTestData(projectId, requirementId, testCaseId));
+      const [g, b] = await Promise.all([
+        api.getLatestTestCases(projectId, requirementId).catch(() => null),
+        api.getLatestBaseline(projectId, requirementId).catch(() => null),
+      ]);
+      if (g) setGeneration(g);
+      if (b) setBaseline(b);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setDataBusyId(null);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -736,7 +757,7 @@ export default function RequirementDetail() {
                       Generate a full, traceable test suite from the acceptance criteria.
                     </p>
                   ) : (
-                    <TestCaseTable cases={multiCases} showTrace />
+                    <TestCaseTable cases={multiCases} showTrace onGenerateData={onGenerateData} dataBusyId={dataBusyId} />
                   )}
                 </>
               ) : (
@@ -749,7 +770,7 @@ export default function RequirementDetail() {
                   {baselineCases.length === 0 ? (
                     <p className="muted">Run the baseline to generate tests in one step.</p>
                   ) : (
-                    <TestCaseTable cases={baselineCases} />
+                    <TestCaseTable cases={baselineCases} onGenerateData={onGenerateData} dataBusyId={dataBusyId} />
                   )}
                 </>
               )}
@@ -971,9 +992,159 @@ function hasTestData(tc) {
   );
 }
 
-function TestCaseTable({ cases, showTrace }) {
+// Turn a snake/kebab key into a readable label ("max_amount" -> "Max amount").
+function humanizeKey(k) {
+  const s = String(k).replace(/[_-]+/g, " ").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function scalarText(v) {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (v === "") return "(empty)";
+  return String(v);
+}
+
+// A short one-line summary of a test_data blob, shown next to the collapse caret.
+function dataSummary(td) {
+  if (Array.isArray(td)) return `${td.length} value${td.length === 1 ? "" : "s"}`;
+  if (td && typeof td === "object") {
+    const n = Object.keys(td).length;
+    return `${n} group${n === 1 ? "" : "s"}`;
+  }
+  return "";
+}
+
+function isPlainObject(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+// A single table cell: scalars plain, nested objects/arrays compacted to text.
+function cellText(v) {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "object") return JSON.stringify(v);
+  return scalarText(v);
+}
+
+// An array of row objects (e.g. many {email, password, name}) rendered as a
+// proper table — the readable way, not a pile of stacked field lists.
+function DataTable({ rows }) {
+  const objRows = rows.map((r) => (isPlainObject(r) ? r : { value: r }));
+  const cols = [];
+  for (const r of objRows) {
+    for (const k of Object.keys(r)) if (!cols.includes(k)) cols.push(k);
+  }
+  return (
+    <div className="tdv-tablewrap">
+      <table className="tdv-table">
+        <thead>
+          <tr>
+            <th className="tdv-rownum">#</th>
+            {cols.map((c) => (
+              <th key={c}>{humanizeKey(c)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {objRows.map((r, i) => (
+            <tr key={i}>
+              <td className="tdv-rownum">{i + 1}</td>
+              {cols.map((c) => (
+                <td key={c}>{cellText(r[c])}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Render one value: array of objects -> table, array of scalars -> chips,
+// object -> field rows, scalar -> plain text.
+function DataValue({ value }) {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="tdv-none">— none —</span>;
+    if (value.some(isPlainObject)) return <DataTable rows={value} />;
+    return (
+      <div className="tdv-chips">
+        {value.map((v, i) => (
+          <span key={i} className="tdv-chip">{scalarText(v)}</span>
+        ))}
+      </div>
+    );
+  }
+  if (isPlainObject(value)) return <DataFields obj={value} />;
+  return <span className="tdv-scalar">{scalarText(value)}</span>;
+}
+
+// An object rendered as a labelled field list ("Email: a@b.com").
+function DataFields({ obj }) {
+  const entries = Object.entries(obj);
+  if (entries.length === 0) return <span className="tdv-none">— none —</span>;
+  return (
+    <dl className="tdv-fields">
+      {entries.map(([k, v]) => (
+        <div className="tdv-field" key={k}>
+          <dt>{humanizeKey(k)}</dt>
+          <dd>
+            {v !== null && typeof v === "object" ? <DataValue value={v} /> : scalarText(v)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+// Readable view of a whole test_data blob: top-level keys (valid / invalid /
+// boundary / …) become labelled groups instead of a raw JSON dump.
+function TestDataView({ data }) {
+  if (Array.isArray(data)) {
+    return <div className="tdv"><DataValue value={data} /></div>;
+  }
+  const groups = Object.entries(data || {});
+  if (groups.length === 0) return <p className="muted tc-data-empty">No data.</p>;
+  return (
+    <div className="tdv tdv-groups">
+      {groups.map(([key, val]) => (
+        <div className="tdv-group" key={key}>
+          <div className={`tdv-group-lbl grp-${String(key).toLowerCase()}`}>
+            {humanizeKey(key)}
+          </div>
+          <DataValue value={val} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TestCaseTable({ cases, showTrace, onGenerateData, dataBusyId }) {
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState(() => new Set());
+  const [dataCollapsed, setDataCollapsed] = useState(() => new Set());
+
+  // Friendly, per-suite acceptance-criterion numbers: the criteria referenced by
+  // these cases, ordered, become AC #001, #002, … (restarting for each suite)
+  // instead of exposing raw database ids.
+  const acNumber = useMemo(() => {
+    const ids = [...new Set(cases.map((c) => c.traces_to).filter((x) => x != null))].sort(
+      (a, b) => a - b
+    );
+    const m = new Map();
+    ids.forEach((id, i) => m.set(id, i + 1));
+    return m;
+  }, [cases]);
+  const acLabel = (id) => `AC #${String(acNumber.get(id) ?? id).padStart(3, "0")}`;
+
+  function toggleData(id, e) {
+    e?.stopPropagation();
+    setDataCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const typeCounts = useMemo(() => {
     const counts = {};
@@ -1084,7 +1255,7 @@ function TestCaseTable({ cases, showTrace }) {
                       {showTrace && (
                         <td>
                           {tc.traces_to ? (
-                            <span className="chip chip-accent">AC #{tc.traces_to}</span>
+                            <span className="chip chip-accent">{acLabel(tc.traces_to)}</span>
                           ) : (
                             <span className="muted">—</span>
                           )}
@@ -1108,25 +1279,67 @@ function TestCaseTable({ cases, showTrace }) {
                     {open && (
                       <tr className="tc-detail">
                         <td colSpan={colCount}>
-                          <div className="tc-detail-grid">
-                            <div>
-                              <div className="tc-lbl">Steps</div>
-                              <ol>
-                                {tc.steps?.map((step, idx) => (
-                                  <li key={idx}>{step}</li>
-                                ))}
-                              </ol>
+                          <div className="tc-detail-card">
+                            <div className="tcd-cols">
+                              <section className="tcd-block">
+                                <div className="tcd-lbl">Steps</div>
+                                <ol className="tcd-steps">
+                                  {tc.steps?.map((step, idx) => (
+                                    <li key={idx}>{step}</li>
+                                  ))}
+                                </ol>
+                              </section>
+                              <section className="tcd-block">
+                                <div className="tcd-lbl">Expected result</div>
+                                <p className="tcd-expected">{tc.expected_result}</p>
+                              </section>
                             </div>
-                            <div>
-                              <div className="tc-lbl">Expected result</div>
-                              <p>{tc.expected_result}</p>
-                            </div>
-                            {hasTestData(tc) && (
-                              <div className="full">
-                                <div className="tc-lbl">Test data</div>
-                                <pre>{JSON.stringify(tc.test_data, null, 2)}</pre>
+
+                            <section className="tcd-block tcd-data">
+                              <div className="tcd-data-head">
+                                <button
+                                  type="button"
+                                  className="tcd-data-toggle"
+                                  onClick={(e) => toggleData(tc.id, e)}
+                                  aria-expanded={!dataCollapsed.has(tc.id)}
+                                >
+                                  <span className={`caret ${!dataCollapsed.has(tc.id) ? "down" : ""}`}>▸</span>
+                                  Sample test data
+                                  {hasTestData(tc) && (
+                                    <span className="tcd-data-count">{dataSummary(tc.test_data)}</span>
+                                  )}
+                                </button>
+                                {onGenerateData && (
+                                  <button
+                                    type="button"
+                                    className="ai-btn ai-btn-sm"
+                                    onClick={() => onGenerateData(tc.id)}
+                                    disabled={dataBusyId != null}
+                                    title="Test Data agent — generate concrete inputs for this case"
+                                  >
+                                    {dataBusyId === tc.id ? (
+                                      <Busy>Generating…</Busy>
+                                    ) : (
+                                      <>
+                                        <SparkIcon />
+                                        {hasTestData(tc) ? "Regenerate" : "Generate sample data"}
+                                      </>
+                                    )}
+                                  </button>
+                                )}
                               </div>
-                            )}
+                              {!dataCollapsed.has(tc.id) &&
+                                (hasTestData(tc) ? (
+                                  <TestDataView data={tc.test_data} />
+                                ) : (
+                                  <p className="muted tc-data-empty">
+                                    No sample data yet
+                                    {onGenerateData
+                                      ? " — use “Generate sample data” to have the Test Data agent fill in concrete inputs (valid, invalid, and boundary values) so this case can actually be run."
+                                      : "."}
+                                  </p>
+                                ))}
+                            </section>
                           </div>
                         </td>
                       </tr>

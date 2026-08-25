@@ -46,9 +46,12 @@ logger = logging.getLogger("evaluation.runner")
 
 
 def scoped_items(db: Session, experiment: Experiment) -> list[BenchmarkItem]:
-    """The benchmark programs this experiment runs: all of them for a 'full'
-    experiment, or the small representative subset for a 'quick' one. Ordered by
-    id so the runner and the progress counter agree on the grid."""
+    """The benchmark programs this experiment runs, ordered by id so the runner
+    and the progress counter agree on the grid:
+      - 'quick' : a small representative subset of the built-in corpus,
+      - 'full'  : the whole built-in corpus (the thesis result),
+      - 'custom': only the user's own programs (kept out of the thesis corpus).
+    """
     items = list(
         db.scalars(
             select(BenchmarkItem)
@@ -56,13 +59,25 @@ def scoped_items(db: Session, experiment: Experiment) -> list[BenchmarkItem]:
             .order_by(BenchmarkItem.id)
         )
     )
-    if (experiment.scope or "full") == "quick":
+    scope = experiment.scope or "full"
+    if scope == "custom":
+        return [it for it in items if it.is_custom]
+
+    # Built-in runs never include user-authored programs.
+    builtin = [it for it in items if not it.is_custom]
+    if scope == "quick":
+        # Prefer the user's explicit selection; fall back to the default subset.
+        chosen = set(experiment.item_ids or [])
+        if chosen:
+            subset = [it for it in builtin if it.id in chosen]
+            if subset:
+                return subset
         quick = set(QUICK_SLUGS)
-        subset = [it for it in items if it.slug in quick]
+        subset = [it for it in builtin if it.slug in quick]
         # Never let a stale/renamed subset silently run zero programs.
         if subset:
             return subset
-    return items
+    return builtin
 
 
 class ExperimentRunner:
