@@ -4375,7 +4375,19 @@ input[type="file"]::file-selector-button:hover {
   padding: 2px 9px; margin-left: 4px; vertical-align: middle;
 }
 .cp-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.cp-lead { margin: 0; max-width: 70ch; }
+.cp-lead { margin: 0; max-width: none; }
+
+/* Prefill-a-sample bar at the top of the add-program form */
+.cp-samplebar {
+  display: flex; align-items: center; gap: 10px; font-size: 12.5px;
+  padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: 10px;
+  background: var(--surface);
+}
+.cp-sample-btn {
+  font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft);
+  border: 1px solid var(--accent-border); border-radius: 999px; padding: 4px 12px; cursor: pointer;
+}
+.cp-sample-btn:hover { filter: brightness(0.97); }
 .cp-empty { margin: 12px 0 0; }
 .cp-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
 .cp-card {

@@ -564,14 +564,14 @@ export default function ExperimentsList() {
       {/* Section 3 — Programs: the built-in benchmark + your own */}
       <section className="section">
         <div className="section-head">
-          <h2><span className="step-n">3</span> Programs</h2>
+          <h2><span className="step-n">3</span> Pre-seeded programs</h2>
         </div>
         <p className="muted cp-lead">
           The small programs the agents write tests against — each hides <b>4 planted bugs</b>.
-          These are the "projects" an experiment runs.
+          These are the "projects" an experiment runs. You can also add your own below.
         </p>
 
-        <details className="progs-builtin" open>
+        <details className="progs-builtin">
           <summary>
             <span className="progs-caret">▸</span>
             Built-in benchmark

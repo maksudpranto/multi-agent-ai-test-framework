@@ -17,6 +17,38 @@ const FAULT_LABEL = Object.fromEntries(FAULT_TYPES.map((f) => [f.key, f.label]))
 const EXAMPLE_REF = `def is_even(n):
     return n % 2 == 0`;
 
+// A complete, self-checking example the user can prefill to see the expected
+// shape. Both bugs genuinely diverge from the reference on the given inputs.
+const SAMPLE = {
+  title: "Checkout total with discount",
+  entrypoint: "final_price",
+  requirement:
+    "A shop gives a 10% discount when the subtotal is $100 or more; below $100 there is no discount. Return the amount to charge, rounded to the nearest cent.",
+  reference: `def final_price(subtotal):
+    if subtotal >= 100:
+        return round(subtotal * 0.9, 2)
+    return round(subtotal, 2)`,
+  inputs: "[100]\n[99.99]\n[250]\n[0]\n[100.5]",
+  bugs: [
+    {
+      description: "Uses > 100 instead of >= 100, so an exact $100 subtotal misses the discount",
+      fault_type: "boundary",
+      code: `def final_price(subtotal):
+    if subtotal > 100:
+        return round(subtotal * 0.9, 2)
+    return round(subtotal, 2)`,
+    },
+    {
+      description: "Applies a 20% discount instead of 10%",
+      fault_type: "wrong_constant",
+      code: `def final_price(subtotal):
+    if subtotal >= 100:
+        return round(subtotal * 0.8, 2)
+    return round(subtotal, 2)`,
+    },
+  ],
+};
+
 const emptyBug = () => ({ description: "", fault_type: "", code: "" });
 
 // Parse the inputs textarea: one call's positional arguments per line, each a
@@ -51,6 +83,17 @@ function AddForm({ onCreated, onCancel }) {
 
   function setBug(i, patch) {
     setBugs((prev) => prev.map((b, j) => (j === i ? { ...b, ...patch } : b)));
+  }
+
+  function fillSample() {
+    setTitle(SAMPLE.title);
+    setEntrypoint(SAMPLE.entrypoint);
+    setRequirement(SAMPLE.requirement);
+    setReference(SAMPLE.reference);
+    setInputs(SAMPLE.inputs);
+    setBugs(SAMPLE.bugs.map((b) => ({ ...b })));
+    setError("");
+    setWarnings([]);
   }
 
   async function submit(e) {
@@ -106,6 +149,13 @@ function AddForm({ onCreated, onCancel }) {
 
   return (
     <form className="cp-form" onSubmit={submit}>
+      <div className="cp-samplebar">
+        <span className="muted">Not sure of the format?</span>
+        <button type="button" className="cp-sample-btn" onClick={fillSample}>
+          Prefill a sample program
+        </button>
+      </div>
+
       <div className="cp-form-grid">
         <label className="field">
           <span className="field-label">Program name</span>
