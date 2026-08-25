@@ -561,14 +561,14 @@ export default function ExperimentsList() {
         </div>
       </Modal>
 
-      {/* Section 3 — Programs: the built-in benchmark + your own */}
+      {/* Section 3 — Pre-seeded programs (the built-in benchmark) */}
       <section className="section">
         <div className="section-head">
           <h2><span className="step-n">3</span> Pre-seeded programs</h2>
         </div>
         <p className="muted cp-lead">
           The small programs the agents write tests against — each hides <b>4 planted bugs</b>.
-          These are the "projects" an experiment runs. You can also add your own below.
+          These are the "projects" an experiment runs.
         </p>
 
         <details className="progs-builtin">
@@ -596,14 +596,20 @@ export default function ExperimentsList() {
             </div>
           )}
         </details>
+      </section>
 
+      {/* Section 4 — Your programs (custom, user-authored) */}
+      <section className="section">
+        <div className="section-head">
+          <h2><span className="step-n">4</span> Your programs <span className="section-optional">optional</span></h2>
+        </div>
         <CustomPrograms programs={customPrograms} onChanged={refreshCustom} />
       </section>
 
-      {/* Section 4 — Your experiments */}
+      {/* Section 5 — Your experiments */}
       <section className="section">
         <div className="section-head">
-          <h2><span className="step-n">4</span> Your experiments</h2>
+          <h2><span className="step-n">5</span> Your experiments</h2>
           <div className="exp-list-tools">
             <div className="exp-search">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">

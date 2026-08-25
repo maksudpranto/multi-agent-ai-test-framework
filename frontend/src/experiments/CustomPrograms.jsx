@@ -270,14 +270,11 @@ export default function CustomPrograms({ programs, onChanged }) {
   return (
     <div className="cp">
       <div className="cp-top">
-        <div className="cp-top-text">
-          <h3 className="cp-heading">Your programs</h3>
-          <p className="muted cp-lead">
-            Add your own program with known bugs, then run a <b>Custom</b> experiment to watch the
-            pipeline catch them — a hands-on way to verify the whole thing. Kept separate from the
-            built-in benchmark.
-          </p>
-        </div>
+        <p className="muted cp-lead">
+          Add your own program with known bugs, then run a <b>Custom</b> experiment to watch the
+          pipeline catch them — a hands-on way to verify the whole thing. Kept separate from the
+          built-in benchmark.
+        </p>
         <button className="ai-btn" onClick={() => setModalOpen(true)}>
           <SparkIcon /> Add a program
         </button>
