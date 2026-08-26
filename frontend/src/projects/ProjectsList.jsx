@@ -4,11 +4,11 @@ import { api } from "../api/client";
 
 const ICON_BG = [
   "var(--grad-deep-blue)",
-  "#7c3aed",
-  "#0ea5e9",
-  "#16a34a",
-  "#db2777",
-  "#d97706",
+  "#2a2a30",
+  "#55565c",
+  "#7c7e86",
+  "#3a3a40",
+  "#6c707a",
 ];
 
 const IconPencil = () => (

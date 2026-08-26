@@ -221,6 +221,8 @@ export const api = {
   listBenchmarkItems: (datasetId) => request(`/evaluation/datasets/${datasetId}/items`),
   // Built-in (pre-seeded) programs for the current user, with a default_quick flag.
   getBenchmarkPrograms: () => request("/evaluation/benchmark/programs"),
+  // Full detail of one program (requirement, reference, inputs, seeded bugs).
+  getProgramDetail: (itemId) => request(`/evaluation/benchmark/programs/${itemId}`),
 
   // Custom (user-authored) benchmark programs + their seeded bugs.
   listCustomPrograms: () => request("/evaluation/benchmark/custom"),

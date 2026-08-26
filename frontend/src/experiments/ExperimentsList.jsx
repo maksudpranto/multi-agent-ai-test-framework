@@ -16,6 +16,21 @@ const STATUS_CHIP = {
 
 const PAGE_SIZE = 6;
 
+const FAULT_LABEL = {
+  boundary: "Boundary",
+  wrong_constant: "Wrong value",
+  wrong_operator: "Wrong operator",
+  missing_condition: "Missing check",
+  control_flow: "Control flow",
+};
+
+// Short one-line explainer per approach (falls back to the backend description).
+const COND_ONELINER = {
+  single_llm: "One AI writes the whole suite from a single prompt — the baseline.",
+  full_pipeline: "A team of agents that hand off and review each other's tests — the full framework.",
+  ablation_no_debate: "The same agent team, but with the self-review step switched off.",
+};
+
 function relTime(iso) {
   if (!iso) return "—";
   const then = new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");
@@ -236,6 +251,7 @@ export default function ExperimentsList() {
   const [experiments, setExperiments] = useState([]);
   const [customPrograms, setCustomPrograms] = useState([]);
   const [builtinPrograms, setBuiltinPrograms] = useState([]);
+  const [detail, setDetail] = useState(null); // program-details popup ({loading} | full)
   const [quickIds, setQuickIds] = useState(() => new Set()); // chosen for a Quick run
   const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -357,6 +373,15 @@ export default function ExperimentsList() {
       return next;
     });
   }
+  async function openProgram(id) {
+    setDetail({ loading: true });
+    try {
+      setDetail(await api.getProgramDetail(id));
+    } catch (err) {
+      setError(err.message);
+      setDetail(null);
+    }
+  }
 
   return (
     <div className="content exp-page">
@@ -425,20 +450,24 @@ export default function ExperimentsList() {
           <div className="field">
             <span className="field-label">What to compare</span>
             <span className="field-sub">Each becomes a column in the results. Keep <b>Single AI</b> and at least one agent team.</span>
-            <div className="cond-pills">
+            <div className="cond-list">
               {conditions.map((c) => (
                 <label
                   key={c.key}
-                  className={`cond-pill ${picked[c.key] ? "on" : ""} ${c.is_baseline ? "base" : ""}`}
-                  title={c.description}
+                  className={`cond-row ${picked[c.key] ? "on" : ""} ${c.is_baseline ? "base" : ""}`}
                 >
                   <input
                     type="checkbox"
                     checked={!!picked[c.key]}
                     onChange={(e) => setPicked((p) => ({ ...p, [c.key]: e.target.checked }))}
                   />
-                  <span className="cp-label">{c.label}</span>
-                  {c.is_baseline && <span className="cp-tag">baseline</span>}
+                  <span className="cond-row-text">
+                    <span className="cond-row-top">
+                      <span className="cond-row-label">{c.label}</span>
+                      {c.is_baseline && <span className="cp-tag">baseline</span>}
+                    </span>
+                    <span className="cond-row-desc">{COND_ONELINER[c.key] || c.description}</span>
+                  </span>
                 </label>
               ))}
             </div>
@@ -582,7 +611,7 @@ export default function ExperimentsList() {
           ) : (
             <div className="progs-grid">
               {builtinPrograms.map((p) => (
-                <div className="progs-card" key={p.id}>
+                <button type="button" className="progs-card" key={p.id} onClick={() => openProgram(p.id)} title="View program details">
                   <div className="progs-card-top">
                     <span className="progs-title">{p.title}</span>
                     {p.default_quick && <span className="progs-quick" title="In the default Quick subset">Quick</span>}
@@ -591,7 +620,7 @@ export default function ExperimentsList() {
                     <code className="cp-entry">{p.entrypoint}()</code>
                     <span className="progs-bugs">{p.n_mutants} bugs</span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -658,6 +687,61 @@ export default function ExperimentsList() {
           </>
         )}
       </section>
+
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail && !detail.loading ? detail.title : "Program details"}
+        subtitle={detail && !detail.loading ? `${detail.entrypoint}(…) · ${detail.mutants.length} seeded bugs` : ""}
+        width={940}
+      >
+        {detail?.loading ? (
+          <p className="muted" style={{ padding: "8px 0" }}>Loading…</p>
+        ) : detail ? (
+          <div className="pd">
+            <section className="pd-block">
+              <div className="pd-lbl">Requirement</div>
+              <div className="pd-req">
+                {detail.requirement.split(/\n\s*\n/).map((para, i) => (
+                  <p key={i}>{para.replace(/\s*\n\s*/g, " ").trim()}</p>
+                ))}
+              </div>
+            </section>
+
+            <section className="pd-block">
+              <div className="pd-lbl">Reference implementation <span className="pd-hint">the correct code — the oracle</span></div>
+              <pre className="pd-code">{detail.reference_code}</pre>
+            </section>
+
+            <section className="pd-block">
+              <div className="pd-lbl">Inputs <span className="pd-hint">{detail.canonical_inputs.length} rows</span></div>
+              <div className="pd-inputs">
+                {detail.canonical_inputs.map((row, i) => (
+                  <code key={i} className="pd-input">{JSON.stringify(row)}</code>
+                ))}
+              </div>
+            </section>
+
+            <section className="pd-block">
+              <div className="pd-lbl">Seeded bugs <span className="pd-hint">each is the reference with one deliberate fault</span></div>
+              <div className="pd-bugs">
+                {detail.mutants.map((m, i) => (
+                  <div className="pd-bug" key={m.id}>
+                    <div className="pd-bug-head">
+                      <span className="pd-bug-num">{i + 1}</span>
+                      <span className="pd-bug-title">
+                        {m.fault_type ? FAULT_LABEL[m.fault_type] || m.fault_type : "Seeded bug"}
+                      </span>
+                    </div>
+                    <p className="pd-bug-desc">{m.description}</p>
+                    <pre className="pd-code">{m.code}</pre>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

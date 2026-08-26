@@ -309,6 +309,21 @@ def _custom_program_out(
     )
 
 
+@router.get("/benchmark/programs/{item_id}", response_model=CustomProgramOut)
+def get_program_detail(
+    item_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> CustomProgramOut:
+    """Full detail of one program (built-in or custom): requirement, reference
+    implementation, inputs, and the seeded bugs. Used by the details popup."""
+    dataset = _benchmark_dataset(user, db)
+    item = db.get(BenchmarkItem, item_id)
+    if item is None or dataset is None or item.dataset_id != dataset.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program not found")
+    return _custom_program_out(item)
+
+
 @router.get("/benchmark/custom", response_model=list[CustomProgramOut])
 def list_custom_programs(
     db: Session = Depends(get_db),
