@@ -90,7 +90,7 @@ export default function UsagePanel({ refreshKey = 0, providerFilter = null }) {
 
   if (err || !data) return null;
 
-  let providers = data.providers.filter((p) => p.daily_limit != null);
+  let providers = data.providers.filter((p) => p.daily_limit != null || p.paid);
   if (providerFilter) providers = providers.filter((p) => p.provider === providerFilter);
   if (!providers.length) return null;
 
@@ -126,25 +126,42 @@ export default function UsagePanel({ refreshKey = 0, providerFilter = null }) {
           // green (healthy) → amber (≤30% left) → red (≤10% left)
           const rp = p.daily_limit ? (100 * p.remaining_today) / p.daily_limit : 0;
           const tone = rp <= 10 ? "crit" : rp <= 30 ? "warn" : "ok";
+          const hasLive = p.live_remaining_requests != null || p.live_remaining_tokens != null;
           return (
             <div className="ucard" key={p.provider}>
               <div className="ucard-top">
                 <span className="uname">{p.label}</span>
-                <span className={`ubadge ${p.source === "provider" ? "live" : ""}`}>
-                  {p.source === "provider" ? "live" : "est."}
+                <span className={`ubadge ${p.paid ? "paid" : p.source === "provider" ? "live" : ""}`}>
+                  {p.paid ? "paid" : p.source === "provider" ? "live" : "est."}
                 </span>
               </div>
 
-              <div className="ucard-main">
-                <Gauge pct={rp} tone={tone} />
-                <div className="ucard-nums">
-                  <div className={`ubig ${tone}`}>{fmt(p.remaining_today)}</div>
-                  <div className="usub">left of {fmt(p.daily_limit)} today</div>
-                  {p.live_remaining_tokens != null && (
-                    <div className="utok">{fmt(p.live_remaining_tokens)} tokens/min left</div>
-                  )}
+              {p.paid ? (
+                <div className="ucard-main">
+                  <div className="upaid-mark" aria-hidden>$</div>
+                  <div className="ucard-nums">
+                    <div className="ubig">{fmt(p.today)}</div>
+                    <div className="usub">runs today · pay-as-you-go</div>
+                    {p.live_remaining_requests != null && (
+                      <div className="utok">{fmt(p.live_remaining_requests)} / {fmt(p.live_limit_requests)} req/min left</div>
+                    )}
+                    {p.live_remaining_tokens != null && (
+                      <div className="utok">{fmt(p.live_remaining_tokens)} tokens/min left</div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="ucard-main">
+                  <Gauge pct={rp} tone={tone} />
+                  <div className="ucard-nums">
+                    <div className={`ubig ${tone}`}>{fmt(p.remaining_today)}</div>
+                    <div className="usub">left of {fmt(p.daily_limit)} today</div>
+                    {p.live_remaining_tokens != null && (
+                      <div className="utok">{fmt(p.live_remaining_tokens)} tokens/min left</div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="ustats">
                 <div className="ustat"><b>{p.session}</b><span>session</span></div>
@@ -153,14 +170,20 @@ export default function UsagePanel({ refreshKey = 0, providerFilter = null }) {
               </div>
 
               <div className="ucard-foot">
-                <span className="ufoot-main">
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="8" cy="8" r="6" />
-                    <path d="M8 5v3l2 1.5" />
-                  </svg>
-                  Resets in <b>{resetsIn(p.next_reset_utc)}</b>
-                </span>
-                <span className="ufoot-dim">· {p.reset_label}</span>
+                {p.paid ? (
+                  <span className="ufoot-main">Paid · {hasLive ? "limits reset each minute" : "no free daily cap"}</span>
+                ) : (
+                  <>
+                    <span className="ufoot-main">
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="8" cy="8" r="6" />
+                        <path d="M8 5v3l2 1.5" />
+                      </svg>
+                      Resets in <b>{resetsIn(p.next_reset_utc)}</b>
+                    </span>
+                    <span className="ufoot-dim">· {p.reset_label}</span>
+                  </>
+                )}
               </div>
             </div>
           );

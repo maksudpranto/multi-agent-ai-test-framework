@@ -36,8 +36,17 @@ class AnthropicProvider(LLMProvider):
         if system:
             kwargs["system"] = system
 
-        resp = self._client.messages.create(**kwargs)
+        # Use the raw response so we can read Anthropic's `anthropic-ratelimit-*`
+        # headers and surface the live per-minute limits in the usage panel.
+        raw = self._client.messages.with_raw_response.create(**kwargs)
+        resp = raw.parse()
         latency_ms = int((time.monotonic() - start) * 1000)
+        try:
+            from app.llm import ratelimit
+
+            ratelimit.record("anthropic", raw.headers)
+        except Exception:
+            pass  # rate-limit capture is best-effort, never fails a run
 
         text = "".join(
             block.text for block in resp.content if getattr(block, "type", None) == "text"

@@ -26,13 +26,31 @@ def _to_int(value) -> int | None:
 def record(provider: str, headers) -> None:
     """Capture the rate-limit headers from a provider response (best-effort)."""
     h = {k.lower(): v for k, v in dict(headers).items()}
+    # Anthropic uses `anthropic-ratelimit-*` (per-minute) instead of `x-ratelimit-*`.
     snap = {
         "captured_at": datetime.now(timezone.utc).isoformat(),
-        "limit_requests": _to_int(h.get("x-ratelimit-limit-requests") or h.get("x-ratelimit-limit")),
-        "remaining_requests": _to_int(h.get("x-ratelimit-remaining-requests") or h.get("x-ratelimit-remaining")),
-        "limit_tokens": _to_int(h.get("x-ratelimit-limit-tokens")),
-        "remaining_tokens": _to_int(h.get("x-ratelimit-remaining-tokens")),
-        "reset_requests": h.get("x-ratelimit-reset-requests") or h.get("x-ratelimit-reset"),
+        "limit_requests": _to_int(
+            h.get("x-ratelimit-limit-requests")
+            or h.get("anthropic-ratelimit-requests-limit")
+            or h.get("x-ratelimit-limit")
+        ),
+        "remaining_requests": _to_int(
+            h.get("x-ratelimit-remaining-requests")
+            or h.get("anthropic-ratelimit-requests-remaining")
+            or h.get("x-ratelimit-remaining")
+        ),
+        "limit_tokens": _to_int(
+            h.get("x-ratelimit-limit-tokens") or h.get("anthropic-ratelimit-tokens-limit")
+        ),
+        "remaining_tokens": _to_int(
+            h.get("x-ratelimit-remaining-tokens")
+            or h.get("anthropic-ratelimit-tokens-remaining")
+        ),
+        "reset_requests": (
+            h.get("x-ratelimit-reset-requests")
+            or h.get("anthropic-ratelimit-requests-reset")
+            or h.get("x-ratelimit-reset")
+        ),
     }
     if snap["remaining_requests"] is None and snap["limit_requests"] is None and snap["remaining_tokens"] is None:
         return  # nothing useful in these headers

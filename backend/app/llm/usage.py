@@ -36,6 +36,15 @@ PROVIDER_LIMITS = {
         "reset_label": "midnight UTC",
         "note": "1000/day if you add $10 of credit.",
     },
+    "anthropic": {
+        # Paid, usage-based — no free daily cap to count down against. The
+        # "limit" Anthropic exposes is a per-minute rate limit (from response
+        # headers), shown live once a Claude call has been made.
+        "daily_limit": None,
+        "paid": True,
+        "reset_label": "per-minute rate limits",
+        "note": "Paid — usage-based; no free daily cap. Live per-minute limits appear after a run.",
+    },
 }
 
 PROVIDER_LABEL = {
@@ -103,9 +112,10 @@ def compute_usage(db: Session, settings: Settings, session_since: str | None = N
         if session_dt and created >= session_dt:
             counts["session"] += 1
 
-    order = ["gemini", "groq", "openrouter"] + [
-        p for p in agg if p not in ("gemini", "groq", "openrouter")
-    ]
+    order = ["gemini", "groq", "openrouter"]
+    # Claude (paid) is hidden from the panel for now until API billing is set up.
+    # To re-enable, append "anthropic" when catalog.provider_ready("anthropic", settings).
+    order += [p for p in agg if p not in order and p != "anthropic"]
     seen: set[str] = set()
     providers: list[dict] = []
     for provider in order:
@@ -143,9 +153,12 @@ def compute_usage(db: Session, settings: Settings, session_since: str | None = N
                 "session": counts["session"],
                 "daily_limit": daily,
                 "remaining_today": remaining,
+                "paid": limits.get("paid", False),
                 "source": source,
                 "live_remaining_tokens": live.get("remaining_tokens") if live else None,
                 "live_limit_tokens": live.get("limit_tokens") if live else None,
+                "live_remaining_requests": live.get("remaining_requests") if live else None,
+                "live_limit_requests": live.get("limit_requests") if live else None,
                 "live_captured_at": live.get("captured_at") if live else None,
                 "reset_label": limits.get("reset_label"),
                 "next_reset_utc": _next_reset_utc(reset_tz).isoformat() if reset_tz else None,

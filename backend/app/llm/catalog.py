@@ -55,6 +55,12 @@ FREE_MODELS: list[dict] = [
         "label": "Nemotron Nano 9B",
         "note": "OpenRouter · fast, lightweight",
     },
+    # Claude (Anthropic) — PAID. Hidden from the picker for now (the API account
+    # needs prepaid credits). To re-enable, uncomment these two entries:
+    # {"provider": "anthropic", "model": "claude-sonnet-4-5",
+    #  "label": "Claude Sonnet 4.5", "note": "Anthropic · paid · strong general model", "paid": True},
+    # {"provider": "anthropic", "model": "claude-haiku-4-5-20251001",
+    #  "label": "Claude Haiku 4.5", "note": "Anthropic · paid · fast & lower-cost", "paid": True},
 ]
 
 

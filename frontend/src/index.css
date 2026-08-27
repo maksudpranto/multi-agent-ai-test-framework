@@ -4097,6 +4097,15 @@ input[type="file"]::file-selector-button:hover {
   color: #6b7280; background: #eceef1;
 }
 .ubadge.live { color: #047857; background: rgba(16, 185, 129, 0.15); }
+.ubadge.paid { color: #fff; background: var(--accent); }
+
+/* Paid-provider mark (shown instead of the free-quota gauge) */
+.upaid-mark {
+  flex: none; width: 64px; height: 64px; border-radius: 999px;
+  display: grid; place-items: center;
+  font-size: 26px; font-weight: 700; color: var(--accent);
+  background: var(--accent-soft); border: 2px solid var(--accent-border);
+}
 
 .ucard-main { display: flex; align-items: center; gap: 16px; }
 .ugauge { flex: none; }
