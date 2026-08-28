@@ -366,6 +366,42 @@ def test_debate_records_reviewer_findings_in_transcript(db):
     assert first.content["findings"][0]["severity"] in {"high", "medium", "low"}
 
 
+def test_execution_grounded_debate_uses_reference_and_grounded_prompt(db):
+    """The grounded arm builds a ground-truth behaviour table from the reference
+    and runs the reviewer with the execution-grounded prompt (never a mutant)."""
+    from app.evaluation.harness import reference_behavior_table
+
+    engine, run, story, criteria, cfg = _run_multi_agent_through_generation(db)
+
+    oracle = {
+        "reference_code": "def is_even(n):\n    return n % 2 == 0\n",
+        "entrypoint": "is_even",
+        "canonical_inputs": [[2], [3], [0]],
+    }
+    evidence = reference_behavior_table(
+        oracle["reference_code"], oracle["entrypoint"], oracle["canonical_inputs"]
+    )
+    assert "is_even(2) -> True" in evidence
+    assert "is_even(3) -> False" in evidence
+
+    gcfg = RunConfig(model="mock-model", execution_grounded=True)
+    summary = engine.run_debate(
+        db, run, user_story=story.raw_text,
+        acceptance_criteria=[{"id": c.id, "text": c.text} for c in criteria],
+        config=gcfg, oracle=oracle,
+    )
+    assert summary["rounds_used"] >= 1
+
+    reviewer_execs = db.scalars(
+        select(AgentExecution).where(
+            AgentExecution.pipeline_run_id == run.id,
+            AgentExecution.stage == PipelineStage.reviewer,
+        )
+    ).all()
+    assert reviewer_execs
+    assert all(e.prompt_version == "grounded_v1" for e in reviewer_execs)
+
+
 def test_test_data_agent_fills_sample_data_for_one_case(db):
     """The on-demand Test Data agent produces concrete sample data for a single
     case, logs an audit row, and its output can be persisted onto the case."""

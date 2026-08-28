@@ -146,8 +146,20 @@ class ExperimentRunner:
                     db, run, user_story=requirement.raw_text, config=cfg
                 )
             else:
+                # Execution-grounded arms get the reference oracle so the reviewer
+                # can see the true behaviour of the inputs. The seeded mutants are
+                # never passed in — only the correct reference — so nothing leaks.
+                oracle = (
+                    {
+                        "reference_code": item.reference_code,
+                        "entrypoint": item.entrypoint,
+                        "canonical_inputs": item.canonical_inputs,
+                    }
+                    if cfg.execution_grounded
+                    else None
+                )
                 self.engine.run_full_pipeline(
-                    db, run, requirement=requirement, config=cfg
+                    db, run, requirement=requirement, config=cfg, oracle=oracle
                 )
 
             metrics = compute_run_metrics(

@@ -7,6 +7,7 @@ export const CONDITION_COLOR = {
   single_llm: "#a6a9b0", // baseline — light grey
   full_pipeline: "#18181b", // near-black — the full framework
   ablation_no_debate: "#55565c", // mid grey
+  grounded_debate: "#2a2a30", // dark grey — execution-grounded arm
   ablation_no_reviewer: "#7c7e86", // grey
   orchestrator: "#34343a", // dark grey
 };

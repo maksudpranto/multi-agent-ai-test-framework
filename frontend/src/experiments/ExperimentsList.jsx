@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import ModelPicker from "../components/ModelPicker";
 import UsagePanel from "../components/UsagePanel";
 import Modal from "../components/Modal";
+import NoveltyBand from "../components/NoveltyBand";
 import CustomPrograms from "./CustomPrograms";
 
 const STATUS_CHIP = {
@@ -29,6 +30,7 @@ const COND_ONELINER = {
   single_llm: "One AI writes the whole suite from a single prompt — the baseline.",
   full_pipeline: "A team of agents that hand off and review each other's tests — the full framework.",
   ablation_no_debate: "The same agent team, but with the self-review step switched off.",
+  grounded_debate: "The agent team whose reviewer sees the tests' real execution results, not just its own guesses.",
 };
 
 function relTime(iso) {
@@ -397,6 +399,8 @@ export default function ExperimentsList() {
           </p>
         </div>
       </section>
+
+      <NoveltyBand />
 
       {error && <p className="error">{error}</p>}
 

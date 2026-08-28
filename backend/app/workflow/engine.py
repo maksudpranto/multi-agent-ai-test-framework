@@ -206,6 +206,7 @@ class DefaultWorkflowEngine(WorkflowEngine):
         *,
         requirement,
         config: RunConfig,
+        oracle: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Run the whole multi-agent pipeline for one requirement end-to-end,
         honoring the RunConfig ablation toggles.
@@ -256,6 +257,7 @@ class DefaultWorkflowEngine(WorkflowEngine):
             debate_summary = self.run_debate(
                 db, run, user_story=story,
                 acceptance_criteria=criteria_payload, config=config,
+                oracle=oracle,
             )
 
         # 4. Coverage (gated).
@@ -598,6 +600,7 @@ class DefaultWorkflowEngine(WorkflowEngine):
         user_story: str,
         acceptance_criteria: list[dict],
         config: RunConfig,
+        oracle: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Bounded, bidirectional Reviewer <-> Consensus debate.
 
@@ -605,11 +608,32 @@ class DefaultWorkflowEngine(WorkflowEngine):
         satisfied the loop stops (consensus reached); otherwise the consensus
         agent rebuts/revises/adds and the reviewer re-inspects next round. Every
         turn is persisted as a DebateTurn so the transcript is auditable.
+
+        Execution-grounded mode (``config.execution_grounded`` + an ``oracle`` of
+        {reference_code, entrypoint, canonical_inputs}): the reviewer is also
+        shown the reference's TRUE behaviour on the benchmark inputs, so its
+        findings are anchored in real execution rather than the model's guess.
+        The oracle is the intended behaviour, never a mutant — nothing leaks.
         """
         rounds_used = 0
         consensus_reached = False
         revisions_made = 0
         total_findings = 0
+
+        # Build the execution evidence once (the reference's behaviour doesn't
+        # change between rounds) and pick the grounded reviewer prompt.
+        evidence = ""
+        reviewer_version = None
+        if config.execution_grounded and oracle:
+            from app.evaluation.harness import reference_behavior_table
+
+            evidence = reference_behavior_table(
+                oracle.get("reference_code", ""),
+                oracle.get("entrypoint", ""),
+                oracle.get("canonical_inputs") or [],
+            )
+            if evidence:
+                reviewer_version = "grounded_v1"
 
         for round_no in range(1, config.max_debate_rounds + 1):
             rounds_used = round_no
@@ -628,8 +652,10 @@ class DefaultWorkflowEngine(WorkflowEngine):
                     "user_story": user_story,
                     "acceptance_criteria": acceptance_criteria,
                     "test_cases": payload,
+                    "execution_evidence": evidence,
                 },
                 config=config,
+                prompt_version=reviewer_version,
             )
             if not review_result.success:
                 db.commit()

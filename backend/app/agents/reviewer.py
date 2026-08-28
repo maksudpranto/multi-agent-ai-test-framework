@@ -37,6 +37,9 @@ class ReviewerAgent(Agent):
             user_story=inputs.get("user_story", ""),
             acceptance_criteria=json.dumps(inputs.get("acceptance_criteria", [])),
             test_cases=json.dumps(inputs.get("test_cases", [])),
+            # Optional grounding: the reference's true behaviour on the inputs.
+            # The active (non-grounded) prompt simply omits this placeholder.
+            execution_evidence=inputs.get("execution_evidence", ""),
         )
         metrics = {
             "model": ctx.model,

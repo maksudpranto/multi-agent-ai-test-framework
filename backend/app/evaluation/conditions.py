@@ -28,6 +28,7 @@ class Condition:
     consensus_enabled: bool = True
     coverage_enabled: bool = True
     quality_enabled: bool = True
+    execution_grounded: bool = False
     is_baseline: bool = False
 
     def apply(self, base: RunConfig) -> RunConfig:
@@ -41,6 +42,7 @@ class Condition:
             coverage_enabled=self.coverage_enabled,
             quality_enabled=self.quality_enabled,
             max_debate_rounds=base.max_debate_rounds,
+            execution_grounded=self.execution_grounded,
         )
 
 
@@ -77,6 +79,20 @@ CONDITIONS: dict[str, Condition] = {
         mode=ExperimentMode.multi_agent,
         reviewer_enabled=False,
         consensus_enabled=False,
+    ),
+    "grounded_debate": Condition(
+        key="grounded_debate",
+        label="Agent team, execution-grounded",
+        description=(
+            "The agent team, but the reviewer is shown how the tests actually "
+            "behave when the inputs are run against a correct reference — so its "
+            "critique is based on real execution evidence, not the model's guess. "
+            "The seeded bugs are never shown, so nothing is leaked."
+        ),
+        mode=ExperimentMode.multi_agent,
+        reviewer_enabled=True,
+        consensus_enabled=True,
+        execution_grounded=True,
     ),
 }
 

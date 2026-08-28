@@ -124,6 +124,36 @@ def _diverges(ref: dict, mut: dict) -> bool:
     return ref["key"] != mut["key"]
 
 
+def reference_behavior_table(
+    reference_code: str, entrypoint: str, inputs: list[list], limit: int = 12
+) -> str:
+    """Run the CORRECT reference implementation on the benchmark inputs and
+    format the true input -> output behaviour as a compact table. This is the
+    execution evidence that grounds the reviewer's critique: it is the *intended*
+    behaviour (the oracle), never a mutant, so it leaks no seeded bug — it just
+    tells the reviewer what each input should actually produce.
+
+    Returns an empty string if there is nothing runnable, so callers can treat it
+    as an optional prompt section.
+    """
+    rows = [list(x) for x in (inputs or [])][:limit]
+    if not reference_code or not entrypoint or not rows:
+        return ""
+    outcomes = _exec(reference_code, entrypoint, rows)
+    lines = []
+    for args, out in zip(rows, outcomes):
+        call = f"{entrypoint}({', '.join(repr(a) for a in args)})"
+        status = out.get("status")
+        key = out.get("key")
+        if status == "ok":
+            lines.append(f"  {call} -> {key}")
+        elif status == "timeout":
+            lines.append(f"  {call} -> (never returns / times out)")
+        else:
+            lines.append(f"  {call} -> raises {key or 'an error'}")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Scoring
 # ---------------------------------------------------------------------------

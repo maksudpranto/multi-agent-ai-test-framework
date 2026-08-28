@@ -22,6 +22,10 @@ class RunConfig:
     coverage_enabled: bool = True
     quality_enabled: bool = True
     max_debate_rounds: int = 3
+    # When True (and an executable reference/oracle is available), the reviewer is
+    # shown the reference's true behaviour on the benchmark inputs, so its critique
+    # is grounded in real execution rather than the model's judgement alone.
+    execution_grounded: bool = False
 
     @classmethod
     def defaults(cls) -> "RunConfig":

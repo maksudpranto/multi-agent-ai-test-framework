@@ -266,6 +266,57 @@ Return ONLY a JSON object with a "test_cases" array. Each item must contain:
 Do not include prose outside the JSON.
 """
 
+# Execution-grounded reviewer: same job, but the reviewer is also given the TRUE
+# behaviour of a correct reference on the benchmark inputs, so its critique is
+# anchored in real execution instead of the model's judgement alone. Selected by
+# the engine only for the `grounded_debate` condition (prompt_version grounded_v1).
+REVIEWER_GROUNDED_V1 = """\
+You are a meticulous QA reviewer taking part in a multi-agent test-design debate.
+
+DEBATE ROUND: {round}
+
+USER STORY:
+{user_story}
+
+ACCEPTANCE CRITERIA (database ids are authoritative):
+{acceptance_criteria}
+
+CURRENT TEST CASES (database ids are authoritative):
+{test_cases}
+
+EXECUTION EVIDENCE — the TRUE result of running each input against a CORRECT
+reference implementation (this is the intended behaviour; treat it as ground
+truth):
+{execution_evidence}
+
+Critically review the CURRENT test cases against the story, the criteria, and —
+above all — the EXECUTION EVIDENCE. Use the real results to find:
+- wrong_expected    — a test whose expected result contradicts the true result
+                      shown in the evidence
+- missing_scenario  — a real behaviour in the evidence (especially an edge case,
+                      an error/rejection, or a boundary value where the result
+                      changes) that no test case exercises
+- duplicate         — two test cases covering the same behaviour
+- weak_steps        — vague/non-executable steps
+- untraceable       — a test case not clearly tied to a criterion
+
+Prioritise findings you can justify from the evidence. Be fair: if the tests
+already match the true behaviour and cover its important cases, say so instead of
+inventing issues.
+
+Return ONLY a JSON object:
+- "needs_revision": boolean (true if there is at least one finding worth acting on)
+- "findings": array of objects, each:
+    - "test_case_id": integer id of the offending test case, or null for a missing scenario
+    - "acceptance_criterion_id": integer criterion id the issue relates to, or null
+    - "issue_type": one of the categories above
+    - "severity": "high" | "medium" | "low"
+    - "description": what is wrong (cite the true result when relevant)
+    - "suggestion": how to fix it
+
+Do not include prose outside the JSON.
+"""
+
 TEST_DATA_V1 = """\
 You are a test-data engineer. Produce concrete, realistic sample data that makes
 the following ONE test case executable — actual values a tester could paste in
@@ -324,6 +375,15 @@ SEED_PROMPTS: list[dict] = [
         "version": "v1",
         "template": REVIEWER_V1,
         "description": "Reviewer: critique current test cases, emit needs_revision verdict.",
+    },
+    {
+        # Selected explicitly by version for the grounded_debate arm (not the
+        # newest, so it never becomes the default active reviewer prompt).
+        "stage": PipelineStage.reviewer,
+        "version": "grounded_v1",
+        "template": REVIEWER_GROUNDED_V1,
+        "description": "Reviewer (execution-grounded): critique using the reference's true behaviour.",
+        "is_active": False,
     },
     {
         "stage": PipelineStage.consensus,

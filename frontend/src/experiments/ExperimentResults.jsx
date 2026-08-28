@@ -88,8 +88,9 @@ const AGENT_STAGES = [
 // ablated), so the page can label the two contenders in plain language.
 function conditionKind(c) {
   if (c.is_baseline) return { team: false, tag: "Single AI", sub: "one AI, one prompt" };
-  if (/ablation|no[_-]?debate/i.test(c.key)) return { team: true, tag: "Agent team", sub: "no self-review" };
-  return { team: true, tag: "Agent team", sub: "reviews its own tests" };
+  if (/grounded/i.test(c.key)) return { team: true, tag: "Agent team · grounded", sub: "reviewer sees real execution" };
+  if (/ablation|no[_-]?debate/i.test(c.key)) return { team: true, tag: "Agent team · no review", sub: "self-review turned off" };
+  return { team: true, tag: "Agent team · full", sub: "full self-review debate" };
 }
 
 function TeamIcon() {
@@ -155,52 +156,48 @@ function HowItWorks() {
 
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
-// One recitable paragraph — literally the script for explaining the whole page.
-function AtAGlance({ results, headline, conditions }) {
-  if (!headline?.available) return null;
+// The single takeaway, in one sentence — the first thing the reader sees.
+function HeadlineOutcome({ headline, conditions }) {
   const cmp = headline.comparison;
   const winner = conditions.find((c) => c.key === headline.winner);
   const who = winner?.is_baseline ? "the single AI" : "the agent team";
   const scorePct = `${Math.round(headline.winner_mutation_score * 100)}%`;
-  const reps = results.n_reps > 1 ? `, averaged over ${results.n_reps} repeated runs` : "";
-
-  let outcome;
   if (winner?.is_baseline || !cmp) {
-    outcome = <>{cap(who)} came out on top, catching <b>{scorePct}</b> — no approach won by a meaningful margin.</>;
-  } else {
-    const delta = cmp.pct_improvement != null ? `${cmp.pct_improvement}%` : `${Math.round(cmp.mean_delta * 100)} points`;
-    outcome = (
-      <>{cap(who)} caught the most — <b>{scorePct}</b>, <b>{delta} more</b> than a single AI{cmp.significant
-        ? <>, a <b>statistically significant</b> gap (p={cmp.p_value}).</>
-        : <>, though <b>not yet a statistically significant</b> gap (p={cmp.p_value}).</>}</>
-    );
+    return <>{cap(who)} caught the most bugs — <b>{scorePct}</b>. No approach won by a meaningful margin.</>;
   }
+  const delta = cmp.pct_improvement != null ? `${cmp.pct_improvement}%` : `${Math.round(cmp.mean_delta * 100)} points`;
   return (
-    <div className="xr-glance">
-      <span className="xr-glance-label">In one line</span>
-      <p>
-        This experiment pitted <b>{conditions.length} approaches</b> against <b>{results.n_items} programs</b>{reps}.
-        Each program hides <b>4 planted bugs</b>, and we counted how many each approach's tests catch. {outcome}
-      </p>
-    </div>
+    <>{cap(who)} caught the most bugs — <b>{scorePct}</b>, <b>{delta} more</b> than a single AI{cmp.significant
+      ? <> — a statistically significant gap.</>
+      : <>, though not a statistically significant gap yet.</>}</>
   );
 }
 
-// Orientation: what this page is, the recitable summary, and how it works.
+// The answer up front, with all the "what is this" teaching folded into one
+// optional expander so the page opens on the result, not on an explainer.
 function ExperimentBrief({ results, headline, conditions }) {
   return (
-    <section className="xr-brief">
-      <span className="xr-eyebrow">Experiment · fault-based evidence</span>
-      <h2 className="xr-q">Do a <em>team</em> of AI agents write better tests than a <em>single</em> AI?</h2>
-      <p className="xr-lead">
-        This page is the evidence. It runs the same requirements through a single AI and an
-        agent team, plants real bugs in the code, and measures whose tests catch more.
-      </p>
-      <AtAGlance results={results} headline={headline} conditions={conditions} />
-      <HowItWorks />
-      <details className="xr-meet">
-        <summary><span className="xr-det-caret" aria-hidden>▸</span> Meet the agent team — five specialists that hand off in a pipeline</summary>
-        <AgentPipeline />
+    <section className="xr-answer">
+      {headline?.available && (
+        <div className="xr-answer-main">
+          <span className="xr-eyebrow">The answer</span>
+          <p className="xr-answer-line"><HeadlineOutcome headline={headline} conditions={conditions} /></p>
+        </div>
+      )}
+      <details className="xr-what">
+        <summary><span className="xr-det-caret" aria-hidden>▸</span> What am I looking at?</summary>
+        <div className="xr-what-body">
+          <p className="xr-what-lead">
+            The same requirements go through <b>{conditions.length} approaches</b> against{" "}
+            <b>{results.n_items} programs</b>. Each program hides <b>4 planted bugs</b>; we count how
+            many each approach's tests catch. That "bugs caught" score is the whole comparison.
+          </p>
+          <HowItWorks />
+          <div className="xr-meet-inner">
+            <span className="xr-meet-title">The agent team — five specialists that hand off in a pipeline</span>
+            <AgentPipeline />
+          </div>
+        </div>
       </details>
     </section>
   );
@@ -210,7 +207,7 @@ function ExperimentBrief({ results, headline, conditions }) {
 function StepHead({ n, title, tip, aside }) {
   return (
     <div className="section-head">
-      <h2><span className="xr-step">{n}</span>{title} {tip && <Info tip={tip} />}</h2>
+      <h2>{n != null && <span className="xr-step">{n}</span>}{title} {tip && <Info tip={tip} />}</h2>
       {aside}
     </div>
   );
@@ -253,8 +250,54 @@ function ResultLeaderboard({ rows }) {
   );
 }
 
+// The novel head-to-head: agent team vs. agent team + execution grounding. Same
+// team, the only difference is whether the reviewer sees real execution — so this
+// isolates the thesis's core contribution. Shows only when both arms are present.
+function GroundingCallout({ conditions }) {
+  const plain = conditions.find(
+    (c) => /full/i.test(c.key) && !/grounded/i.test(c.key) && c.metrics.mutation_score
+  );
+  const grounded = conditions.find((c) => /grounded/i.test(c.key) && c.metrics.mutation_score);
+  if (!plain || !grounded) return null;
+
+  const delta = Math.round(
+    (grounded.metrics.mutation_score.mean - plain.metrics.mutation_score.mean) * 100
+  );
+  let verdict, caption;
+  if (delta >= 1) {
+    verdict = `Grounding helped — the grounded team caught ${delta}% more bugs than plain debate.`;
+    caption = "more bugs caught";
+  } else if (delta <= -1) {
+    verdict = `Grounding didn't help here — the plain team caught ${Math.abs(delta)}% more.`;
+    caption = "fewer bugs caught";
+  } else {
+    verdict = "No difference here — both caught the same bugs.";
+    caption = "no change";
+  }
+
+  return (
+    <section className="section">
+      <div className="nhh">
+        <div className="nhh-text">
+          <div className="nhh-tag">The novel comparison</div>
+          <h3 className="nhh-title">Does grounding the debate help?</h3>
+          <p className="nhh-verdict">{verdict}</p>
+          <p className="nhh-sub">
+            Same agent team — the only difference is that the grounded one's reviewer sees how the
+            tests really behave against correct code. This is the thesis's key comparison.
+          </p>
+        </div>
+        <div className="nhh-num">
+          <div className="nhh-delta">{delta >= 0 ? "+" : "−"}{Math.abs(delta)}%</div>
+          <div className="nhh-num-cap">{caption}</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // Plain-language cost trade-off: the agent team is more thorough but spends more.
-function CostCallout({ conditions, step }) {
+function CostCallout({ conditions, bare }) {
   const team = conditions.find((c) => !c.is_baseline && /full/i.test(c.key)) || conditions.find((c) => !c.is_baseline);
   const single = conditions.find((c) => c.is_baseline);
   const tok = (c) => c?.metrics?.tokens_total?.mean;
@@ -264,9 +307,8 @@ function CostCallout({ conditions, step }) {
   const ratioText = ratio ? (ratio >= 10 ? `~${Math.round(ratio)}×` : `${ratio.toFixed(1)}×`) : "—";
   const effTeam = eff(team);
   const effSingle = eff(single);
-  return (
-    <section className="section">
-      <StepHead n={step} title="What did the extra agents cost?" tip="The agent team runs several agents and a self-review round, so it does much more work — measured in 'tokens', the AI's unit of work — than a single prompt." />
+  const body = (
+    <>
       <div className="xr-cost">
         <div className="xr-cost-cell">
           <div className="xr-cost-big">{ratioText}</div>
@@ -286,6 +328,13 @@ function CostCallout({ conditions, step }) {
       <p className="muted xr-cost-take">
         In plain terms: the agent team is more thorough, but roughly {ratioText.replace("~", "")} the cost of a single AI.
       </p>
+    </>
+  );
+  if (bare) return body;
+  return (
+    <section className="section">
+      <StepHead title="What did the extra agents cost?" tip="The agent team runs several agents and a self-review round, so it does much more work — measured in 'tokens', the AI's unit of work — than a single prompt." />
+      {body}
     </section>
   );
 }
@@ -358,12 +407,6 @@ export default function ExperimentResults() {
   const ranIds = new Set(results.ran_requirement_ids || []);
   const shownItems = ranIds.size ? items.filter((it) => ranIds.has(it.requirement_id)) : items;
   const hasEvidence = shownItems.length > 0;
-  let stepK = 1;
-  const stepResult = stepK++;
-  const stepFaults = ftHasData ? stepK++ : null;
-  const stepSig = hasSig ? stepK++ : null;
-  const stepCost = hasCost ? stepK++ : null;
-  const stepEvidence = hasEvidence ? stepK++ : null;
 
   // --- merged result rows: identity + score, sorted best-first ---
   const resultRows = orderedConditions
@@ -483,13 +526,12 @@ export default function ExperimentResults() {
         </div>
       )}
 
-      {/* Orientation: what this page is, a recitable summary, and how it works */}
+      {/* Answer up front + all the "what is this" teaching folded away */}
       <ExperimentBrief results={results} headline={headline} conditions={orderedConditions} />
 
-      {/* 1 — The result */}
+      {/* Open: the result */}
       <section className="section">
         <StepHead
-          n={stepResult}
           title="The result: who caught more bugs?"
           tip="The share of seeded bugs each approach's suites caught, averaged over every program. This is the thesis's core measure."
           aside={results.n_reps > 1 ? <span className="muted">averaged over {results.n_reps} runs · ± = run-to-run spread</span> : null}
@@ -497,25 +539,40 @@ export default function ExperimentResults() {
         <ResultLeaderboard rows={resultRows} />
       </section>
 
-      {/* 2 — Which kinds of bug */}
+      {/* Open: the novel head-to-head — grounded vs plain debate */}
+      <GroundingCallout conditions={orderedConditions} />
+
+      {/* Everything below is folded away by default to keep the load light */}
       {ftHasData && (
-        <FaultTypeBreakdown faultTypes={results.fault_types} conditions={orderedConditions} step={stepFaults} />
-      )}
-
-      {/* 3 — Is the difference real */}
-      {hasSig && (
-        <section className="section">
-          <StepHead n={stepSig} title="Is the difference real, or luck?" tip="Each agent condition is compared to the single-AI baseline with a Wilcoxon signed-rank test, paired by program. p < 0.05 means the gap is unlikely to be chance." />
-          <div className="sig-grid">
-            {results.comparisons.map((cmp) => (
-              <SignificanceCard key={cmp.condition} cmp={cmp} />
-            ))}
+        <details className="xr-more">
+          <summary><span className="xr-det-caret" aria-hidden>▸</span> Which bug types did each catch? <span className="muted">fault-detection breakdown</span></summary>
+          <div className="xr-more-body">
+            <FaultTypeBreakdown faultTypes={results.fault_types} conditions={orderedConditions} bare />
           </div>
-        </section>
+        </details>
       )}
 
-      {/* 4 — What did the extra agents cost */}
-      <CostCallout conditions={orderedConditions} step={stepCost} />
+      {hasSig && (
+        <details className="xr-more">
+          <summary><span className="xr-det-caret" aria-hidden>▸</span> Is the difference real, or luck? <span className="muted">significance test</span></summary>
+          <div className="xr-more-body">
+            <div className="sig-grid">
+              {results.comparisons.map((cmp) => (
+                <SignificanceCard key={cmp.condition} cmp={cmp} />
+              ))}
+            </div>
+          </div>
+        </details>
+      )}
+
+      {hasCost && (
+        <details className="xr-more">
+          <summary><span className="xr-det-caret" aria-hidden>▸</span> What did the extra agents cost? <span className="muted">tokens per run</span></summary>
+          <div className="xr-more-body">
+            <CostCallout conditions={orderedConditions} bare />
+          </div>
+        </details>
+      )}
 
       {/* All the numbers — folded away by default to keep the page clean */}
       <details className="xr-details">
@@ -594,16 +651,17 @@ export default function ExperimentResults() {
         </div>
       </details>
 
-      {/* 5 — The evidence, program by program */}
       {hasEvidence && (
-        <section className="section">
-          <StepHead n={stepEvidence} title="The evidence, program by program" tip="Open a program to see the suite each approach produced and exactly which bugs it caught." />
-          <div className="drill-list">
-            {shownItems.map((it) => (
-              <DrilldownItem key={it.id} item={it} experimentId={exp.id} />
-            ))}
+        <details className="xr-more">
+          <summary><span className="xr-det-caret" aria-hidden>▸</span> The evidence, program by program <span className="muted">open a program to see each suite &amp; the bugs it caught</span></summary>
+          <div className="xr-more-body">
+            <div className="drill-list">
+              {shownItems.map((it) => (
+                <DrilldownItem key={it.id} item={it} experimentId={exp.id} />
+              ))}
+            </div>
           </div>
-        </section>
+        </details>
       )}
     </div>
   );
@@ -653,7 +711,7 @@ function SignificanceCard({ cmp }) {
 // Fault detection broken down by the KIND of bug (boundary, wrong value, …).
 // The sharper thesis result: not just "multi-agent catches more" but *which*
 // classes of bug it closes the gap on versus the baseline.
-function FaultTypeBreakdown({ faultTypes, conditions, step }) {
+function FaultTypeBreakdown({ faultTypes, conditions, bare }) {
   const legend = faultTypes?.legend || [];
   const byCond = faultTypes?.by_condition || {};
 
@@ -681,9 +739,8 @@ function FaultTypeBreakdown({ faultTypes, conditions, step }) {
     return best?.key ?? null;
   };
 
-  return (
-    <section className="section">
-      <StepHead n={step} title="Which kinds of bug did each catch?" tip="Every seeded bug is labelled with the kind of mistake it represents. This shows which classes of bug each approach catches — e.g. whether the agent team closes the boundary/edge-case gap a single AI leaves open." />
+  const body = (
+    <>
       <div className="table-wrap">
         <table className="ex-table ft-table">
           <thead>
@@ -722,6 +779,13 @@ function FaultTypeBreakdown({ faultTypes, conditions, step }) {
         </table>
       </div>
       <p className="muted ft-note">Share of each bug type caught, pooled across every program and run. The count is bugs caught / bugs of that type seeded.</p>
+    </>
+  );
+  if (bare) return body;
+  return (
+    <section className="section">
+      <StepHead title="Which kinds of bug did each catch?" tip="Every seeded bug is labelled with the kind of mistake it represents. This shows which classes of bug each approach catches — e.g. whether the agent team closes the boundary/edge-case gap a single AI leaves open." />
+      {body}
     </section>
   );
 }
